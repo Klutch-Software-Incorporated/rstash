@@ -1,0 +1,27 @@
+version: '3'
+
+tasks:
+  build:
+    desc: Build the gosilo binary
+    cmds:
+      - go build -o ./build/gosilo.exe .
+
+  run:
+    desc: Run the server
+    cmds:
+      - go run .
+
+  test:
+    desc: Run all tests
+    cmds:
+      - go test ./...
+
+  fmt:
+    desc: Format all Go source files
+    cmds:
+      - gofmt -w .
+
+  vet:
+    desc: Run go vet on all packages
+    cmds:
+      - go vet ./...
