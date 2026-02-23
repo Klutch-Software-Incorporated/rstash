@@ -1,0 +1,46 @@
+build/
+*.iml
+nul
+
+# Dependencies
+*node_modules*
+
+# Flutter/Dart generated
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.metadata
+
+# IDE and editor
+.idea/
+.vscode/
+.claude/
+*.ipr
+*.iws
+*.swp
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Android
+android/.gradle/
+android/.kotlin/
+android/local.properties
+android/key.properties
+android/**/*.keystore
+android/**/*.jks
+
+# Windows
+windows/flutter/ephemeral/
+
+# Astro
+astro/dist/
+astro/.astro/
+
+# Infrastructure
+infra/pulumi/node_modules/
+infra/.caddy-image.tar
+infra/.fossil-image.tar
