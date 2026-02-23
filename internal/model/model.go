@@ -1,19 +1,17 @@
 package model
 
-import "time"
-
 type User struct {
 	ID           int64
 	Username     string
 	PasswordHash string
 	IsAdmin      bool
-	CreatedAt    time.Time
+	CreatedAt    string
 }
 
 type OAuthClient struct {
 	ID          string
 	RedirectURI string
-	CreatedAt   time.Time
+	CreatedAt   string
 }
 
 type OAuthToken struct {
@@ -21,8 +19,8 @@ type OAuthToken struct {
 	UserID    int64
 	ClientID  string
 	Scopes    []string
-	CreatedAt time.Time
-	ExpiresAt *time.Time
+	CreatedAt string
+	ExpiresAt *string
 }
 
 type Node struct {
@@ -33,6 +31,6 @@ type Node struct {
 	ContentType   string
 	ContentLength int64
 	ETag          string
-	CreatedAt     time.Time
-	UpdatedAt     time.Time
+	CreatedAt     string
+	UpdatedAt     string
 }

@@ -14,6 +14,7 @@ import (
 	"gosilo/internal/config"
 	"gosilo/internal/db"
 	"gosilo/internal/handler"
+	"gosilo/internal/storage"
 	"gosilo/internal/ui"
 )
 
@@ -49,13 +50,19 @@ func main() {
 		os.Exit(1)
 	}
 
+	// Initialize storage service.
+	storageSvc := storage.NewService(database, blobs)
+
 	// Build routes.
 	mux := http.NewServeMux()
 
 	mux.Handle("GET /.well-known/webfinger", handler.WebFinger(cfg))
 	mux.Handle("GET /oauth/authorize", handler.OAuthAuthorize())
 	mux.Handle("POST /oauth/token", handler.OAuthToken())
-	mux.Handle("/storage/{user}/{path...}", handler.Storage(blobs))
+	mux.Handle("/storage/{user}/{path...}", handler.Storage(database, storageSvc))
+
+	// API docs (Redoc + OpenAPI spec).
+	mux.Handle("/docs/", handler.Docs())
 
 	// Static file server from embedded assets.
 	staticFS, err := fs.Sub(ui.Static, "static")
