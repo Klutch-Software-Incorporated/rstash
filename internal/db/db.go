@@ -83,6 +83,12 @@ CREATE TABLE IF NOT EXISTS authorization_codes (
     expires_at TEXT NOT NULL DEFAULT (datetime('now', '+10 minutes')),
     used INTEGER NOT NULL DEFAULT 0
 );
+
+CREATE TABLE IF NOT EXISTS settings (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL,
+    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
 `
 
 // Open opens a SQLite database at the given path, enables WAL mode and

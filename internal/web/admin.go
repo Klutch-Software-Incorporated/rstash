@@ -21,8 +21,9 @@ func AdminHandler(deps *UIDeps) *adminHandler {
 	return &adminHandler{deps: deps}
 }
 
-type adminContent struct {
-	// Server stats
+// --- Content structs (one per sub-page) ---
+
+type adminDashboardContent struct {
 	UserCount        int64
 	RegistrationMode string
 	BaseURL          string
@@ -30,18 +31,35 @@ type adminContent struct {
 	TotalStorageUsed string
 	QuotaMode        string
 	QuotaLimit       string
-	// Activity
-	ActiveUsers24h int64
-	ActiveUsers7d  int64
-	TopUsers       []*topUserRow
-	// Users
-	Users []*userRow
-	// Invites
-	Invites []*inviteRow
-	// Audit log
+	ActiveUsers24h   int64
+	ActiveUsers7d    int64
+	TopUsers         []*topUserRow
+}
+
+type adminUsersContent struct {
+	QuotaMode string
+	Users     []*userRow
+}
+
+type adminSettingsContent struct {
+	Settings []*adminSettingRow
+}
+
+type adminInvitesContent struct {
+	RegistrationMode string
+	Invites          []*inviteRow
+}
+
+type adminAuditContent struct {
 	AuditLog []*auditRow
-	// OAuth test
-	OAuthTest *oauthTestContent
+}
+
+type adminSettingRow struct {
+	Key         string
+	Label       string
+	Description string
+	Value       string
+	IsOverride  bool // true if set in DB (not env default)
 }
 
 type userRow struct {
@@ -86,16 +104,16 @@ type oauthTestContent struct {
 	Error       string
 }
 
-// Show handles GET /admin — combined admin page with all sections.
-func (h *adminHandler) Show(w http.ResponseWriter, r *http.Request) {
+// --- Handlers for each admin sub-page ---
+
+// ShowDashboard handles GET /admin — server stats + top users.
+func (h *adminHandler) ShowDashboard(w http.ResponseWriter, r *http.Request) {
 	if !RequireAuth(w, r) || !RequireAdmin(w, r) {
 		return
 	}
 
 	ctx := r.Context()
-	currentUser := CurrentUser(r)
 
-	// Server stats
 	count, err := h.deps.Auth.UserCount(ctx)
 	if err != nil {
 		slog.Error("failed to get user count", "error", err)
@@ -109,21 +127,21 @@ func (h *adminHandler) Show(w http.ResponseWriter, r *http.Request) {
 		totalUsed = 0
 	}
 
-	content := &adminContent{
+	snap := h.deps.Settings.Load()
+	content := &adminDashboardContent{
 		UserCount:        count,
-		RegistrationMode: h.deps.Config.RegistrationMode,
+		RegistrationMode: snap.RegistrationMode,
 		BaseURL:          h.deps.Config.BaseURL,
 		BlobBackend:      h.deps.Config.BlobBackend,
 		TotalStorageUsed: formatBytes(totalUsed),
-		QuotaMode:        h.deps.Config.QuotaMode,
+		QuotaMode:        snap.QuotaMode,
 	}
-	if h.deps.Config.QuotaMode == "total" {
-		content.QuotaLimit = formatBytes(h.deps.Config.QuotaTotal)
-	} else if h.deps.Config.QuotaMode == "user" {
-		content.QuotaLimit = formatBytes(h.deps.Config.QuotaUser) + " per user"
+	if snap.QuotaMode == "total" {
+		content.QuotaLimit = formatBytes(snap.QuotaTotal)
+	} else if snap.QuotaMode == "user" {
+		content.QuotaLimit = formatBytes(snap.QuotaUser) + " per user"
 	}
 
-	// Activity: active user counts
 	now := time.Now().UTC()
 	since24h := now.Add(-24 * time.Hour).Format("2006-01-02 15:04:05")
 	since7d := now.Add(-7 * 24 * time.Hour).Format("2006-01-02 15:04:05")
@@ -131,7 +149,6 @@ func (h *adminHandler) Show(w http.ResponseWriter, r *http.Request) {
 	content.ActiveUsers24h, _ = db.ActiveUserCount(ctx, h.deps.DB, since24h)
 	content.ActiveUsers7d, _ = db.ActiveUserCount(ctx, h.deps.DB, since7d)
 
-	// Top users by storage
 	topUsers, err := db.TopUsersByStorage(ctx, h.deps.DB, 5)
 	if err != nil {
 		slog.Error("failed to get top users by storage", "error", err)
@@ -146,97 +163,191 @@ func (h *adminHandler) Show(w http.ResponseWriter, r *http.Request) {
 		content.TopUsers = topRows
 	}
 
-	// Users
+	h.deps.Renderer.Render(w, "admin_dashboard", h.deps.adminPageData(w, r, "Admin — Gosilo", "overview", content))
+}
+
+// ShowUsers handles GET /admin/users — user list with actions.
+func (h *adminHandler) ShowUsers(w http.ResponseWriter, r *http.Request) {
+	if !RequireAuth(w, r) || !RequireAdmin(w, r) {
+		return
+	}
+
+	ctx := r.Context()
+	currentUser := CurrentUser(r)
+	snap := h.deps.Settings.Load()
+
 	users, err := h.deps.Auth.ListUsers(ctx)
 	if err != nil {
 		slog.Error("failed to list users", "error", err)
-	} else {
-		rows := make([]*userRow, len(users))
-		for i, u := range users {
-			row := &userRow{
-				ID:        u.ID,
-				Username:  u.Username,
-				IsAdmin:   u.IsAdmin,
-				Disabled:  u.Disabled,
-				CreatedAt: u.CreatedAt,
-				IsSelf:    u.ID == currentUser.ID,
-			}
-			sessCount, err := h.deps.Auth.CountUserSessions(ctx, u.ID)
-			if err != nil {
-				slog.Error("failed to count user sessions", "user_id", u.ID, "error", err)
-			} else {
-				row.SessionCount = sessCount
-			}
-			stats, err := db.GetUserStorageStats(ctx, h.deps.DB, u.ID)
-			if err != nil {
-				slog.Error("failed to get user storage stats", "user_id", u.ID, "error", err)
-			} else {
-				row.StorageUsed = formatBytes(stats.TotalBytes)
-			}
-			if h.deps.Config.QuotaMode == "user" {
-				if u.StorageQuota > 0 {
-					row.StorageQuota = formatBytes(u.StorageQuota)
-				} else {
-					row.StorageQuota = formatBytes(h.deps.Config.QuotaUser) + " (default)"
-				}
-			}
-			rows[i] = row
-		}
-		content.Users = rows
 	}
 
-	// Invites
-	invites, err := h.deps.Auth.ListInvites(ctx)
+	rows := make([]*userRow, len(users))
+	for i, u := range users {
+		row := &userRow{
+			ID:        u.ID,
+			Username:  u.Username,
+			IsAdmin:   u.IsAdmin,
+			Disabled:  u.Disabled,
+			CreatedAt: u.CreatedAt,
+			IsSelf:    u.ID == currentUser.ID,
+		}
+		sessCount, err := h.deps.Auth.CountUserSessions(ctx, u.ID)
+		if err != nil {
+			slog.Error("failed to count user sessions", "user_id", u.ID, "error", err)
+		} else {
+			row.SessionCount = sessCount
+		}
+		stats, err := db.GetUserStorageStats(ctx, h.deps.DB, u.ID)
+		if err != nil {
+			slog.Error("failed to get user storage stats", "user_id", u.ID, "error", err)
+		} else {
+			row.StorageUsed = formatBytes(stats.TotalBytes)
+		}
+		if snap.QuotaMode == "user" {
+			if u.StorageQuota > 0 {
+				row.StorageQuota = formatBytes(u.StorageQuota)
+			} else {
+				row.StorageQuota = formatBytes(snap.QuotaUser) + " (default)"
+			}
+		}
+		rows[i] = row
+	}
+
+	content := &adminUsersContent{
+		QuotaMode: snap.QuotaMode,
+		Users:     rows,
+	}
+
+	h.deps.Renderer.Render(w, "admin_users", h.deps.adminPageData(w, r, "Users — Admin", "users", content))
+}
+
+// ShowSettings handles GET /admin/settings — runtime settings form.
+func (h *adminHandler) ShowSettings(w http.ResponseWriter, r *http.Request) {
+	if !RequireAuth(w, r) || !RequireAdmin(w, r) {
+		return
+	}
+
+	ctx := r.Context()
+	snap := h.deps.Settings.Load()
+
+	overrides, err := h.deps.Settings.Overrides(ctx)
+	if err != nil {
+		slog.Error("failed to load setting overrides", "error", err)
+		overrides = map[string]string{}
+	}
+
+	settingDefs := []struct {
+		key   string
+		label string
+		desc  string
+		value string
+	}{
+		{"registration_mode", "Registration mode", "Who can create new accounts", snap.RegistrationMode},
+		{"log_level", "Log level", "Minimum severity for log output", snap.LogLevel},
+		{"rate_limit_rate", "Rate limit", "Max requests per second per IP (0 = unlimited)", fmt.Sprintf("%g", snap.RateLimitRate)},
+		{"rate_limit_burst", "Rate limit burst", "Max burst of requests allowed before throttling", fmt.Sprintf("%d", snap.RateLimitBurst)},
+		{"quota_mode", "Quota mode", "How storage quotas are enforced", snap.QuotaMode},
+		{"quota_total", "Total quota", "Maximum storage across all users (e.g. 50GB)", config.FormatByteSize(snap.QuotaTotal)},
+		{"quota_user", "Per-user quota", "Default storage limit per user (e.g. 1GB)", config.FormatByteSize(snap.QuotaUser)},
+		{"max_upload_size", "Max upload size", "Maximum file size for a single upload (e.g. 50MB)", config.FormatByteSize(snap.MaxUploadSize)},
+	}
+
+	var settings []*adminSettingRow
+	for _, sd := range settingDefs {
+		_, isOverride := overrides[sd.key]
+		settings = append(settings, &adminSettingRow{
+			Key:         sd.key,
+			Label:       sd.label,
+			Description: sd.desc,
+			Value:       sd.value,
+			IsOverride:  isOverride,
+		})
+	}
+
+	content := &adminSettingsContent{Settings: settings}
+	h.deps.Renderer.Render(w, "admin_settings", h.deps.adminPageData(w, r, "Settings — Admin", "settings", content))
+}
+
+// ShowInvites handles GET /admin/invites — invite code management.
+func (h *adminHandler) ShowInvites(w http.ResponseWriter, r *http.Request) {
+	if !RequireAuth(w, r) || !RequireAdmin(w, r) {
+		return
+	}
+
+	snap := h.deps.Settings.Load()
+
+	invites, err := h.deps.Auth.ListInvites(r.Context())
 	if err != nil {
 		slog.Error("failed to list invite codes", "error", err)
-	} else {
-		rows := make([]*inviteRow, len(invites))
-		for i, inv := range invites {
-			rows[i] = &inviteRow{
-				Code:      inv.Code,
-				UsedBy:    inv.UsedBy,
-				CreatedAt: inv.CreatedAt,
-			}
-		}
-		content.Invites = rows
 	}
 
-	// Audit log (last 25 entries)
-	auditEntries, err := db.ListAuditEntries(ctx, h.deps.DB, 25, 0)
+	rows := make([]*inviteRow, len(invites))
+	for i, inv := range invites {
+		rows[i] = &inviteRow{
+			Code:      inv.Code,
+			UsedBy:    inv.UsedBy,
+			CreatedAt: inv.CreatedAt,
+		}
+	}
+
+	content := &adminInvitesContent{
+		RegistrationMode: snap.RegistrationMode,
+		Invites:          rows,
+	}
+	h.deps.Renderer.Render(w, "admin_invites", h.deps.adminPageData(w, r, "Invites — Admin", "invites", content))
+}
+
+// ShowAudit handles GET /admin/audit — audit log.
+func (h *adminHandler) ShowAudit(w http.ResponseWriter, r *http.Request) {
+	if !RequireAuth(w, r) || !RequireAdmin(w, r) {
+		return
+	}
+
+	auditEntries, err := db.ListAuditEntries(r.Context(), h.deps.DB, 25, 0)
 	if err != nil {
 		slog.Error("failed to list audit entries", "error", err)
-	} else {
-		aRows := make([]*auditRow, len(auditEntries))
-		for i, e := range auditEntries {
-			aRows[i] = &auditRow{
-				ActorUsername: e.ActorUsername,
-				Action:       e.Action,
-				TargetType:   e.TargetType,
-				TargetID:     e.TargetID,
-				Details:      e.Details,
-				CreatedAt:    e.CreatedAt,
-			}
-		}
-		content.AuditLog = aRows
 	}
 
-	// OAuth test
-	callbackURL := h.deps.Config.BaseURL + "/admin"
-	oauthTest := &oauthTestContent{
+	aRows := make([]*auditRow, len(auditEntries))
+	for i, e := range auditEntries {
+		aRows[i] = &auditRow{
+			ActorUsername: e.ActorUsername,
+			Action:       e.Action,
+			TargetType:   e.TargetType,
+			TargetID:     e.TargetID,
+			Details:      e.Details,
+			CreatedAt:    e.CreatedAt,
+		}
+	}
+
+	content := &adminAuditContent{AuditLog: aRows}
+	h.deps.Renderer.Render(w, "admin_audit", h.deps.adminPageData(w, r, "Audit Log — Admin", "audit", content))
+}
+
+// ShowOAuthTest handles GET /admin/oauth-test — OAuth implicit flow test tool.
+func (h *adminHandler) ShowOAuthTest(w http.ResponseWriter, r *http.Request) {
+	if !RequireAuth(w, r) || !RequireAdmin(w, r) {
+		return
+	}
+
+	currentUser := CurrentUser(r)
+	callbackURL := h.deps.Config.BaseURL + "/admin/oauth-test"
+	content := &oauthTestContent{
 		CallbackURL: callbackURL,
 		BaseURL:     h.deps.Config.BaseURL,
 		Username:    currentUser.Username,
 	}
 	if r.URL.Query().Get("callback") == "1" {
-		oauthTest.Token = r.URL.Query().Get("access_token")
-		oauthTest.TokenType = r.URL.Query().Get("token_type")
-		oauthTest.State = r.URL.Query().Get("state")
-		oauthTest.Error = r.URL.Query().Get("error")
+		content.Token = r.URL.Query().Get("access_token")
+		content.TokenType = r.URL.Query().Get("token_type")
+		content.State = r.URL.Query().Get("state")
+		content.Error = r.URL.Query().Get("error")
 	}
-	content.OAuthTest = oauthTest
 
-	h.deps.Renderer.Render(w, "admin", h.deps.pageData(w, r, "Admin — Gosilo", content))
+	h.deps.Renderer.Render(w, "admin_oauth_test", h.deps.adminPageData(w, r, "OAuth Test — Admin", "oauth-test", content))
 }
+
+// --- POST handlers (redirects updated to sub-pages) ---
 
 func (h *adminHandler) DeleteUser(w http.ResponseWriter, r *http.Request) {
 	if !RequireAuth(w, r) || !RequireAdmin(w, r) {
@@ -253,7 +364,7 @@ func (h *adminHandler) DeleteUser(w http.ResponseWriter, r *http.Request) {
 	currentUser := CurrentUser(r)
 	if id == currentUser.ID {
 		ui.SetFlashError(w, "You cannot delete your own account.")
-		http.Redirect(w, r, "/admin", http.StatusSeeOther)
+		http.Redirect(w, r, "/admin/users", http.StatusSeeOther)
 		return
 	}
 
@@ -261,7 +372,7 @@ func (h *adminHandler) DeleteUser(w http.ResponseWriter, r *http.Request) {
 	if err := h.deps.Auth.DeleteUser(r.Context(), id); err != nil {
 		slog.Error("failed to delete user", "error", err)
 		ui.SetFlashError(w, "Failed to delete user.")
-		http.Redirect(w, r, "/admin", http.StatusSeeOther)
+		http.Redirect(w, r, "/admin/users", http.StatusSeeOther)
 		return
 	}
 
@@ -272,7 +383,7 @@ func (h *adminHandler) DeleteUser(w http.ResponseWriter, r *http.Request) {
 	h.audit(r, "user.deleted", "user", idStr, targetName)
 
 	ui.SetFlash(w, "User deleted.")
-	http.Redirect(w, r, "/admin", http.StatusSeeOther)
+	http.Redirect(w, r, "/admin/users", http.StatusSeeOther)
 }
 
 func (h *adminHandler) CreateInvite(w http.ResponseWriter, r *http.Request) {
@@ -280,9 +391,9 @@ func (h *adminHandler) CreateInvite(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if h.deps.Config.RegistrationMode == "closed" {
+	if h.deps.Settings.Load().RegistrationMode == "closed" {
 		ui.SetFlashError(w, "Cannot create invite codes while registration is closed.")
-		http.Redirect(w, r, "/admin", http.StatusSeeOther)
+		http.Redirect(w, r, "/admin/invites", http.StatusSeeOther)
 		return
 	}
 
@@ -291,14 +402,14 @@ func (h *adminHandler) CreateInvite(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		slog.Error("failed to create invite code", "error", err)
 		ui.SetFlashError(w, "Failed to generate invite code.")
-		http.Redirect(w, r, "/admin", http.StatusSeeOther)
+		http.Redirect(w, r, "/admin/invites", http.StatusSeeOther)
 		return
 	}
 
 	h.audit(r, "invite.created", "invite", inv.Code, "")
 
 	ui.SetFlash(w, fmt.Sprintf("Invite code created: %s", inv.Code))
-	http.Redirect(w, r, "/admin", http.StatusSeeOther)
+	http.Redirect(w, r, "/admin/invites", http.StatusSeeOther)
 }
 
 func (h *adminHandler) SetUserQuota(w http.ResponseWriter, r *http.Request) {
@@ -319,7 +430,7 @@ func (h *adminHandler) SetUserQuota(w http.ResponseWriter, r *http.Request) {
 		parsed, err := config.ParseByteSize(quotaStr)
 		if err != nil {
 			ui.SetFlashError(w, fmt.Sprintf("Invalid quota value: %s", quotaStr))
-			http.Redirect(w, r, "/admin", http.StatusSeeOther)
+			http.Redirect(w, r, "/admin/users", http.StatusSeeOther)
 			return
 		}
 		quotaBytes = parsed
@@ -328,7 +439,7 @@ func (h *adminHandler) SetUserQuota(w http.ResponseWriter, r *http.Request) {
 	if err := db.UpdateUserQuota(r.Context(), h.deps.DB, id, quotaBytes); err != nil {
 		slog.Error("failed to update user quota", "error", err)
 		ui.SetFlashError(w, "Failed to update quota.")
-		http.Redirect(w, r, "/admin", http.StatusSeeOther)
+		http.Redirect(w, r, "/admin/users", http.StatusSeeOther)
 		return
 	}
 
@@ -339,7 +450,7 @@ func (h *adminHandler) SetUserQuota(w http.ResponseWriter, r *http.Request) {
 	} else {
 		ui.SetFlash(w, "Quota reset to server default.")
 	}
-	http.Redirect(w, r, "/admin", http.StatusSeeOther)
+	http.Redirect(w, r, "/admin/users", http.StatusSeeOther)
 }
 
 func (h *adminHandler) CreateUser(w http.ResponseWriter, r *http.Request) {
@@ -353,13 +464,13 @@ func (h *adminHandler) CreateUser(w http.ResponseWriter, r *http.Request) {
 
 	if username == "" || password == "" {
 		ui.SetFlashError(w, "Username and password are required.")
-		http.Redirect(w, r, "/admin", http.StatusSeeOther)
+		http.Redirect(w, r, "/admin/users", http.StatusSeeOther)
 		return
 	}
 
 	if msg := validatePassword(password); msg != "" {
 		ui.SetFlashError(w, msg)
-		http.Redirect(w, r, "/admin", http.StatusSeeOther)
+		http.Redirect(w, r, "/admin/users", http.StatusSeeOther)
 		return
 	}
 
@@ -367,14 +478,14 @@ func (h *adminHandler) CreateUser(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		slog.Error("failed to create user", "error", err)
 		ui.SetFlashError(w, "Failed to create user. Username may already exist.")
-		http.Redirect(w, r, "/admin", http.StatusSeeOther)
+		http.Redirect(w, r, "/admin/users", http.StatusSeeOther)
 		return
 	}
 
 	h.audit(r, "user.created", "user", fmt.Sprintf("%d", newUser.ID), username)
 
 	ui.SetFlash(w, fmt.Sprintf("User %q created.", username))
-	http.Redirect(w, r, "/admin", http.StatusSeeOther)
+	http.Redirect(w, r, "/admin/users", http.StatusSeeOther)
 }
 
 func (h *adminHandler) ToggleAdmin(w http.ResponseWriter, r *http.Request) {
@@ -392,14 +503,14 @@ func (h *adminHandler) ToggleAdmin(w http.ResponseWriter, r *http.Request) {
 	currentUser := CurrentUser(r)
 	if id == currentUser.ID {
 		ui.SetFlashError(w, "You cannot change your own admin status.")
-		http.Redirect(w, r, "/admin", http.StatusSeeOther)
+		http.Redirect(w, r, "/admin/users", http.StatusSeeOther)
 		return
 	}
 
 	user, err := h.deps.Auth.GetUser(r.Context(), id)
 	if err != nil || user == nil {
 		ui.SetFlashError(w, "User not found.")
-		http.Redirect(w, r, "/admin", http.StatusSeeOther)
+		http.Redirect(w, r, "/admin/users", http.StatusSeeOther)
 		return
 	}
 
@@ -407,7 +518,7 @@ func (h *adminHandler) ToggleAdmin(w http.ResponseWriter, r *http.Request) {
 	if err := h.deps.Auth.ToggleAdmin(r.Context(), id, newAdmin); err != nil {
 		slog.Error("failed to toggle admin", "error", err)
 		ui.SetFlashError(w, "Failed to toggle admin status.")
-		http.Redirect(w, r, "/admin", http.StatusSeeOther)
+		http.Redirect(w, r, "/admin/users", http.StatusSeeOther)
 		return
 	}
 
@@ -418,7 +529,7 @@ func (h *adminHandler) ToggleAdmin(w http.ResponseWriter, r *http.Request) {
 	} else {
 		ui.SetFlash(w, fmt.Sprintf("%s is no longer an admin.", user.Username))
 	}
-	http.Redirect(w, r, "/admin", http.StatusSeeOther)
+	http.Redirect(w, r, "/admin/users", http.StatusSeeOther)
 }
 
 func (h *adminHandler) ToggleDisabled(w http.ResponseWriter, r *http.Request) {
@@ -436,14 +547,14 @@ func (h *adminHandler) ToggleDisabled(w http.ResponseWriter, r *http.Request) {
 	currentUser := CurrentUser(r)
 	if id == currentUser.ID {
 		ui.SetFlashError(w, "You cannot disable your own account.")
-		http.Redirect(w, r, "/admin", http.StatusSeeOther)
+		http.Redirect(w, r, "/admin/users", http.StatusSeeOther)
 		return
 	}
 
 	user, err := h.deps.Auth.GetUser(r.Context(), id)
 	if err != nil || user == nil {
 		ui.SetFlashError(w, "User not found.")
-		http.Redirect(w, r, "/admin", http.StatusSeeOther)
+		http.Redirect(w, r, "/admin/users", http.StatusSeeOther)
 		return
 	}
 
@@ -451,7 +562,7 @@ func (h *adminHandler) ToggleDisabled(w http.ResponseWriter, r *http.Request) {
 	if err := h.deps.Auth.SetDisabled(r.Context(), id, newDisabled); err != nil {
 		slog.Error("failed to toggle disabled", "error", err)
 		ui.SetFlashError(w, "Failed to toggle disabled status.")
-		http.Redirect(w, r, "/admin", http.StatusSeeOther)
+		http.Redirect(w, r, "/admin/users", http.StatusSeeOther)
 		return
 	}
 
@@ -465,7 +576,7 @@ func (h *adminHandler) ToggleDisabled(w http.ResponseWriter, r *http.Request) {
 		h.audit(r, "user.enabled", "user", idStr, user.Username)
 		ui.SetFlash(w, fmt.Sprintf("%s has been enabled.", user.Username))
 	}
-	http.Redirect(w, r, "/admin", http.StatusSeeOther)
+	http.Redirect(w, r, "/admin/users", http.StatusSeeOther)
 }
 
 type adminSessionsContent struct {
@@ -517,7 +628,7 @@ func (h *adminHandler) UserSessions(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	h.deps.Renderer.Render(w, "admin_sessions", h.deps.pageData(w, r, fmt.Sprintf("Sessions — %s", user.Username), adminSessionsContent{
+	h.deps.Renderer.Render(w, "admin_sessions", h.deps.adminPageData(w, r, fmt.Sprintf("Sessions — %s", user.Username), "users", adminSessionsContent{
 		UserID:   user.ID,
 		Username: user.Username,
 		Sessions: rows,
@@ -542,7 +653,7 @@ func (h *adminHandler) TerminateSession(w http.ResponseWriter, r *http.Request) 
 	if referer != "" {
 		http.Redirect(w, r, referer, http.StatusSeeOther)
 	} else {
-		http.Redirect(w, r, "/admin", http.StatusSeeOther)
+		http.Redirect(w, r, "/admin/users", http.StatusSeeOther)
 	}
 }
 
@@ -650,7 +761,7 @@ func (h *adminHandler) UserActivity(w http.ResponseWriter, r *http.Request) {
 		content.FileCount = stats.FileCount
 	}
 
-	h.deps.Renderer.Render(w, "admin_user", h.deps.pageData(w, r, fmt.Sprintf("User — %s", user.Username), content))
+	h.deps.Renderer.Render(w, "admin_user", h.deps.adminPageData(w, r, fmt.Sprintf("User — %s", user.Username), "users", content))
 }
 
 func (h *adminHandler) DeleteInvite(w http.ResponseWriter, r *http.Request) {
@@ -662,14 +773,100 @@ func (h *adminHandler) DeleteInvite(w http.ResponseWriter, r *http.Request) {
 	if err := h.deps.Auth.DeleteInvite(r.Context(), code); err != nil {
 		slog.Error("failed to delete invite code", "error", err)
 		ui.SetFlashError(w, "Failed to delete invite code.")
-		http.Redirect(w, r, "/admin", http.StatusSeeOther)
+		http.Redirect(w, r, "/admin/invites", http.StatusSeeOther)
 		return
 	}
 
 	h.audit(r, "invite.deleted", "invite", code, "")
 
 	ui.SetFlash(w, "Invite code deleted.")
-	http.Redirect(w, r, "/admin", http.StatusSeeOther)
+	http.Redirect(w, r, "/admin/invites", http.StatusSeeOther)
+}
+
+// settingFormKeys are the settings editable in the admin form.
+var settingFormKeys = []string{
+	"registration_mode", "log_level",
+	"rate_limit_rate", "rate_limit_burst",
+	"quota_mode", "quota_total", "quota_user",
+	"max_upload_size",
+}
+
+// UpdateSettings handles POST /admin/settings — update runtime settings.
+func (h *adminHandler) UpdateSettings(w http.ResponseWriter, r *http.Request) {
+	if !RequireAuth(w, r) || !RequireAdmin(w, r) {
+		return
+	}
+
+	ctx := r.Context()
+	changed := 0
+	snap := h.deps.Settings.Load()
+
+	for _, key := range settingFormKeys {
+		newVal := r.FormValue(key)
+		if newVal == "" {
+			continue
+		}
+
+		// Compare with current value to avoid no-op writes.
+		var current string
+		switch key {
+		case "registration_mode":
+			current = snap.RegistrationMode
+		case "log_level":
+			current = snap.LogLevel
+		case "rate_limit_rate":
+			current = fmt.Sprintf("%g", snap.RateLimitRate)
+		case "rate_limit_burst":
+			current = fmt.Sprintf("%d", snap.RateLimitBurst)
+		case "quota_mode":
+			current = snap.QuotaMode
+		case "quota_total":
+			current = config.FormatByteSize(snap.QuotaTotal)
+		case "quota_user":
+			current = config.FormatByteSize(snap.QuotaUser)
+		case "max_upload_size":
+			current = config.FormatByteSize(snap.MaxUploadSize)
+		}
+		if newVal == current {
+			continue
+		}
+
+		if err := h.deps.Settings.Set(ctx, key, newVal); err != nil {
+			slog.Error("failed to update setting", "key", key, "error", err)
+			ui.SetFlashError(w, fmt.Sprintf("Invalid value for %s: %v", key, err))
+			http.Redirect(w, r, "/admin/settings", http.StatusSeeOther)
+			return
+		}
+		h.audit(r, "settings.updated", "setting", key, newVal)
+		changed++
+	}
+
+	if changed > 0 {
+		ui.SetFlash(w, fmt.Sprintf("Updated %d setting(s).", changed))
+	} else {
+		ui.SetFlash(w, "No settings changed.")
+	}
+	http.Redirect(w, r, "/admin/settings", http.StatusSeeOther)
+}
+
+// ResetSetting handles POST /admin/settings/{key}/reset — revert to env default.
+func (h *adminHandler) ResetSetting(w http.ResponseWriter, r *http.Request) {
+	if !RequireAuth(w, r) || !RequireAdmin(w, r) {
+		return
+	}
+
+	key := r.PathValue("key")
+	if err := h.deps.Settings.Delete(r.Context(), key); err != nil {
+		slog.Error("failed to reset setting", "key", key, "error", err)
+		ui.SetFlashError(w, fmt.Sprintf("Failed to reset %s.", key))
+		http.Redirect(w, r, "/admin/settings", http.StatusSeeOther)
+		return
+	}
+
+	h.audit(r, "settings.reset", "setting", key, "reverted to default")
+
+	ui.SetFlash(w, fmt.Sprintf("Reset %s to default.", key))
+	http.Redirect(w, r, "/admin/settings", http.StatusSeeOther)
 }
 
 // audit is a helper to log admin actions to the audit trail.

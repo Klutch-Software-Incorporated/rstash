@@ -1,0 +1,10 @@
+{{define "admin_nav"}}
+<nav class="admin-nav">
+    <a href="/admin" {{if eq $.ActiveAdminNav "overview"}}class="active"{{end}}>Overview</a>
+    <a href="/admin/users" {{if eq $.ActiveAdminNav "users"}}class="active"{{end}}>Users</a>
+    <a href="/admin/settings" {{if eq $.ActiveAdminNav "settings"}}class="active"{{end}}>Settings</a>
+    <a href="/admin/invites" {{if eq $.ActiveAdminNav "invites"}}class="active"{{end}}>Invites</a>
+    <a href="/admin/audit" {{if eq $.ActiveAdminNav "audit"}}class="active"{{end}}>Audit Log</a>
+    <a href="/admin/oauth-test" {{if eq $.ActiveAdminNav "oauth-test"}}class="active"{{end}}>OAuth Test</a>
+</nav>
+{{end}}

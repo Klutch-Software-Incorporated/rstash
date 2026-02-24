@@ -11,6 +11,7 @@ import (
 	"gosilo/internal/auth"
 	"gosilo/internal/config"
 	"gosilo/internal/db"
+	"gosilo/internal/settings"
 	"gosilo/internal/ui"
 	"gosilo/internal/web"
 )
@@ -35,12 +36,14 @@ func setupTestServer(t *testing.T, regMode string) (*httptest.Server, *web.UIDep
 	}
 
 	localAuth := auth.NewLocalService(database)
+	runtimeSettings := settings.New(database, cfg)
 
 	deps := &web.UIDeps{
 		Auth:     localAuth,
 		DB:       database,
 		Renderer: renderer,
 		Config:   cfg,
+		Settings: runtimeSettings,
 	}
 
 	uiHandler := web.Routes(deps)

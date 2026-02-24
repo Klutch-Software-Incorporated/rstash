@@ -15,7 +15,7 @@ import (
 )
 
 // Storage handles GET/PUT/DELETE/HEAD requests on /storage/{user}/{path...}.
-func Storage(database *sql.DB, svc *storage.Service, maxUploadSize int64) http.Handler {
+func Storage(database *sql.DB, svc *storage.Service, maxUploadSize func() int64) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		username := r.PathValue("user")
 		pathVal := r.PathValue("path")
@@ -99,7 +99,7 @@ func Storage(database *sql.DB, svc *storage.Service, maxUploadSize int64) http.H
 				http.Error(w, "cannot PUT a folder", http.StatusBadRequest)
 				return
 			}
-			r.Body = http.MaxBytesReader(w, r.Body, maxUploadSize)
+			r.Body = http.MaxBytesReader(w, r.Body, maxUploadSize())
 			handlePutDocument(w, r, svc, user.ID, storagePath, cond)
 		case http.MethodDelete:
 			handleDeleteDocument(w, r, svc, user.ID, storagePath, cond)

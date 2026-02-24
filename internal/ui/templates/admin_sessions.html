@@ -1,7 +1,7 @@
 {{define "admin_sessions"}}
 {{with .Content}}
 
-<h2><a href="/admin">&larr; Admin</a> / Sessions for {{.Username}}</h2>
+<h2><a href="/admin/users">&larr; Users</a> / Sessions for {{.Username}}</h2>
 
 {{if .Sessions}}
 <form method="POST" action="/admin/users/{{.UserID}}/terminate-all" style="margin-bottom:.75rem"

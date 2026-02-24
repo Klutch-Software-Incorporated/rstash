@@ -195,7 +195,7 @@ func (h *filesHandler) Upload(w http.ResponseWriter, r *http.Request) {
 	user := CurrentUser(r)
 
 	// Limit request body size.
-	maxSize := h.deps.Config.MaxUploadSize
+	maxSize := h.deps.Settings.Load().MaxUploadSize
 	if maxSize <= 0 {
 		maxSize = 50 << 20 // 50MB default
 	}

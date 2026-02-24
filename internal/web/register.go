@@ -32,7 +32,7 @@ func (h *registerHandler) ShowRegister(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	mode := h.deps.Config.RegistrationMode
+	mode := h.deps.Settings.Load().RegistrationMode
 	content := &registerContent{
 		Closed:     mode == "closed",
 		InviteMode: mode == "invite",
@@ -42,7 +42,7 @@ func (h *registerHandler) ShowRegister(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *registerHandler) DoRegister(w http.ResponseWriter, r *http.Request) {
-	mode := h.deps.Config.RegistrationMode
+	mode := h.deps.Settings.Load().RegistrationMode
 
 	if mode == "closed" {
 		http.Error(w, "Registration is closed", http.StatusForbidden)

@@ -40,9 +40,14 @@ func NewRateLimiter(rate float64, burst int) *RateLimiter {
 
 // Allow reports whether one request for the given key is allowed. If denied, it
 // returns the duration the caller should wait before retrying.
+// When rate is 0, all requests are allowed (rate limiting disabled).
 func (rl *RateLimiter) Allow(key string) (bool, time.Duration) {
 	rl.mu.Lock()
 	defer rl.mu.Unlock()
+
+	if rl.rate == 0 {
+		return true, 0
+	}
 
 	now := time.Now()
 	b, ok := rl.buckets[key]
@@ -68,6 +73,15 @@ func (rl *RateLimiter) Allow(key string) (bool, time.Duration) {
 	deficit := 1 - b.tokens
 	retryAfter := time.Duration(math.Ceil(deficit/rl.rate*1000)) * time.Millisecond
 	return false, retryAfter
+}
+
+// UpdateConfig changes the rate and burst for new requests. Existing buckets
+// continue with the updated parameters on their next Allow() call.
+func (rl *RateLimiter) UpdateConfig(rate float64, burst int) {
+	rl.mu.Lock()
+	defer rl.mu.Unlock()
+	rl.rate = rate
+	rl.burst = float64(burst)
 }
 
 // Stop shuts down the background sweep goroutine. Safe to call multiple times.

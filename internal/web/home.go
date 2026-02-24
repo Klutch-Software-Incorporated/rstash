@@ -123,8 +123,9 @@ func (h *homeHandler) Show(w http.ResponseWriter, r *http.Request) {
 		StorageBytes: stats.TotalBytes,
 		OAuthApps:    tokenCount,
 	}
-	if h.deps.Config.QuotaMode == "user" {
-		limit := h.deps.Config.QuotaUser
+	snap := h.deps.Settings.Load()
+	if snap.QuotaMode == "user" {
+		limit := snap.QuotaUser
 		if user.StorageQuota > 0 {
 			limit = user.StorageQuota
 		}
@@ -143,7 +144,7 @@ func (h *homeHandler) Show(w http.ResponseWriter, r *http.Request) {
 		Stats:     hs,
 		Modules:   moduleRows,
 		Activity:  activity,
-		QuotaMode: h.deps.Config.QuotaMode,
+		QuotaMode: snap.QuotaMode,
 		Tokens:    tokenRows,
 		BaseURL:   h.deps.Config.BaseURL,
 	}))

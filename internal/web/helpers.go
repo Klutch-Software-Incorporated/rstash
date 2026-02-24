@@ -30,7 +30,7 @@ func (d *UIDeps) pageData(w http.ResponseWriter, r *http.Request, title string, 
 		CurrentUser:      userInfo(CurrentUser(r)),
 		CSRFToken:        CSRFToken(r),
 		Flash:            ui.GetFlash(w, r),
-		RegistrationMode: d.Config.RegistrationMode,
+		RegistrationMode: d.Settings.Load().RegistrationMode,
 		Content:          content,
 		ActiveNav:        activeNavFromPath(r.URL.Path),
 	}
@@ -50,6 +50,13 @@ func activeNavFromPath(path string) string {
 	default:
 		return ""
 	}
+}
+
+// adminPageData builds a ui.PageData for admin sub-pages, setting ActiveAdminNav.
+func (d *UIDeps) adminPageData(w http.ResponseWriter, r *http.Request, title string, nav string, content any) ui.PageData {
+	pd := d.pageData(w, r, title, content)
+	pd.ActiveAdminNav = nav
+	return pd
 }
 
 // validatePassword checks that a password meets minimum requirements.

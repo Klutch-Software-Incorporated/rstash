@@ -37,6 +37,13 @@ func NewQuotaChecker(cfg QuotaConfig, database *sql.DB) *QuotaChecker {
 	return &QuotaChecker{config: cfg, db: database}
 }
 
+// UpdateConfig replaces the quota configuration at runtime.
+func (qc *QuotaChecker) UpdateConfig(cfg QuotaConfig) {
+	qc.mu.Lock()
+	defer qc.mu.Unlock()
+	qc.config = cfg
+}
+
 // Check verifies that storing incomingBytes for userID would not exceed quotas.
 // incomingBytes should be the net delta (new size minus old size if overwriting).
 // Use a Querier (tx or db) for transactional consistency.

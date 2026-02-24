@@ -1,0 +1,39 @@
+{{define "admin_dashboard"}}
+{{template "admin_nav" $}}
+{{with .Content}}
+
+<h2>Server</h2>
+<dl>
+    <dt>Users</dt>
+    <dd>{{.UserCount}}</dd>
+    <dt>Base URL</dt>
+    <dd><code>{{.BaseURL}}</code></dd>
+    <dt>Blob Backend</dt>
+    <dd>{{.BlobBackend}}</dd>
+    <dt>Total Storage</dt>
+    <dd>{{.TotalStorageUsed}}</dd>
+    <dt>Active Users (24h)</dt>
+    <dd>{{.ActiveUsers24h}}</dd>
+    <dt>Active Users (7d)</dt>
+    <dd>{{.ActiveUsers7d}}</dd>
+</dl>
+
+{{if .TopUsers}}
+<h2>Top Users by Storage</h2>
+<table>
+    <thead>
+        <tr><th>Username</th><th>Storage Used</th></tr>
+    </thead>
+    <tbody>
+        {{range .TopUsers}}
+        <tr>
+            <td>{{.Username}}</td>
+            <td>{{.StorageUsed}}</td>
+        </tr>
+        {{end}}
+    </tbody>
+</table>
+{{end}}
+
+{{end}}
+{{end}}

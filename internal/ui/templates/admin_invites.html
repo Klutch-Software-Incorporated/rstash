@@ -1,0 +1,52 @@
+{{define "admin_invites"}}
+{{template "admin_nav" $}}
+{{with .Content}}
+
+<h2>Invite Codes</h2>
+{{if eq .RegistrationMode "invite"}}
+<form method="POST" action="/admin/invites" style="margin-bottom:.75rem">
+    <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
+    <button type="submit" class="btn-primary">Generate Invite Code</button>
+</form>
+{{else if eq .RegistrationMode "closed"}}
+<p class="empty-state">Invite codes are disabled while registration is closed.</p>
+{{end}}
+
+{{if .Invites}}
+<table class="responsive-table">
+    <thead>
+        <tr>
+            <th>Code</th>
+            <th>Status</th>
+            <th>Created</th>
+            <th>Actions</th>
+        </tr>
+    </thead>
+    <tbody>
+        {{range .Invites}}
+        <tr>
+            <td data-label="Code"><code>{{.Code}}</code></td>
+            <td data-label="Status">
+                {{if .UsedBy}}<span class="badge badge-used">used</span>
+                {{else}}<span class="badge badge-available">available</span>
+                {{end}}
+            </td>
+            <td data-label="Created"><time datetime="{{.CreatedAt}}">{{.CreatedAt}}</time></td>
+            <td data-label="Actions">
+                {{if not .UsedBy}}
+                <form method="POST" action="/admin/invites/{{.Code}}/delete">
+                    <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
+                    <button type="submit" class="btn-danger">Delete</button>
+                </form>
+                {{end}}
+            </td>
+        </tr>
+        {{end}}
+    </tbody>
+</table>
+{{else}}
+<p class="empty-state">No invite codes yet.</p>
+{{end}}
+
+{{end}}
+{{end}}

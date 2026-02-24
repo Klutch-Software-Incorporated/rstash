@@ -5,6 +5,7 @@ import (
 
 	"gosilo/internal/auth"
 	"gosilo/internal/config"
+	"gosilo/internal/settings"
 	"gosilo/internal/storage"
 	"gosilo/internal/ui"
 )
@@ -16,4 +17,5 @@ type UIDeps struct {
 	Renderer *ui.Renderer
 	Config   *config.Config
 	Storage  *storage.Service
+	Settings *settings.Settings
 }

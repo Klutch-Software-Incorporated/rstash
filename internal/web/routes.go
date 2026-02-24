@@ -45,9 +45,14 @@ func Routes(deps *UIDeps) http.Handler {
 	mux.HandleFunc("POST /files/bulk-delete", RequireCSRF(filesHandler.BulkDelete))
 	mux.HandleFunc("POST /files/create-module", RequireCSRF(filesHandler.CreateModule))
 
-	// Admin (single page, all sections combined).
+	// Admin sub-pages.
 	adminHandler := AdminHandler(deps)
-	mux.HandleFunc("GET /admin", adminHandler.Show)
+	mux.HandleFunc("GET /admin", adminHandler.ShowDashboard)
+	mux.HandleFunc("GET /admin/users", adminHandler.ShowUsers)
+	mux.HandleFunc("GET /admin/settings", adminHandler.ShowSettings)
+	mux.HandleFunc("GET /admin/invites", adminHandler.ShowInvites)
+	mux.HandleFunc("GET /admin/audit", adminHandler.ShowAudit)
+	mux.HandleFunc("GET /admin/oauth-test", adminHandler.ShowOAuthTest)
 	mux.HandleFunc("POST /admin/users/create", RequireCSRF(adminHandler.CreateUser))
 	mux.HandleFunc("POST /admin/users/{id}/delete", RequireCSRF(adminHandler.DeleteUser))
 	mux.HandleFunc("POST /admin/users/{id}/quota", RequireCSRF(adminHandler.SetUserQuota))
@@ -57,6 +62,8 @@ func Routes(deps *UIDeps) http.Handler {
 	mux.HandleFunc("GET /admin/users/{id}/activity", adminHandler.UserActivity)
 	mux.HandleFunc("POST /admin/sessions/{token}/terminate", RequireCSRF(adminHandler.TerminateSession))
 	mux.HandleFunc("POST /admin/users/{id}/terminate-all", RequireCSRF(adminHandler.TerminateAllSessions))
+	mux.HandleFunc("POST /admin/settings", RequireCSRF(adminHandler.UpdateSettings))
+	mux.HandleFunc("POST /admin/settings/{key}/reset", RequireCSRF(adminHandler.ResetSetting))
 	mux.HandleFunc("POST /admin/invites", RequireCSRF(adminHandler.CreateInvite))
 	mux.HandleFunc("POST /admin/invites/{code}/delete", RequireCSRF(adminHandler.DeleteInvite))
 

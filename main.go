@@ -19,6 +19,7 @@ import (
 	"gosilo/internal/blob"
 	"gosilo/internal/config"
 	"gosilo/internal/db"
+	"gosilo/internal/settings"
 	"gosilo/internal/storage"
 	"gosilo/internal/ui"
 	"gosilo/internal/web"
@@ -86,19 +87,10 @@ func runServe() {
 		os.Exit(1)
 	}
 
-	// Configure structured logging.
-	var level slog.Level
-	switch cfg.LogLevel {
-	case "debug":
-		level = slog.LevelDebug
-	case "warn":
-		level = slog.LevelWarn
-	case "error":
-		level = slog.LevelError
-	default:
-		level = slog.LevelInfo
-	}
-	slog.SetDefault(slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: level})))
+	// Configure structured logging with dynamic level.
+	var levelVar slog.LevelVar
+	levelVar.Set(parseLogLevel(cfg.LogLevel))
+	slog.SetDefault(slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: &levelVar})))
 
 	// Open and migrate the database.
 	database, err := db.Open(cfg.DatabasePath)
@@ -107,6 +99,14 @@ func runServe() {
 		os.Exit(1)
 	}
 	defer database.Close()
+
+	// Initialize runtime settings (DB overrides + env defaults).
+	runtimeSettings := settings.New(database, cfg)
+
+	// Register onChange callback for dynamic log level.
+	runtimeSettings.OnChange(func(s *settings.Snapshot) {
+		levelVar.Set(parseLogLevel(s.LogLevel))
+	})
 
 	// Initialize blob storage.
 	var blobs blob.Store
@@ -128,16 +128,21 @@ func runServe() {
 		os.Exit(1)
 	}
 
-	// Initialize quota checker.
-	var quotaChecker *storage.QuotaChecker
-	if cfg.QuotaMode != "off" {
-		quotaChecker = storage.NewQuotaChecker(storage.QuotaConfig{
-			Mode:       cfg.QuotaMode,
-			TotalLimit: cfg.QuotaTotal,
-			UserLimit:  cfg.QuotaUser,
-		}, database)
-		slog.Info("quota enforcement enabled", "mode", cfg.QuotaMode)
-	}
+	// Initialize quota checker (always create so it can be enabled at runtime).
+	snap := runtimeSettings.Load()
+	quotaChecker := storage.NewQuotaChecker(storage.QuotaConfig{
+		Mode:       snap.QuotaMode,
+		TotalLimit: snap.QuotaTotal,
+		UserLimit:  snap.QuotaUser,
+	}, database)
+
+	runtimeSettings.OnChange(func(s *settings.Snapshot) {
+		quotaChecker.UpdateConfig(storage.QuotaConfig{
+			Mode:       s.QuotaMode,
+			TotalLimit: s.QuotaTotal,
+			UserLimit:  s.QuotaUser,
+		})
+	})
 
 	// Initialize storage service.
 	storageSvc := storage.NewService(database, blobs, quotaChecker)
@@ -155,6 +160,7 @@ func runServe() {
 		Renderer: renderer,
 		Config:   cfg,
 		Storage:  storageSvc,
+		Settings: runtimeSettings,
 	}
 
 	// Build routes.
@@ -172,7 +178,9 @@ func runServe() {
 	mux.Handle("GET /oauth/authorize", oauthWrap(oauthH.ShowAuthorize))
 	mux.Handle("POST /oauth/authorize", oauthWrap(web.RequireCSRF(oauthH.DoAuthorize)))
 	mux.Handle("POST /oauth/token", api.CORS(api.OAuthToken(database)))
-	mux.Handle("/storage/{user}/{path...}", api.CORS(api.Storage(database, storageSvc, cfg.MaxUploadSize)))
+	mux.Handle("/storage/{user}/{path...}", api.CORS(api.Storage(database, storageSvc, func() int64 {
+		return runtimeSettings.Load().MaxUploadSize
+	})))
 
 	// Static file server from embedded assets.
 	staticFS, err := fs.Sub(ui.Static, "static")
@@ -191,13 +199,15 @@ func runServe() {
 	)
 	mux.Handle("/", wrapped)
 
-	// Optionally wrap with rate limiting.
-	var handler http.Handler = mux
-	if cfg.RateLimitRate > 0 {
-		limiter := api.NewRateLimiter(cfg.RateLimitRate, cfg.RateLimitBurst)
-		defer limiter.Stop()
-		handler = api.RateLimit(limiter)(mux)
-		slog.Info("rate limiting enabled", "rate", cfg.RateLimitRate, "burst", cfg.RateLimitBurst)
+	// Always create rate limiter so it can be enabled/adjusted at runtime.
+	limiter := api.NewRateLimiter(snap.RateLimitRate, snap.RateLimitBurst)
+	defer limiter.Stop()
+	runtimeSettings.OnChange(func(s *settings.Snapshot) {
+		limiter.UpdateConfig(s.RateLimitRate, s.RateLimitBurst)
+	})
+	var handler http.Handler = api.RateLimit(limiter)(mux)
+	if snap.RateLimitRate > 0 {
+		slog.Info("rate limiting enabled", "rate", snap.RateLimitRate, "burst", snap.RateLimitBurst)
 	}
 
 	// Start server.
@@ -252,5 +262,18 @@ func runServe() {
 
 	if err := srv.Shutdown(shutdownCtx); err != nil {
 		slog.Error("shutdown error", "error", err)
+	}
+}
+
+func parseLogLevel(s string) slog.Level {
+	switch s {
+	case "debug":
+		return slog.LevelDebug
+	case "warn":
+		return slog.LevelWarn
+	case "error":
+		return slog.LevelError
+	default:
+		return slog.LevelInfo
 	}
 }

@@ -1,0 +1,85 @@
+{{define "admin_users"}}
+{{template "admin_nav" $}}
+{{with .Content}}
+
+<h2>Create User</h2>
+<form method="POST" action="/admin/users/create" style="max-width:28rem">
+    <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
+    <div>
+        <label for="new_username">Username</label>
+        <input type="text" id="new_username" name="username" required autocomplete="off">
+    </div>
+    <div>
+        <label for="new_password">Password</label>
+        <input type="password" id="new_password" name="password" required minlength="8" autocomplete="new-password">
+    </div>
+    <div>
+        <label><input type="checkbox" name="is_admin"> Admin</label>
+    </div>
+    <button type="submit" class="btn-primary">Create User</button>
+</form>
+
+<h2>Users</h2>
+{{if .Users}}
+<table class="responsive-table">
+    <thead>
+        <tr>
+            <th>Username</th>
+            <th>Role</th>
+            <th>Status</th>
+            <th>Storage</th>
+            <th>Sessions</th>
+            <th>Created</th>
+            <th>Actions</th>
+        </tr>
+    </thead>
+    <tbody>
+        {{range .Users}}
+        <tr>
+            <td data-label="Username"><a href="/admin/users/{{.ID}}/activity">{{.Username}}</a></td>
+            <td data-label="Role">{{if .IsAdmin}}<span class="badge badge-admin">admin</span>{{else}}user{{end}}</td>
+            <td data-label="Status">{{if .Disabled}}<span class="badge badge-disabled">disabled</span>{{else}}<span class="badge badge-active">active</span>{{end}}</td>
+            <td data-label="Storage">
+                {{.StorageUsed}}
+                {{if $.Content.QuotaMode | eq "user"}}
+                <span style="color:#888;font-size:.75rem">/ {{.StorageQuota}}</span>
+                {{end}}
+            </td>
+            <td data-label="Sessions"><a href="/admin/users/{{.ID}}/sessions">{{.SessionCount}}</a></td>
+            <td data-label="Created"><time datetime="{{.CreatedAt}}">{{.CreatedAt}}</time></td>
+            <td data-label="Actions">
+                {{if not .IsSelf}}
+                <div style="display:flex;gap:.25rem;flex-wrap:wrap;justify-content:flex-end">
+                    <form method="POST" action="/admin/users/{{.ID}}/toggle-admin">
+                        <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
+                        <button type="submit" class="btn-secondary" style="font-size:.75rem;padding:.15rem .4rem">{{if .IsAdmin}}Demote{{else}}Promote{{end}}</button>
+                    </form>
+                    <form method="POST" action="/admin/users/{{.ID}}/toggle-disabled">
+                        <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
+                        <button type="submit" class="btn-secondary" style="font-size:.75rem;padding:.15rem .4rem">{{if .Disabled}}Enable{{else}}Disable{{end}}</button>
+                    </form>
+                    <form method="POST" action="/admin/users/{{.ID}}/delete"
+                        onsubmit="return confirm('Delete user {{.Username}}?')">
+                        <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
+                        <button type="submit" class="btn-danger">Delete</button>
+                    </form>
+                </div>
+                {{end}}
+                {{if $.Content.QuotaMode | eq "user"}}
+                <form method="POST" action="/admin/users/{{.ID}}/quota" class="inline-form">
+                    <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
+                    <input type="text" name="quota" placeholder="e.g. 1GB">
+                    <button type="submit" class="btn-primary">Set Quota</button>
+                </form>
+                {{end}}
+            </td>
+        </tr>
+        {{end}}
+    </tbody>
+</table>
+{{else}}
+<p class="empty-state">No users.</p>
+{{end}}
+
+{{end}}
+{{end}}

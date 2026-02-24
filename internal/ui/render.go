@@ -23,6 +23,7 @@ type PageData struct {
 	Content          any
 	RegistrationMode string
 	ActiveNav        string
+	ActiveAdminNav   string
 }
 
 // Renderer parses and renders HTML templates from the embedded filesystem.
@@ -39,12 +40,18 @@ func NewRenderer() *Renderer {
 	tmpl, err := template.New("").Funcs(funcMap).ParseFS(Templates,
 		"templates/partials/header.html",
 		"templates/partials/footer.html",
+		"templates/partials/admin_nav.html",
 		"templates/layout.html",
 		"templates/home.html",
 		"templates/setup.html",
 		"templates/login.html",
 		"templates/register.html",
-		"templates/admin.html",
+		"templates/admin_dashboard.html",
+		"templates/admin_users.html",
+		"templates/admin_settings.html",
+		"templates/admin_invites.html",
+		"templates/admin_audit.html",
+		"templates/admin_oauth_test.html",
 		"templates/admin_sessions.html",
 		"templates/admin_user.html",
 		"templates/oauth_authorize.html",
