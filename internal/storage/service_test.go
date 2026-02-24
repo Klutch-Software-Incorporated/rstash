@@ -25,7 +25,7 @@ func setup(t *testing.T) (*storage.Service, int64) {
 		t.Fatal(err)
 	}
 
-	svc := storage.NewService(database, blobs)
+	svc := storage.NewService(database, blobs, nil)
 
 	user, err := db.CreateUser(context.Background(), database, "alice", "secret", false)
 	if err != nil {

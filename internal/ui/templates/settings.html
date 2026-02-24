@@ -6,6 +6,26 @@
 
     {{with .Content}}
 
+    <h2>Storage</h2>
+    {{if eq .QuotaMode "user"}}
+    <div class="quota-bar-wrap">
+        <div class="quota-bar-label">
+            <span>{{.StorageUsed}} used of {{.StorageQuota}}</span>
+            <span>{{.QuotaPercent}}%</span>
+        </div>
+        <div class="quota-bar">
+            <div class="quota-bar-fill{{if ge .QuotaPercent 90}} quota-bar-danger{{end}}" style="width: {{.QuotaPercent}}%"></div>
+        </div>
+    </div>
+    {{else}}
+    <dl class="stats">
+        <div>
+            <dt>Used</dt>
+            <dd>{{.StorageUsed}}</dd>
+        </div>
+    </dl>
+    {{end}}
+
     <h2>Password</h2>
     <p><a href="/settings/password">Change your password</a></p>
 

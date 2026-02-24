@@ -6,6 +6,8 @@ import (
 	"net/http"
 	"strconv"
 
+	"gosilo/internal/config"
+	"gosilo/internal/db"
 	"gosilo/internal/ui"
 )
 
@@ -23,6 +25,9 @@ type dashboardContent struct {
 	RegistrationMode string
 	BaseURL          string
 	BlobBackend      string
+	TotalStorageUsed string
+	QuotaMode        string
+	QuotaLimit       string
 }
 
 func (h *adminHandler) Dashboard(w http.ResponseWriter, r *http.Request) {
@@ -37,24 +42,42 @@ func (h *adminHandler) Dashboard(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	h.deps.Renderer.Render(w, "admin_dashboard", h.deps.pageData(w, r, "Admin — Gosilo", &dashboardContent{
+	totalUsed, err := db.GetTotalStorageUsed(r.Context(), h.deps.DB)
+	if err != nil {
+		slog.Error("failed to get total storage used", "error", err)
+		totalUsed = 0
+	}
+
+	content := &dashboardContent{
 		UserCount:        count,
 		RegistrationMode: h.deps.Config.RegistrationMode,
 		BaseURL:          h.deps.Config.BaseURL,
 		BlobBackend:      h.deps.Config.BlobBackend,
-	}))
+		TotalStorageUsed: formatBytes(totalUsed),
+		QuotaMode:        h.deps.Config.QuotaMode,
+	}
+	if h.deps.Config.QuotaMode == "total" {
+		content.QuotaLimit = formatBytes(h.deps.Config.QuotaTotal)
+	} else if h.deps.Config.QuotaMode == "user" {
+		content.QuotaLimit = formatBytes(h.deps.Config.QuotaUser) + " per user"
+	}
+
+	h.deps.Renderer.Render(w, "admin_dashboard", h.deps.pageData(w, r, "Admin — Gosilo", content))
 }
 
 type usersContent struct {
-	Users []*userRow
+	Users     []*userRow
+	QuotaMode string
 }
 
 type userRow struct {
-	ID        int64
-	Username  string
-	IsAdmin   bool
-	CreatedAt string
-	IsSelf    bool
+	ID           int64
+	Username     string
+	IsAdmin      bool
+	CreatedAt    string
+	IsSelf       bool
+	StorageUsed  string
+	StorageQuota string // human-readable, empty if no quota
 }
 
 func (h *adminHandler) Users(w http.ResponseWriter, r *http.Request) {
@@ -72,16 +95,36 @@ func (h *adminHandler) Users(w http.ResponseWriter, r *http.Request) {
 	currentUser := CurrentUser(r)
 	rows := make([]*userRow, len(users))
 	for i, u := range users {
-		rows[i] = &userRow{
+		row := &userRow{
 			ID:        u.ID,
 			Username:  u.Username,
 			IsAdmin:   u.IsAdmin,
 			CreatedAt: u.CreatedAt,
 			IsSelf:    u.ID == currentUser.ID,
 		}
+
+		stats, err := db.GetUserStorageStats(r.Context(), h.deps.DB, u.ID)
+		if err != nil {
+			slog.Error("failed to get user storage stats", "user_id", u.ID, "error", err)
+		} else {
+			row.StorageUsed = formatBytes(stats.TotalBytes)
+		}
+
+		if h.deps.Config.QuotaMode == "user" {
+			if u.StorageQuota > 0 {
+				row.StorageQuota = formatBytes(u.StorageQuota)
+			} else {
+				row.StorageQuota = formatBytes(h.deps.Config.QuotaUser) + " (default)"
+			}
+		}
+
+		rows[i] = row
 	}
 
-	h.deps.Renderer.Render(w, "admin_users", h.deps.pageData(w, r, "Users — Admin — Gosilo", &usersContent{Users: rows}))
+	h.deps.Renderer.Render(w, "admin_users", h.deps.pageData(w, r, "Users — Admin — Gosilo", &usersContent{
+		Users:     rows,
+		QuotaMode: h.deps.Config.QuotaMode,
+	}))
 }
 
 func (h *adminHandler) DeleteUser(w http.ResponseWriter, r *http.Request) {
@@ -199,6 +242,45 @@ func (h *adminHandler) CreateInvite(w http.ResponseWriter, r *http.Request) {
 
 	ui.SetFlash(w, fmt.Sprintf("Invite code created: %s", inv.Code))
 	http.Redirect(w, r, "/admin/invites", http.StatusSeeOther)
+}
+
+func (h *adminHandler) SetUserQuota(w http.ResponseWriter, r *http.Request) {
+	if !RequireAuth(w, r) || !RequireAdmin(w, r) {
+		return
+	}
+
+	idStr := r.PathValue("id")
+	id, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		http.Error(w, "Invalid user ID", http.StatusBadRequest)
+		return
+	}
+
+	quotaStr := r.FormValue("quota")
+	var quotaBytes int64
+	if quotaStr != "" && quotaStr != "0" {
+		parsed, err := config.ParseByteSize(quotaStr)
+		if err != nil {
+			ui.SetFlash(w, fmt.Sprintf("Invalid quota value: %s", quotaStr))
+			http.Redirect(w, r, "/admin/users", http.StatusSeeOther)
+			return
+		}
+		quotaBytes = parsed
+	}
+
+	if err := db.UpdateUserQuota(r.Context(), h.deps.DB, id, quotaBytes); err != nil {
+		slog.Error("failed to update user quota", "error", err)
+		ui.SetFlash(w, "Failed to update quota.")
+		http.Redirect(w, r, "/admin/users", http.StatusSeeOther)
+		return
+	}
+
+	if quotaBytes > 0 {
+		ui.SetFlash(w, fmt.Sprintf("Quota updated to %s.", formatBytes(quotaBytes)))
+	} else {
+		ui.SetFlash(w, "Quota reset to server default.")
+	}
+	http.Redirect(w, r, "/admin/users", http.StatusSeeOther)
 }
 
 func (h *adminHandler) DeleteInvite(w http.ResponseWriter, r *http.Request) {

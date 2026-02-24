@@ -58,11 +58,12 @@ type DeleteResult struct {
 type Service struct {
 	database *sql.DB
 	blobs    blob.Store
+	quota    *QuotaChecker
 }
 
 // NewService creates a new storage service.
-func NewService(database *sql.DB, blobs blob.Store) *Service {
-	return &Service{database: database, blobs: blobs}
+func NewService(database *sql.DB, blobs blob.Store, quota *QuotaChecker) *Service {
+	return &Service{database: database, blobs: blobs, quota: quota}
 }
 
 // PutDocument stores a document and propagates folder ETags up to root.
@@ -77,6 +78,11 @@ func (s *Service) PutDocument(ctx context.Context, userID int64, path string, co
 	}
 
 	etag := DocumentETag(data)
+
+	if s.quota != nil {
+		s.quota.Lock()
+		defer s.quota.Unlock()
+	}
 
 	tx, err := s.database.BeginTx(ctx, nil)
 	if err != nil {
@@ -104,6 +110,17 @@ func (s *Service) PutDocument(ctx context.Context, userID int64, path string, co
 	// If-None-Match: "*" means "only if the document doesn't exist yet".
 	if cond.IfNoneMatch == "*" && existing != nil {
 		return nil, ErrPreconditionFailed
+	}
+
+	// Quota check: compute net delta and verify.
+	if s.quota != nil {
+		oldSize := int64(0)
+		if existing != nil {
+			oldSize = existing.ContentLength
+		}
+		if err := s.quota.Check(ctx, tx, userID, int64(len(data))-oldSize); err != nil {
+			return nil, err
+		}
 	}
 
 	isNew := existing == nil

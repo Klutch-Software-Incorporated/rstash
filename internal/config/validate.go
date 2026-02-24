@@ -74,5 +74,23 @@ func (c *Config) Validate() error {
 		errs = append(errs, fmt.Errorf("GOSILO_RATE_BURST: must be >= 1 when rate limiting is enabled — got %d", c.RateLimitBurst))
 	}
 
+	// QuotaMode
+	switch c.QuotaMode {
+	case "off", "total", "user":
+		// ok
+	default:
+		errs = append(errs, fmt.Errorf("GOSILO_QUOTA_MODE: must be one of: off, total, user — got %q", c.QuotaMode))
+	}
+
+	// QuotaTotal required and > 0 when mode=total
+	if c.QuotaMode == "total" && c.QuotaTotal <= 0 {
+		errs = append(errs, fmt.Errorf("GOSILO_QUOTA_TOTAL: must be > 0 when GOSILO_QUOTA_MODE=total"))
+	}
+
+	// QuotaUser required and > 0 when mode=user
+	if c.QuotaMode == "user" && c.QuotaUser <= 0 {
+		errs = append(errs, fmt.Errorf("GOSILO_QUOTA_USER: must be > 0 when GOSILO_QUOTA_MODE=user"))
+	}
+
 	return errors.Join(errs...)
 }

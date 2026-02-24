@@ -62,6 +62,22 @@ func EnvVars() []EnvVar {
 			Default:     "20",
 			Description: "Max burst size for per-IP rate limiting.",
 		},
+		{
+			Name:        "GOSILO_QUOTA_MODE",
+			Default:     "off",
+			Description: "Storage quota enforcement mode.",
+			ValidValues: []string{"off", "total", "user"},
+		},
+		{
+			Name:         "GOSILO_QUOTA_TOTAL",
+			Description:  "Global storage limit across all users (e.g. 10GB, 500MB).",
+			RequiredWhen: "GOSILO_QUOTA_MODE=total",
+		},
+		{
+			Name:         "GOSILO_QUOTA_USER",
+			Description:  "Default per-user storage quota (e.g. 500MB, 1GB). Admin can override per user.",
+			RequiredWhen: "GOSILO_QUOTA_MODE=user",
+		},
 	}
 }
 

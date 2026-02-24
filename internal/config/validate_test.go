@@ -17,6 +17,7 @@ func validConfig() *Config {
 		LogLevel:         "info",
 		RateLimitRate:    10,
 		RateLimitBurst:   20,
+		QuotaMode:        "off",
 	}
 }
 
@@ -241,6 +242,7 @@ func TestValidate_MultipleErrors(t *testing.T) {
 		BlobBackend:      "s3",
 		RegistrationMode: "maybe",
 		LogLevel:         "trace",
+		QuotaMode:        "off",
 	}
 	err := cfg.Validate()
 	if err == nil {
@@ -251,5 +253,67 @@ func TestValidate_MultipleErrors(t *testing.T) {
 		if !strings.Contains(msg, want) {
 			t.Errorf("expected error to contain %q, got: %v", want, msg)
 		}
+	}
+}
+
+func TestValidate_QuotaMode(t *testing.T) {
+	for _, mode := range []string{"off", "total", "user"} {
+		cfg := validConfig()
+		cfg.QuotaMode = mode
+		if mode == "total" {
+			cfg.QuotaTotal = 1024
+		}
+		if mode == "user" {
+			cfg.QuotaUser = 1024
+		}
+		if err := cfg.Validate(); err != nil {
+			t.Errorf("quota mode %q should be valid, got: %v", mode, err)
+		}
+	}
+
+	cfg := validConfig()
+	cfg.QuotaMode = "invalid"
+	err := cfg.Validate()
+	if err == nil {
+		t.Fatal("expected error for invalid quota mode")
+	}
+	if !strings.Contains(err.Error(), "GOSILO_QUOTA_MODE") {
+		t.Fatalf("error should mention GOSILO_QUOTA_MODE, got: %v", err)
+	}
+}
+
+func TestValidate_QuotaTotal_RequiredForTotalMode(t *testing.T) {
+	cfg := validConfig()
+	cfg.QuotaMode = "total"
+	cfg.QuotaTotal = 0
+	err := cfg.Validate()
+	if err == nil {
+		t.Fatal("expected error for total mode without quota total")
+	}
+	if !strings.Contains(err.Error(), "GOSILO_QUOTA_TOTAL") {
+		t.Fatalf("error should mention GOSILO_QUOTA_TOTAL, got: %v", err)
+	}
+}
+
+func TestValidate_QuotaUser_RequiredForUserMode(t *testing.T) {
+	cfg := validConfig()
+	cfg.QuotaMode = "user"
+	cfg.QuotaUser = 0
+	err := cfg.Validate()
+	if err == nil {
+		t.Fatal("expected error for user mode without quota user")
+	}
+	if !strings.Contains(err.Error(), "GOSILO_QUOTA_USER") {
+		t.Fatalf("error should mention GOSILO_QUOTA_USER, got: %v", err)
+	}
+}
+
+func TestValidate_QuotaOff_NoLimitsNeeded(t *testing.T) {
+	cfg := validConfig()
+	cfg.QuotaMode = "off"
+	cfg.QuotaTotal = 0
+	cfg.QuotaUser = 0
+	if err := cfg.Validate(); err != nil {
+		t.Fatalf("quota off should not require limits, got: %v", err)
 	}
 }

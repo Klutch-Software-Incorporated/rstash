@@ -46,6 +46,7 @@ func Routes(deps *UIDeps) http.Handler {
 	mux.HandleFunc("GET /admin", adminHandler.Dashboard)
 	mux.HandleFunc("GET /admin/users", adminHandler.Users)
 	mux.HandleFunc("POST /admin/users/{id}/delete", RequireCSRF(adminHandler.DeleteUser))
+	mux.HandleFunc("POST /admin/users/{id}/quota", RequireCSRF(adminHandler.SetUserQuota))
 	mux.HandleFunc("GET /admin/invites", adminHandler.Invites)
 	mux.HandleFunc("POST /admin/invites", RequireCSRF(adminHandler.CreateInvite))
 	mux.HandleFunc("POST /admin/invites/{code}/delete", RequireCSRF(adminHandler.DeleteInvite))

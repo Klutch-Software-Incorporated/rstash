@@ -5,6 +5,7 @@ type User struct {
 	Username     string
 	PasswordHash string
 	IsAdmin      bool
+	StorageQuota int64 // 0 = use server default
 	CreatedAt    string
 }
 

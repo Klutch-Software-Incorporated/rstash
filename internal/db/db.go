@@ -87,5 +87,45 @@ func Open(path string) (*sql.DB, error) {
 		return nil, fmt.Errorf("run migrations: %w", err)
 	}
 
+	// Run column migrations (safe to re-run).
+	if err := runMigrations(db); err != nil {
+		db.Close()
+		return nil, fmt.Errorf("run column migrations: %w", err)
+	}
+
 	return db, nil
+}
+
+// runMigrations applies ALTER TABLE migrations, ignoring "duplicate column" errors.
+func runMigrations(database *sql.DB) error {
+	migrations := []string{
+		"ALTER TABLE users ADD COLUMN storage_quota INTEGER NOT NULL DEFAULT 0",
+	}
+	for _, m := range migrations {
+		if _, err := database.Exec(m); err != nil {
+			// Ignore "duplicate column" errors (column already exists).
+			if !isDuplicateColumnError(err) {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+// isDuplicateColumnError checks if the error indicates the column already exists.
+func isDuplicateColumnError(err error) bool {
+	return err != nil && (contains(err.Error(), "duplicate column") || contains(err.Error(), "already exists"))
+}
+
+func contains(s, substr string) bool {
+	return len(s) >= len(substr) && searchString(s, substr)
+}
+
+func searchString(s, substr string) bool {
+	for i := 0; i <= len(s)-len(substr); i++ {
+		if s[i:i+len(substr)] == substr {
+			return true
+		}
+	}
+	return false
 }

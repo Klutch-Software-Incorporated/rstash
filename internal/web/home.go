@@ -20,15 +20,18 @@ func HomeHandler(deps *UIDeps) *homeHandler {
 }
 
 type homeContent struct {
-	Stats    *homeStats
-	Modules  []*moduleRow
-	Activity []*activityEvent
+	Stats     *homeStats
+	Modules   []*moduleRow
+	Activity  []*activityEvent
+	QuotaMode string
 }
 
 type homeStats struct {
-	FileCount   int64
-	StorageUsed string
-	OAuthApps   int64
+	FileCount    int64
+	StorageUsed  string
+	StorageQuota string // empty when no quota
+	QuotaPercent int
+	OAuthApps    int64
 }
 
 type moduleRow struct {
@@ -91,14 +94,31 @@ func (h *homeHandler) Show(w http.ResponseWriter, r *http.Request) {
 
 	activity := buildActivityFeed(ctx, h.deps.DB, user.ID)
 
+	hs := &homeStats{
+		FileCount:   stats.FileCount,
+		StorageUsed: formatBytes(stats.TotalBytes),
+		OAuthApps:   tokenCount,
+	}
+	if h.deps.Config.QuotaMode == "user" {
+		limit := h.deps.Config.QuotaUser
+		if user.StorageQuota > 0 {
+			limit = user.StorageQuota
+		}
+		hs.StorageQuota = formatBytes(limit)
+		if limit > 0 {
+			pct := int(stats.TotalBytes * 100 / limit)
+			if pct > 100 {
+				pct = 100
+			}
+			hs.QuotaPercent = pct
+		}
+	}
+
 	h.deps.Renderer.Render(w, "home", h.deps.pageData(w, r, "Gosilo", &homeContent{
-		Stats: &homeStats{
-			FileCount:   stats.FileCount,
-			StorageUsed: formatBytes(stats.TotalBytes),
-			OAuthApps:   tokenCount,
-		},
-		Modules:  moduleRows,
-		Activity: activity,
+		Stats:     hs,
+		Modules:   moduleRows,
+		Activity:  activity,
+		QuotaMode: h.deps.Config.QuotaMode,
 	}))
 }
 

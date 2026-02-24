@@ -19,7 +19,11 @@ func SettingsHandler(deps *UIDeps) *settingsHandler {
 }
 
 type settingsContent struct {
-	Tokens []*tokenRow
+	Tokens       []*tokenRow
+	StorageUsed  string
+	StorageQuota string // human-readable, empty when quota mode is not "user"
+	QuotaMode    string
+	QuotaPercent int // 0-100, only meaningful when QuotaMode == "user"
 }
 
 type changePasswordContent struct {
@@ -58,7 +62,34 @@ func (h *settingsHandler) ShowSettings(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	h.deps.Renderer.Render(w, "settings", h.deps.pageData(w, r, "Settings — Gosilo", &settingsContent{Tokens: rows}))
+	content := &settingsContent{
+		Tokens:    rows,
+		QuotaMode: h.deps.Config.QuotaMode,
+	}
+
+	stats, err := db.GetUserStorageStats(r.Context(), h.deps.DB, user.ID)
+	if err != nil {
+		slog.Error("failed to get user storage stats", "error", err)
+	} else {
+		content.StorageUsed = formatBytes(stats.TotalBytes)
+	}
+
+	if h.deps.Config.QuotaMode == "user" {
+		limit := h.deps.Config.QuotaUser
+		if user.StorageQuota > 0 {
+			limit = user.StorageQuota
+		}
+		content.StorageQuota = formatBytes(limit)
+		if limit > 0 && stats != nil {
+			pct := int(stats.TotalBytes * 100 / limit)
+			if pct > 100 {
+				pct = 100
+			}
+			content.QuotaPercent = pct
+		}
+	}
+
+	h.deps.Renderer.Render(w, "settings", h.deps.pageData(w, r, "Settings — Gosilo", content))
 }
 
 func (h *settingsHandler) ShowChangePassword(w http.ResponseWriter, r *http.Request) {

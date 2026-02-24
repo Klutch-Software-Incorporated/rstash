@@ -128,8 +128,19 @@ func runServe() {
 		os.Exit(1)
 	}
 
+	// Initialize quota checker.
+	var quotaChecker *storage.QuotaChecker
+	if cfg.QuotaMode != "off" {
+		quotaChecker = storage.NewQuotaChecker(storage.QuotaConfig{
+			Mode:       cfg.QuotaMode,
+			TotalLimit: cfg.QuotaTotal,
+			UserLimit:  cfg.QuotaUser,
+		}, database)
+		slog.Info("quota enforcement enabled", "mode", cfg.QuotaMode)
+	}
+
 	// Initialize storage service.
-	storageSvc := storage.NewService(database, blobs)
+	storageSvc := storage.NewService(database, blobs, quotaChecker)
 
 	// Initialize auth service.
 	localAuth := auth.NewLocalService(database)

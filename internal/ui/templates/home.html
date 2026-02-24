@@ -13,7 +13,14 @@
         </div>
         <div>
             <dt>Storage Used</dt>
+            {{if eq $.Content.QuotaMode "user"}}
+            <dd>{{.Stats.StorageUsed}} <span class="hint">of {{.Stats.StorageQuota}}</span></dd>
+            <div class="quota-bar" style="margin-top: 0.5rem">
+                <div class="quota-bar-fill{{if ge .Stats.QuotaPercent 90}} quota-bar-danger{{end}}" style="width: {{.Stats.QuotaPercent}}%"></div>
+            </div>
+            {{else}}
             <dd>{{.Stats.StorageUsed}}</dd>
+            {{end}}
         </div>
         <div>
             <dt>Connected Apps</dt>

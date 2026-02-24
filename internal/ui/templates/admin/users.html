@@ -14,6 +14,7 @@
                 <tr>
                     <th scope="col">Username</th>
                     <th scope="col">Role</th>
+                    <th scope="col">Storage</th>
                     <th scope="col">Created</th>
                     <th scope="col">Actions</th>
                 </tr>
@@ -23,6 +24,12 @@
                 <tr>
                     <td>{{.Username}}</td>
                     <td>{{if .IsAdmin}}<span class="badge badge-admin">admin</span>{{else}}user{{end}}</td>
+                    <td>
+                        {{.StorageUsed}}
+                        {{if $.Content.QuotaMode | eq "user"}}
+                        <span class="hint">/ {{.StorageQuota}}</span>
+                        {{end}}
+                    </td>
                     <td>{{.CreatedAt}}</td>
                     <td>
                         {{if not .IsSelf}}
@@ -30,6 +37,13 @@
                             onsubmit="return confirm('Delete user {{.Username}}?')">
                             <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
                             <button type="submit" class="btn-danger">Delete</button>
+                        </form>
+                        {{end}}
+                        {{if $.Content.QuotaMode | eq "user"}}
+                        <form method="POST" action="/admin/users/{{.ID}}/quota" class="inline-form">
+                            <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
+                            <input type="text" name="quota" placeholder="e.g. 1GB" class="input-sm">
+                            <button type="submit" class="btn-sm">Set Quota</button>
                         </form>
                         {{end}}
                     </td>

@@ -27,6 +27,16 @@
             <dt>Blob Backend</dt>
             <dd>{{.BlobBackend}}</dd>
         </div>
+        <div>
+            <dt>Total Storage Used</dt>
+            <dd>{{.TotalStorageUsed}}</dd>
+        </div>
+        {{if ne .QuotaMode "off"}}
+        <div>
+            <dt>Quota</dt>
+            <dd>{{.QuotaMode}} — {{.QuotaLimit}}</dd>
+        </div>
+        {{end}}
     </dl>
     {{end}}
 </div>

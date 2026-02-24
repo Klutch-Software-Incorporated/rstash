@@ -227,6 +227,8 @@ func writeServiceError(w http.ResponseWriter, err error) {
 		http.Error(w, "conflict", http.StatusConflict)
 	case errors.Is(err, storage.ErrNotModified):
 		w.WriteHeader(http.StatusNotModified)
+	case errors.Is(err, storage.ErrQuotaExceeded):
+		http.Error(w, "quota exceeded", http.StatusRequestEntityTooLarge)
 	default:
 		slog.Error("storage error", "error", err)
 		http.Error(w, "internal error", http.StatusInternalServerError)
