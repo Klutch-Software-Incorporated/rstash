@@ -36,18 +36,15 @@ func NewRenderer() *Renderer {
 	}
 
 	tmpl, err := template.New("").Funcs(funcMap).ParseFS(Templates,
+		"templates/partials/header.html",
+		"templates/partials/footer.html",
 		"templates/layout.html",
 		"templates/home.html",
 		"templates/setup.html",
 		"templates/login.html",
 		"templates/register.html",
-		"templates/admin/dashboard.html",
-		"templates/admin/users.html",
-		"templates/admin/invites.html",
-		"templates/admin/oauth_test.html",
+		"templates/admin.html",
 		"templates/oauth_authorize.html",
-		"templates/settings.html",
-		"templates/change_password.html",
 		"templates/files.html",
 	)
 	if err != nil {

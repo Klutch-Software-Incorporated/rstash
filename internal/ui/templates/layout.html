@@ -7,30 +7,7 @@
     <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
-    <header>
-        <nav aria-label="Main navigation">
-            <a href="/">Gosilo</a>
-            <div>
-                {{if .CurrentUser}}
-                    <span>{{.CurrentUser.Username}}</span>
-                    <a href="/files/">Files</a>
-                    <a href="/settings">Settings</a>
-                    {{if .CurrentUser.IsAdmin}}
-                        <a href="/admin">Admin</a>
-                    {{end}}
-                    <form method="POST" action="/logout">
-                        <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
-                        <button type="submit">Logout</button>
-                    </form>
-                {{else}}
-                    <a href="/login">Login</a>
-                    {{if and .RegistrationMode (not (eq .RegistrationMode "closed"))}}
-                        <a href="/register">Register</a>
-                    {{end}}
-                {{end}}
-            </div>
-        </nav>
-    </header>
+    {{template "header" .}}
 
     <main>
         {{if .Flash}}
@@ -41,9 +18,7 @@
         {{template "content" .}}
     </main>
 
-    <footer>
-        Gosilo &mdash; remoteStorage server
-    </footer>
+    {{template "footer" .}}
     <script>
     document.querySelectorAll('time[datetime]').forEach(function(el) {
         var d = new Date(el.getAttribute('datetime') + 'Z');

@@ -1,91 +1,119 @@
 {{define "home"}}
 {{if .Content}}
-{{/* ===== Logged-in: Account Overview ===== */}}
-<div class="home-dashboard">
-    <h1>Account Overview</h1>
+{{/* ===== Logged-in: User Dashboard ===== */}}
+{{with .Content}}
 
-    {{with .Content}}
+<h2>Storage</h2>
+{{if eq $.Content.QuotaMode "user"}}
+<p>{{.Stats.StorageUsed}} used of {{.Stats.StorageQuota}} ({{.Stats.QuotaPercent}}%)</p>
+<meter min="0" max="{{.Stats.QuotaBytes}}" value="{{.Stats.StorageBytes}}">{{.Stats.QuotaPercent}}%</meter>
+{{else}}
+<p>{{.Stats.StorageUsed}} used &mdash; {{.Stats.FileCount}} files</p>
+{{end}}
 
-    <dl class="stats stats-3col">
-        <div>
-            <dt>Files</dt>
-            <dd>{{.Stats.FileCount}}</dd>
-        </div>
-        <div>
-            <dt>Storage Used</dt>
-            {{if eq $.Content.QuotaMode "user"}}
-            <dd>{{.Stats.StorageUsed}} <span class="hint">of {{.Stats.StorageQuota}}</span></dd>
-            <div class="quota-bar" style="margin-top: 0.5rem">
-                <div class="quota-bar-fill{{if ge .Stats.QuotaPercent 90}} quota-bar-danger{{end}}" style="width: {{.Stats.QuotaPercent}}%"></div>
-            </div>
-            {{else}}
-            <dd>{{.Stats.StorageUsed}}</dd>
-            {{end}}
-        </div>
-        <div>
-            <dt>Connected Apps</dt>
-            <dd>{{.Stats.OAuthApps}}</dd>
-        </div>
-    </dl>
+<h2>Data Modules</h2>
+{{if .Modules}}
+<table>
+    <thead>
+        <tr><th>Module</th><th>Files</th><th>Size</th></tr>
+    </thead>
+    <tbody>
+        {{range .Modules}}
+        <tr>
+            <td><a href="/files/{{.Name}}/"><code>{{.Name}}/</code></a></td>
+            <td>{{.FileCount}}</td>
+            <td>{{.Size}}</td>
+        </tr>
+        {{end}}
+    </tbody>
+</table>
+{{else}}
+<p class="empty-state">No files stored yet. Use a <a href="https://remotestorage.io/apps/">remoteStorage app</a> to get started.</p>
+{{end}}
 
-    <h2>Modules</h2>
-    {{if .Modules}}
-    <div class="table-wrap">
-        <table>
-            <thead>
-                <tr>
-                    <th scope="col">Module</th>
-                    <th scope="col">Files</th>
-                    <th scope="col">Size</th>
-                </tr>
-            </thead>
-            <tbody>
-                {{range .Modules}}
-                <tr>
-                    <td><a href="/files/{{.Name}}/"><code>{{.Name}}/</code></a></td>
-                    <td>{{.FileCount}}</td>
-                    <td>{{.Size}}</td>
-                </tr>
+<h2>Connected Apps</h2>
+{{if .Tokens}}
+<table>
+    <thead>
+        <tr><th>Application</th><th>Scopes</th><th>Granted</th><th>Actions</th></tr>
+    </thead>
+    <tbody>
+        {{range .Tokens}}
+        <tr>
+            <td>{{.ClientID}}</td>
+            <td><code>{{.Scopes}}</code></td>
+            <td><time datetime="{{.CreatedAt}}">{{.CreatedAt}}</time></td>
+            <td>
+                <form method="POST" action="/settings/tokens/{{.TokenFull}}/revoke"
+                    onsubmit="return confirm('Revoke this token?')">
+                    <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
+                    <button type="submit" class="btn-danger">Revoke</button>
+                </form>
+            </td>
+        </tr>
+        {{end}}
+    </tbody>
+</table>
+{{else}}
+<p>No connected apps.</p>
+{{end}}
+
+<h2>Recent Activity</h2>
+{{if .Activity}}
+<table>
+    <thead>
+        <tr><th>Event</th><th>Time</th></tr>
+    </thead>
+    <tbody>
+        {{range .Activity}}
+        <tr>
+            <td>
+                {{if eq .Type "file_update"}}<span class="badge badge-available">file</span>
+                {{else if eq .Type "login"}}<span class="badge badge-admin">login</span>
+                {{else if eq .Type "oauth_grant"}}<span class="badge badge-used">oauth</span>
                 {{end}}
-            </tbody>
-        </table>
-    </div>
-    {{else}}
-    <p class="empty-state">No files stored yet. Use a <a href="https://remotestorage.io/apps/">remoteStorage app</a> or the <code>rs-upload</code> CLI to get started.</p>
-    {{end}}
+                {{.Summary}}
+            </td>
+            <td><time datetime="{{.Timestamp}}">{{.Timestamp}}</time></td>
+        </tr>
+        {{end}}
+    </tbody>
+</table>
+{{else}}
+<p class="empty-state">No recent activity.</p>
+{{end}}
 
-    <h2>Recent Activity</h2>
-    {{if .Activity}}
-    <div class="table-wrap">
-        <table>
-            <thead>
-                <tr>
-                    <th scope="col">Event</th>
-                    <th scope="col">Time</th>
-                </tr>
-            </thead>
-            <tbody>
-                {{range .Activity}}
-                <tr>
-                    <td>
-                        {{if eq .Type "file_update"}}<span class="badge badge-available">file</span>
-                        {{else if eq .Type "login"}}<span class="badge badge-admin">login</span>
-                        {{else if eq .Type "oauth_grant"}}<span class="badge badge-used">oauth</span>
-                        {{end}}
-                        {{.Summary}}
-                    </td>
-                    <td><time datetime="{{.Timestamp}}">{{.Timestamp}}</time></td>
-                </tr>
-                {{end}}
-            </tbody>
-        </table>
-    </div>
-    {{else}}
-    <p class="empty-state">No recent activity.</p>
-    {{end}}
+<h2>Account</h2>
+<dl>
+    <dt>User address</dt>
+    <dd><code>{{$.CurrentUser.Username}}@{{.BaseURL}}</code></dd>
+    <dt>WebFinger</dt>
+    <dd><code>{{.BaseURL}}/.well-known/webfinger?resource=acct:{{$.CurrentUser.Username}}@{{.BaseURL}}</code></dd>
+    <dt>Storage root</dt>
+    <dd><code>{{.BaseURL}}/storage/{{$.CurrentUser.Username}}/</code></dd>
+    <dt>Protocol</dt>
+    <dd>draft-dejong-remotestorage-26</dd>
+</dl>
 
-    {{end}}
-</div>
+<h2>Change Password</h2>
+<form method="POST" action="/settings/password" style="max-width:28rem">
+    <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
+    <div>
+        <label for="current_password">Current Password</label>
+        <input type="password" id="current_password" name="current_password" required autocomplete="current-password">
+    </div>
+    <div>
+        <label for="new_password">New Password</label>
+        <input type="password" id="new_password" name="new_password" required minlength="8" autocomplete="new-password">
+    </div>
+    <div>
+        <label for="confirm_password">Confirm New Password</label>
+        <input type="password" id="confirm_password" name="confirm_password" required minlength="8" autocomplete="new-password">
+    </div>
+    <button type="submit">Change Password</button>
+</form>
+
+{{end}}
 
 {{else}}
 {{/* ===== Logged-out: Server Info ===== */}}
@@ -93,21 +121,19 @@
     <h1>Welcome to Gosilo</h1>
     <p>A <a href="https://remotestorage.io">remoteStorage</a> server.</p>
 
-    <div class="home-server-info">
-        <p>
-            Registration:
-            {{if eq .RegistrationMode "open"}}
-                <span class="badge badge-available">Open</span>
-            {{else if eq .RegistrationMode "invite"}}
-                <span class="badge badge-admin">Invite Only</span>
-            {{else}}
-                <span class="badge badge-used">Closed</span>
-            {{end}}
-        </p>
-    </div>
+    <p style="margin-top:.75rem">
+        Registration:
+        {{if eq .RegistrationMode "open"}}
+            <span class="badge badge-available">Open</span>
+        {{else if eq .RegistrationMode "invite"}}
+            <span class="badge badge-admin">Invite Only</span>
+        {{else}}
+            <span class="badge badge-used">Closed</span>
+        {{end}}
+    </p>
 
     <div class="home-cta">
-        <a href="/login" class="oauth-btn-login">Log In</a>
+        <a href="/login">Log In</a>
         {{if or (eq .RegistrationMode "open") (eq .RegistrationMode "invite")}}
             <p class="home-register-link">or <a href="/register">create an account</a></p>
         {{end}}

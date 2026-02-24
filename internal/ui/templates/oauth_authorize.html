@@ -8,16 +8,14 @@
         {{end}}
 
         <div class="oauth-consent-card">
-            {{/* -- Header: app origin, small and contextual -- */}}
             <div class="oauth-consent-header">
-                <p class="oauth-from">
+                <p>
                     <span class="oauth-origin">{{.ClientID}}</span>
                     is requesting access to
                     {{if .LoggedIn}}your storage{{else}}a Gosilo account{{end}}
                 </p>
             </div>
 
-            {{/* -- Permissions: the hero of the page -- */}}
             <div class="oauth-consent-perms">
                 {{if .LoggedIn}}
                     <div class="oauth-account">
@@ -47,7 +45,6 @@
                 </table>
             </div>
 
-            {{/* -- Footer: actions -- */}}
             <div class="oauth-consent-footer">
                 {{if .LoggedIn}}
                     <form method="POST" action="/oauth/authorize">
@@ -58,7 +55,6 @@
                         {{range .Scopes}}
                             <input type="hidden" name="scope" value="{{.}}">
                         {{end}}
-
                         <button type="submit" name="action" value="approve" class="oauth-btn-allow">
                             Allow access
                         </button>

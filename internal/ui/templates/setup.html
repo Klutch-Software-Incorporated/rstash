@@ -1,7 +1,7 @@
 {{define "setup"}}
 <div class="form-page">
-    <h1 class="text-center">Initial Setup</h1>
-    <p class="text-center">Create the first admin account to get started.</p>
+    <h1>Initial Setup</h1>
+    <p>Create the first admin account to get started.</p>
 
     {{with .Content}}
         {{if .Error}}
@@ -13,27 +13,20 @@
 
     <form method="POST" action="/setup">
         <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
-        <fieldset>
-            <legend class="sr-only">Admin Account</legend>
-
-            <div>
-                <label for="username">Username</label>
-                <input type="text" id="username" name="username" required autocomplete="username"
-                    value="{{with .Content}}{{.Username}}{{end}}">
-            </div>
-
-            <div>
-                <label for="password">Password</label>
-                <input type="password" id="password" name="password" required autocomplete="new-password" minlength="8">
-                <p>Minimum 8 characters</p>
-            </div>
-
-            <div>
-                <label for="password_confirm">Confirm Password</label>
-                <input type="password" id="password_confirm" name="password_confirm" required autocomplete="new-password">
-            </div>
-        </fieldset>
-
+        <div>
+            <label for="username">Username</label>
+            <input type="text" id="username" name="username" required autocomplete="username"
+                value="{{with .Content}}{{.Username}}{{end}}">
+        </div>
+        <div>
+            <label for="password">Password</label>
+            <input type="password" id="password" name="password" required autocomplete="new-password" minlength="8">
+            <p>Minimum 8 characters</p>
+        </div>
+        <div>
+            <label for="password_confirm">Confirm Password</label>
+            <input type="password" id="password_confirm" name="password_confirm" required autocomplete="new-password">
+        </div>
         <button type="submit">Create Admin Account</button>
     </form>
 </div>

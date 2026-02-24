@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"net/http"
 	"sort"
+	"strings"
 
 	"gosilo/internal/db"
 )
@@ -20,10 +21,13 @@ func HomeHandler(deps *UIDeps) *homeHandler {
 }
 
 type homeContent struct {
-	Stats     *homeStats
-	Modules   []*moduleRow
-	Activity  []*activityEvent
-	QuotaMode string
+	Stats         *homeStats
+	Modules       []*moduleRow
+	Activity      []*activityEvent
+	QuotaMode     string
+	Tokens        []*tokenRow
+	PasswordError string
+	BaseURL       string
 }
 
 type homeStats struct {
@@ -32,6 +36,8 @@ type homeStats struct {
 	StorageQuota string // empty when no quota
 	QuotaPercent int
 	OAuthApps    int64
+	StorageBytes int64 // raw bytes for meter
+	QuotaBytes   int64 // raw bytes for meter max
 }
 
 type moduleRow struct {
@@ -94,10 +100,28 @@ func (h *homeHandler) Show(w http.ResponseWriter, r *http.Request) {
 
 	activity := buildActivityFeed(ctx, h.deps.DB, user.ID)
 
+	// Load OAuth tokens for "Connected Apps" section.
+	oauthTokens, err := db.ListOAuthTokensByUserID(ctx, h.deps.DB, user.ID)
+	if err != nil {
+		slog.Error("failed to list oauth tokens", "error", err)
+		oauthTokens = nil
+	}
+	tokenRows := make([]*tokenRow, len(oauthTokens))
+	for i, t := range oauthTokens {
+		tokenRows[i] = &tokenRow{
+			TokenPrefix: t.Token[:8] + "...",
+			TokenFull:   t.Token,
+			ClientID:    t.ClientID,
+			Scopes:      strings.Join(t.Scopes, ", "),
+			CreatedAt:   t.CreatedAt,
+		}
+	}
+
 	hs := &homeStats{
-		FileCount:   stats.FileCount,
-		StorageUsed: formatBytes(stats.TotalBytes),
-		OAuthApps:   tokenCount,
+		FileCount:    stats.FileCount,
+		StorageUsed:  formatBytes(stats.TotalBytes),
+		StorageBytes: stats.TotalBytes,
+		OAuthApps:    tokenCount,
 	}
 	if h.deps.Config.QuotaMode == "user" {
 		limit := h.deps.Config.QuotaUser
@@ -105,6 +129,7 @@ func (h *homeHandler) Show(w http.ResponseWriter, r *http.Request) {
 			limit = user.StorageQuota
 		}
 		hs.StorageQuota = formatBytes(limit)
+		hs.QuotaBytes = limit
 		if limit > 0 {
 			pct := int(stats.TotalBytes * 100 / limit)
 			if pct > 100 {
@@ -119,6 +144,8 @@ func (h *homeHandler) Show(w http.ResponseWriter, r *http.Request) {
 		Modules:   moduleRows,
 		Activity:  activity,
 		QuotaMode: h.deps.Config.QuotaMode,
+		Tokens:    tokenRows,
+		BaseURL:   h.deps.Config.BaseURL,
 	}))
 }
 

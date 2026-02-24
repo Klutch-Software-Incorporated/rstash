@@ -1,64 +1,57 @@
 {{define "files"}}
-<div>
-    {{with .Content}}
-    <div class="page-header">
-        <h1>Files</h1>
-    </div>
+{{with .Content}}
+<h1>Files</h1>
 
-    <!-- Breadcrumb navigation -->
-    <nav class="breadcrumb" aria-label="File path">
-        <a href="/files/">Home</a>
-        {{range .Breadcrumbs}}
-            <span class="breadcrumb-sep">/</span>
-            <a href="{{.Path}}">{{.Name}}</a>
-        {{end}}
-    </nav>
+<nav class="breadcrumb" aria-label="File path">
+    <a href="/files/">Home</a>
+    {{range .Breadcrumbs}}
+        <span class="breadcrumb-sep">/</span>
+        <a href="{{.Path}}">{{.Name}}</a>
+    {{end}}
+</nav>
 
-    {{if .Items}}
-    <div class="table-wrap">
-        <table>
-            <thead>
-                <tr>
-                    <th scope="col">Name</th>
-                    <th scope="col">Size</th>
-                    <th scope="col">Type</th>
-                    <th scope="col">Actions</th>
-                </tr>
-            </thead>
-            <tbody>
-                {{range .Items}}
-                <tr>
-                    <td>
-                        {{if .IsFolder}}<span class="file-icon">&#128193;</span>{{else}}<span class="file-icon">&#128196;</span>{{end}}
-                        <a href="{{.BrowseURL}}">{{.Name}}</a>
-                    </td>
-                    <td>{{.Size}}</td>
-                    <td>{{.ContentType}}</td>
-                    <td>
-                        {{if .IsFolder}}
-                        <form method="POST" action="/files/delete"
-                            onsubmit="return confirm('Delete folder {{.Name}} and ALL its contents?')">
-                            <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
-                            <input type="hidden" name="path" value="{{.Path}}">
-                            <button type="submit" class="btn-danger">Delete</button>
-                        </form>
-                        {{else}}
-                        <form method="POST" action="/files/delete"
-                            onsubmit="return confirm('Delete {{.Name}}?')">
-                            <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
-                            <input type="hidden" name="path" value="{{.Path}}">
-                            <button type="submit" class="btn-danger">Delete</button>
-                        </form>
-                        {{end}}
-                    </td>
-                </tr>
+{{if .Items}}
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Size</th>
+            <th>Type</th>
+            <th>Actions</th>
+        </tr>
+    </thead>
+    <tbody>
+        {{range .Items}}
+        <tr>
+            <td>
+                {{if .IsFolder}}<span class="file-icon">&#128193;</span>{{else}}<span class="file-icon">&#128196;</span>{{end}}
+                <a href="{{.BrowseURL}}">{{.Name}}</a>
+            </td>
+            <td>{{.Size}}</td>
+            <td>{{.ContentType}}</td>
+            <td>
+                {{if .IsFolder}}
+                <form method="POST" action="/files/delete"
+                    onsubmit="return confirm('Delete folder {{.Name}} and ALL its contents?')">
+                    <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
+                    <input type="hidden" name="path" value="{{.Path}}">
+                    <button type="submit" class="btn-danger">Delete</button>
+                </form>
+                {{else}}
+                <form method="POST" action="/files/delete"
+                    onsubmit="return confirm('Delete {{.Name}}?')">
+                    <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
+                    <input type="hidden" name="path" value="{{.Path}}">
+                    <button type="submit" class="btn-danger">Delete</button>
+                </form>
                 {{end}}
-            </tbody>
-        </table>
-    </div>
-    {{else}}
-    <p class="empty-state">This folder is empty.</p>
-    {{end}}
-    {{end}}
-</div>
+            </td>
+        </tr>
+        {{end}}
+    </tbody>
+</table>
+{{else}}
+<p class="empty-state">This folder is empty.</p>
+{{end}}
+{{end}}
 {{end}}

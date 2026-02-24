@@ -1,0 +1,26 @@
+{{define "header"}}
+<header>
+  <h1><a href="/">Gosilo</a></h1>
+  {{if .CurrentUser}}
+    <p>Logged in as <strong>{{.CurrentUser.Username}}</strong></p>
+  {{end}}
+  <nav aria-label="Main">
+    <ul>
+      {{if .CurrentUser}}
+        <li><a href="/">Dashboard</a></li>
+        <li><a href="/files/">Files</a></li>
+        {{if .CurrentUser.IsAdmin}}<li><a href="/admin">Admin</a></li>{{end}}
+        <li><form method="POST" action="/logout">
+          <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
+          <button type="submit">Log out</button>
+        </form></li>
+      {{else}}
+        <li><a href="/login">Log in</a></li>
+        {{if and .RegistrationMode (not (eq .RegistrationMode "closed"))}}
+          <li><a href="/register">Register</a></li>
+        {{end}}
+      {{end}}
+    </ul>
+  </nav>
+</header>
+{{end}}

@@ -1,0 +1,191 @@
+{{define "admin"}}
+{{with .Content}}
+
+<h2>Server</h2>
+<dl>
+    <dt>Users</dt>
+    <dd>{{.UserCount}}</dd>
+    <dt>Registration</dt>
+    <dd>{{.RegistrationMode}}
+        {{if eq .RegistrationMode "open"}} &mdash; anyone can register
+        {{else if eq .RegistrationMode "invite"}} &mdash; invite code required
+        {{else}} &mdash; registration disabled
+        {{end}}
+    </dd>
+    <dt>Base URL</dt>
+    <dd><code>{{.BaseURL}}</code></dd>
+    <dt>Blob Backend</dt>
+    <dd>{{.BlobBackend}}</dd>
+    <dt>Total Storage</dt>
+    <dd>{{.TotalStorageUsed}}</dd>
+    {{if ne .QuotaMode "off"}}
+    <dt>Quota</dt>
+    <dd>{{.QuotaMode}} &mdash; {{.QuotaLimit}}</dd>
+    {{end}}
+</dl>
+
+<h2>Users</h2>
+{{if .Users}}
+<table>
+    <thead>
+        <tr>
+            <th>Username</th>
+            <th>Role</th>
+            <th>Storage</th>
+            <th>Created</th>
+            <th>Actions</th>
+        </tr>
+    </thead>
+    <tbody>
+        {{range .Users}}
+        <tr>
+            <td>{{.Username}}</td>
+            <td>{{if .IsAdmin}}<span class="badge badge-admin">admin</span>{{else}}user{{end}}</td>
+            <td>
+                {{.StorageUsed}}
+                {{if $.Content.QuotaMode | eq "user"}}
+                <span style="color:#888;font-size:.75rem">/ {{.StorageQuota}}</span>
+                {{end}}
+            </td>
+            <td><time datetime="{{.CreatedAt}}">{{.CreatedAt}}</time></td>
+            <td>
+                {{if not .IsSelf}}
+                <form method="POST" action="/admin/users/{{.ID}}/delete"
+                    onsubmit="return confirm('Delete user {{.Username}}?')">
+                    <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
+                    <button type="submit" class="btn-danger">Delete</button>
+                </form>
+                {{end}}
+                {{if $.Content.QuotaMode | eq "user"}}
+                <form method="POST" action="/admin/users/{{.ID}}/quota" class="inline-form">
+                    <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
+                    <input type="text" name="quota" placeholder="e.g. 1GB">
+                    <button type="submit" class="btn-primary">Set Quota</button>
+                </form>
+                {{end}}
+            </td>
+        </tr>
+        {{end}}
+    </tbody>
+</table>
+{{else}}
+<p class="empty-state">No users.</p>
+{{end}}
+
+<h2>Invite Codes</h2>
+<form method="POST" action="/admin/invites" style="margin-bottom:.75rem">
+    <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
+    <button type="submit" class="btn-primary">Generate Invite Code</button>
+</form>
+
+{{if .Invites}}
+<table>
+    <thead>
+        <tr>
+            <th>Code</th>
+            <th>Status</th>
+            <th>Created</th>
+            <th>Actions</th>
+        </tr>
+    </thead>
+    <tbody>
+        {{range .Invites}}
+        <tr>
+            <td><code>{{.Code}}</code></td>
+            <td>
+                {{if .UsedBy}}<span class="badge badge-used">used</span>
+                {{else}}<span class="badge badge-available">available</span>
+                {{end}}
+            </td>
+            <td><time datetime="{{.CreatedAt}}">{{.CreatedAt}}</time></td>
+            <td>
+                {{if not .UsedBy}}
+                <form method="POST" action="/admin/invites/{{.Code}}/delete">
+                    <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
+                    <button type="submit" class="btn-danger">Delete</button>
+                </form>
+                {{end}}
+            </td>
+        </tr>
+        {{end}}
+    </tbody>
+</table>
+{{else}}
+<p class="empty-state">No invite codes yet.</p>
+{{end}}
+
+<h2>OAuth Test</h2>
+<p>Test the OAuth 2.0 implicit grant flow. This page acts as a minimal OAuth client.</p>
+
+{{with .OAuthTest}}
+
+{{if .Token}}
+    <div role="alert">
+        Access token received! You can use it with the storage API.
+    </div>
+    <dl>
+        <dt>Access Token</dt>
+        <dd><code id="token-display">{{.Token}}</code></dd>
+        <dt>Token Type</dt>
+        <dd>{{.TokenType}}</dd>
+        {{if .State}}
+        <dt>State</dt>
+        <dd>{{.State}}</dd>
+        {{end}}
+        <dt>Example curl</dt>
+        <dd><code id="curl-example"></code></dd>
+    </dl>
+    <script>
+        (function() {
+            var token = document.getElementById('token-display').textContent;
+            var baseURL = {{.BaseURL}};
+            var username = {{.Username}};
+            var curl = 'curl -H "Authorization: Bearer ' + token + '" ' + baseURL + '/storage/' + username + '/';
+            document.getElementById('curl-example').textContent = curl;
+        })();
+    </script>
+{{end}}
+
+{{if .Error}}
+    <div role="alert" class="alert-error">
+        OAuth error: <strong>{{.Error}}</strong>
+    </div>
+{{end}}
+
+<form id="oauth-test-form" method="GET" action="/oauth/authorize" style="max-width:28rem;margin-top:.75rem">
+    <input type="hidden" name="response_type" value="token">
+    <div>
+        <label for="redirect_uri">Redirect URI</label>
+        <input type="text" id="redirect_uri" name="redirect_uri" value="{{.CallbackURL}}" required>
+        <p>Where the token will be sent (this page's callback URL).</p>
+    </div>
+    <div>
+        <label for="scope">Scope</label>
+        <input type="text" id="scope" name="scope" value="*:rw" required>
+        <p>Space-separated scopes, e.g. <code>*:rw</code> or <code>contacts:r documents:rw</code></p>
+    </div>
+    <div>
+        <label for="state">State (optional)</label>
+        <input type="text" id="state" name="state" value="">
+        <p>Opaque value echoed back in the redirect.</p>
+    </div>
+    <button type="submit" class="btn-primary">Start Authorization</button>
+</form>
+
+<script>
+    // On page load, check if we have a fragment with access_token or error.
+    (function() {
+        var hash = window.location.hash.substring(1);
+        if (!hash) return;
+        var params = new URLSearchParams(hash);
+        if (params.has('access_token') || params.has('error')) {
+            var url = window.location.pathname + '?callback=1&' + hash;
+            window.location.replace(url);
+        }
+    })();
+</script>
+
+{{end}}
+
+{{end}}
+{{end}}

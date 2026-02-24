@@ -1,10 +1,10 @@
 {{define "register"}}
 <div class="form-page">
-    <h1 class="text-center">Register</h1>
+    <h1>Register</h1>
 
     {{with .Content}}
         {{if .Closed}}
-            <div role="alert" class="alert-warning text-center">
+            <div role="alert" class="alert-warning" style="text-align:center">
                 Registration is currently closed.
             </div>
         {{else}}
@@ -16,35 +16,29 @@
 
             <form method="POST" action="/register">
                 <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
-                <fieldset>
-                    <legend class="sr-only">Registration</legend>
+                <div>
+                    <label for="username">Username</label>
+                    <input type="text" id="username" name="username" required autocomplete="username"
+                        value="{{.Username}}">
+                </div>
 
+                {{if .InviteMode}}
                     <div>
-                        <label for="username">Username</label>
-                        <input type="text" id="username" name="username" required autocomplete="username"
-                            value="{{.Username}}">
+                        <label for="invite_code">Invite Code</label>
+                        <input type="text" id="invite_code" name="invite_code" required
+                            value="{{.InviteCode}}">
                     </div>
+                {{end}}
 
-                    {{if .InviteMode}}
-                        <div>
-                            <label for="invite_code">Invite Code</label>
-                            <input type="text" id="invite_code" name="invite_code" required
-                                value="{{.InviteCode}}">
-                        </div>
-                    {{end}}
-
-                    <div>
-                        <label for="password">Password</label>
-                        <input type="password" id="password" name="password" required autocomplete="new-password" minlength="8">
-                        <p>Minimum 8 characters</p>
-                    </div>
-
-                    <div>
-                        <label for="password_confirm">Confirm Password</label>
-                        <input type="password" id="password_confirm" name="password_confirm" required autocomplete="new-password">
-                    </div>
-                </fieldset>
-
+                <div>
+                    <label for="password">Password</label>
+                    <input type="password" id="password" name="password" required autocomplete="new-password" minlength="8">
+                    <p>Minimum 8 characters</p>
+                </div>
+                <div>
+                    <label for="password_confirm">Confirm Password</label>
+                    <input type="password" id="password_confirm" name="password_confirm" required autocomplete="new-password">
+                </div>
                 <button type="submit">Register</button>
             </form>
         {{end}}

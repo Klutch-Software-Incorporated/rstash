@@ -26,10 +26,8 @@ func Routes(deps *UIDeps) http.Handler {
 	mux.HandleFunc("GET /register", registerHandler.ShowRegister)
 	mux.HandleFunc("POST /register", registerHandler.DoRegister)
 
-	// Account settings.
+	// Account settings (POST-only actions, pages merged into home dashboard).
 	settingsHandler := SettingsHandler(deps)
-	mux.HandleFunc("GET /settings", settingsHandler.ShowSettings)
-	mux.HandleFunc("GET /settings/password", settingsHandler.ShowChangePassword)
 	mux.HandleFunc("POST /settings/password", RequireCSRF(settingsHandler.ChangePassword))
 	mux.HandleFunc("POST /settings/tokens/{token}/revoke", RequireCSRF(settingsHandler.RevokeToken))
 
@@ -41,16 +39,13 @@ func Routes(deps *UIDeps) http.Handler {
 	mux.HandleFunc("GET /files/{path...}", filesHandler.Browse)
 	mux.HandleFunc("POST /files/delete", RequireCSRF(filesHandler.Delete))
 
-	// Admin (all routes require auth + admin, enforced inside handler).
+	// Admin (single page, all sections combined).
 	adminHandler := AdminHandler(deps)
-	mux.HandleFunc("GET /admin", adminHandler.Dashboard)
-	mux.HandleFunc("GET /admin/users", adminHandler.Users)
+	mux.HandleFunc("GET /admin", adminHandler.Show)
 	mux.HandleFunc("POST /admin/users/{id}/delete", RequireCSRF(adminHandler.DeleteUser))
 	mux.HandleFunc("POST /admin/users/{id}/quota", RequireCSRF(adminHandler.SetUserQuota))
-	mux.HandleFunc("GET /admin/invites", adminHandler.Invites)
 	mux.HandleFunc("POST /admin/invites", RequireCSRF(adminHandler.CreateInvite))
 	mux.HandleFunc("POST /admin/invites/{code}/delete", RequireCSRF(adminHandler.DeleteInvite))
-	mux.HandleFunc("GET /admin/oauth-test", adminHandler.OAuthTest)
 
 	return mux
 }
