@@ -2,9 +2,7 @@ package db
 
 import (
 	"context"
-	"crypto/rand"
 	"database/sql"
-	"encoding/hex"
 	"fmt"
 	"strings"
 
@@ -46,7 +44,7 @@ func GetOAuthClient(ctx context.Context, q Querier, id string) (*model.OAuthClie
 // CreateOAuthToken generates a new OAuth access token for the given user and client.
 // Scopes are stored as a space-separated string. No expiry (revoke-only).
 func CreateOAuthToken(ctx context.Context, q Querier, userID int64, clientID string, scopes []string) (*model.OAuthToken, error) {
-	token, err := oauthRandomHex(32)
+	token, err := RandomHex(32)
 	if err != nil {
 		return nil, fmt.Errorf("generate oauth token: %w", err)
 	}
@@ -175,12 +173,4 @@ func GetRecentUserOAuthTokens(ctx context.Context, q Querier, userID int64, limi
 		tokens = append(tokens, &t)
 	}
 	return tokens, rows.Err()
-}
-
-func oauthRandomHex(n int) (string, error) {
-	b := make([]byte, n)
-	if _, err := rand.Read(b); err != nil {
-		return "", err
-	}
-	return hex.EncodeToString(b), nil
 }

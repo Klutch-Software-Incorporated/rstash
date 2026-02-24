@@ -2,9 +2,7 @@ package db
 
 import (
 	"context"
-	"crypto/rand"
 	"database/sql"
-	"encoding/hex"
 	"fmt"
 
 	"gosilo/internal/model"
@@ -13,11 +11,11 @@ import (
 // CreateSession generates a new session token and CSRF token for the given user,
 // with a 7-day expiry.
 func CreateSession(ctx context.Context, q Querier, userID int64) (*model.Session, error) {
-	token, err := randomHex(32)
+	token, err := RandomHex(32)
 	if err != nil {
 		return nil, fmt.Errorf("generate session token: %w", err)
 	}
-	csrf, err := randomHex(32)
+	csrf, err := RandomHex(32)
 	if err != nil {
 		return nil, fmt.Errorf("generate csrf token: %w", err)
 	}
@@ -115,12 +113,4 @@ func GetRecentUserSessions(ctx context.Context, q Querier, userID int64, limit i
 		sessions = append(sessions, &s)
 	}
 	return sessions, rows.Err()
-}
-
-func randomHex(n int) (string, error) {
-	b := make([]byte, n)
-	if _, err := rand.Read(b); err != nil {
-		return "", err
-	}
-	return hex.EncodeToString(b), nil
 }

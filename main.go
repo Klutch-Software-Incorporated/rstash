@@ -10,11 +10,13 @@ import (
 	"syscall"
 	"time"
 
+	"gosilo/internal/auth"
 	"gosilo/internal/blob"
 	"gosilo/internal/config"
 	"gosilo/internal/db"
-	"gosilo/internal/handler"
+	"gosilo/internal/api"
 	"gosilo/internal/storage"
+	"gosilo/internal/web"
 	"gosilo/internal/ui"
 )
 
@@ -53,11 +55,15 @@ func main() {
 	// Initialize storage service.
 	storageSvc := storage.NewService(database, blobs)
 
+	// Initialize auth service.
+	localAuth := auth.NewLocalService(database)
+
 	// Initialize template renderer.
 	renderer := ui.NewRenderer()
 
 	// UI dependencies (shared by UI handlers and OAuth).
-	uiDeps := &handler.UIDeps{
+	uiDeps := &web.UIDeps{
+		Auth:     localAuth,
 		DB:       database,
 		Renderer: renderer,
 		Config:   cfg,
@@ -67,19 +73,19 @@ func main() {
 	// Build routes.
 	mux := http.NewServeMux()
 
-	mux.Handle("/.well-known/webfinger", handler.CORS(handler.WebFinger(cfg)))
+	mux.Handle("/.well-known/webfinger", api.CORS(api.WebFinger(cfg)))
 
 	// OAuth routes (need auth loader + setup guard for session cookie support).
-	oauthH := handler.OAuthHandler(uiDeps)
+	oauthH := web.OAuthHandler(uiDeps)
 	oauthWrap := func(h http.HandlerFunc) http.Handler {
-		return handler.AuthLoader(database)(
-			handler.SetupGuard(database)(http.HandlerFunc(h)),
+		return web.AuthLoader(localAuth)(
+			web.SetupGuard(localAuth)(http.HandlerFunc(h)),
 		)
 	}
 	mux.Handle("GET /oauth/authorize", oauthWrap(oauthH.ShowAuthorize))
-	mux.Handle("POST /oauth/authorize", oauthWrap(oauthH.DoAuthorize))
-	mux.Handle("POST /oauth/token", handler.CORS(handler.OAuthToken()))
-	mux.Handle("/storage/{user}/{path...}", handler.CORS(handler.Storage(database, storageSvc)))
+	mux.Handle("POST /oauth/authorize", oauthWrap(web.RequireCSRF(oauthH.DoAuthorize)))
+	mux.Handle("POST /oauth/token", api.CORS(api.OAuthToken()))
+	mux.Handle("/storage/{user}/{path...}", api.CORS(api.Storage(database, storageSvc)))
 
 	// Static file server from embedded assets.
 	staticFS, err := fs.Sub(ui.Static, "static")
@@ -90,18 +96,18 @@ func main() {
 	mux.Handle("GET /static/", http.StripPrefix("/static/", http.FileServer(http.FS(staticFS))))
 
 	// Web UI routes (must be registered last so specific routes take precedence).
-	uiHandler := handler.UI(uiDeps)
+	uiHandler := web.Routes(uiDeps)
 
 	// Wrap UI handler with auth loader and setup guard.
-	wrapped := handler.AuthLoader(database)(
-		handler.SetupGuard(database)(uiHandler),
+	wrapped := web.AuthLoader(localAuth)(
+		web.SetupGuard(localAuth)(uiHandler),
 	)
 	mux.Handle("/", wrapped)
 
 	// Start server.
 	srv := &http.Server{
 		Addr:    cfg.Addr,
-		Handler: handler.RequestLogger(mux),
+		Handler: api.RequestLogger(mux),
 	}
 
 	// Graceful shutdown on SIGINT/SIGTERM.
@@ -115,7 +121,7 @@ func main() {
 		for {
 			select {
 			case <-ticker.C:
-				if err := db.DeleteExpiredSessions(context.Background(), database); err != nil {
+				if err := localAuth.CleanupExpiredSessions(context.Background()); err != nil {
 					slog.Error("failed to delete expired sessions", "error", err)
 				}
 				if err := db.DeleteExpiredOAuthTokens(context.Background(), database); err != nil {

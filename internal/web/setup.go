@@ -1,11 +1,11 @@
-package handler
+package web
 
 import (
 	"log/slog"
 	"net/http"
 	"strings"
 
-	"gosilo/internal/db"
+	"gosilo/internal/auth"
 	"gosilo/internal/ui"
 )
 
@@ -25,7 +25,7 @@ type setupContent struct {
 
 func (h *setupHandler) ShowSetup(w http.ResponseWriter, r *http.Request) {
 	// If users already exist, redirect to home.
-	count, err := db.UserCount(r.Context(), h.deps.DB)
+	count, err := h.deps.Auth.UserCount(r.Context())
 	if err != nil {
 		slog.Error("failed to check user count", "error", err)
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
@@ -44,7 +44,7 @@ func (h *setupHandler) ShowSetup(w http.ResponseWriter, r *http.Request) {
 
 func (h *setupHandler) DoSetup(w http.ResponseWriter, r *http.Request) {
 	// If users already exist, redirect to home.
-	count, err := db.UserCount(r.Context(), h.deps.DB)
+	count, err := h.deps.Auth.UserCount(r.Context())
 	if err != nil {
 		slog.Error("failed to check user count", "error", err)
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
@@ -70,8 +70,8 @@ func (h *setupHandler) DoSetup(w http.ResponseWriter, r *http.Request) {
 		renderErr("Username is required.")
 		return
 	}
-	if len(password) < 8 {
-		renderErr("Password must be at least 8 characters.")
+	if msg := validatePassword(password); msg != "" {
+		renderErr(msg)
 		return
 	}
 	if password != confirm {
@@ -79,7 +79,7 @@ func (h *setupHandler) DoSetup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user, err := db.CreateUser(r.Context(), h.deps.DB, username, password, true)
+	user, err := h.deps.Auth.CreateUser(r.Context(), username, password, true)
 	if err != nil {
 		slog.Error("failed to create admin user", "error", err)
 		renderErr("Failed to create user. Username may already be taken.")
@@ -87,14 +87,14 @@ func (h *setupHandler) DoSetup(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Create session.
-	sess, err := db.CreateSession(r.Context(), h.deps.DB, user.ID)
+	sess, err := h.deps.Auth.CreateSession(r.Context(), user.ID)
 	if err != nil {
 		slog.Error("failed to create session", "error", err)
 		http.Redirect(w, r, "/login", http.StatusSeeOther)
 		return
 	}
 
-	SetSessionCookie(w, sess.Token)
-	SetFlash(w, "Welcome to Gosilo! Your admin account has been created.")
+	auth.SetSessionCookie(w, sess.Token)
+	ui.SetFlash(w, "Welcome to Gosilo! Your admin account has been created.")
 	http.Redirect(w, r, "/admin", http.StatusSeeOther)
 }

@@ -1,4 +1,4 @@
-package handler
+package web
 
 import (
 	"fmt"
@@ -7,6 +7,7 @@ import (
 	"net/url"
 	"strings"
 
+	"gosilo/internal/api"
 	"gosilo/internal/db"
 	"gosilo/internal/ui"
 )
@@ -99,7 +100,7 @@ func (h *oauthHandler) ShowAuthorize(w http.ResponseWriter, r *http.Request) {
 	}
 
 	scopeStr := q.Get("scope")
-	scopes, ok := ParseScopes(scopeStr)
+	scopes, ok := api.ParseScopes(scopeStr)
 	if !ok {
 		http.Error(w, "invalid scope", http.StatusBadRequest)
 		return
@@ -137,11 +138,6 @@ func (h *oauthHandler) ShowAuthorize(w http.ResponseWriter, r *http.Request) {
 
 // DoAuthorize handles POST /oauth/authorize.
 func (h *oauthHandler) DoAuthorize(w http.ResponseWriter, r *http.Request) {
-	if !ValidateCSRF(r) {
-		http.Error(w, "Forbidden", http.StatusForbidden)
-		return
-	}
-
 	redirectURI := r.FormValue("redirect_uri")
 	state := r.FormValue("state")
 	action := r.FormValue("action")
@@ -184,7 +180,7 @@ func (h *oauthHandler) DoAuthorize(w http.ResponseWriter, r *http.Request) {
 
 	// Re-validate scopes from form.
 	scopeStr := strings.Join(scopes, " ")
-	validScopes, ok := ParseScopes(scopeStr)
+	validScopes, ok := api.ParseScopes(scopeStr)
 	if !ok {
 		http.Error(w, "invalid scope", http.StatusBadRequest)
 		return
@@ -211,11 +207,4 @@ func (h *oauthHandler) DoAuthorize(w http.ResponseWriter, r *http.Request) {
 	}
 	redirectBase.Fragment = fragment
 	http.Redirect(w, r, redirectBase.String(), http.StatusFound)
-}
-
-// OAuthToken handles POST /oauth/token (stub for future PKCE support).
-func OAuthToken() http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		http.Error(w, "oauth token: not yet implemented", http.StatusNotImplemented)
-	})
 }

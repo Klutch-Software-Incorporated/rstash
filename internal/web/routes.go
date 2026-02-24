@@ -1,24 +1,9 @@
-package handler
+package web
 
-import (
-	"database/sql"
-	"net/http"
+import "net/http"
 
-	"gosilo/internal/config"
-	"gosilo/internal/storage"
-	"gosilo/internal/ui"
-)
-
-// UIDeps holds the dependencies needed by UI handlers.
-type UIDeps struct {
-	DB       *sql.DB
-	Renderer *ui.Renderer
-	Config   *config.Config
-	Storage  *storage.Service
-}
-
-// UI returns an http.Handler that serves the web UI routes.
-func UI(deps *UIDeps) http.Handler {
+// Routes returns an http.Handler that serves the web UI routes.
+func Routes(deps *UIDeps) http.Handler {
 	mux := http.NewServeMux()
 
 	// Home page.
@@ -34,7 +19,7 @@ func UI(deps *UIDeps) http.Handler {
 	authHandler := AuthHandler(deps)
 	mux.HandleFunc("GET /login", authHandler.ShowLogin)
 	mux.HandleFunc("POST /login", authHandler.DoLogin)
-	mux.HandleFunc("POST /logout", authHandler.DoLogout)
+	mux.HandleFunc("POST /logout", RequireCSRF(authHandler.DoLogout))
 
 	// Registration.
 	registerHandler := RegisterHandler(deps)
@@ -45,8 +30,8 @@ func UI(deps *UIDeps) http.Handler {
 	settingsHandler := SettingsHandler(deps)
 	mux.HandleFunc("GET /settings", settingsHandler.ShowSettings)
 	mux.HandleFunc("GET /settings/password", settingsHandler.ShowChangePassword)
-	mux.HandleFunc("POST /settings/password", settingsHandler.ChangePassword)
-	mux.HandleFunc("POST /settings/tokens/{token}/revoke", settingsHandler.RevokeToken)
+	mux.HandleFunc("POST /settings/password", RequireCSRF(settingsHandler.ChangePassword))
+	mux.HandleFunc("POST /settings/tokens/{token}/revoke", RequireCSRF(settingsHandler.RevokeToken))
 
 	// File browser.
 	filesHandler := FilesHandler(deps)
@@ -54,16 +39,16 @@ func UI(deps *UIDeps) http.Handler {
 		http.Redirect(w, r, "/files/", http.StatusMovedPermanently)
 	})
 	mux.HandleFunc("GET /files/{path...}", filesHandler.Browse)
-	mux.HandleFunc("POST /files/delete", filesHandler.Delete)
+	mux.HandleFunc("POST /files/delete", RequireCSRF(filesHandler.Delete))
 
 	// Admin (all routes require auth + admin, enforced inside handler).
 	adminHandler := AdminHandler(deps)
 	mux.HandleFunc("GET /admin", adminHandler.Dashboard)
 	mux.HandleFunc("GET /admin/users", adminHandler.Users)
-	mux.HandleFunc("POST /admin/users/{id}/delete", adminHandler.DeleteUser)
+	mux.HandleFunc("POST /admin/users/{id}/delete", RequireCSRF(adminHandler.DeleteUser))
 	mux.HandleFunc("GET /admin/invites", adminHandler.Invites)
-	mux.HandleFunc("POST /admin/invites", adminHandler.CreateInvite)
-	mux.HandleFunc("POST /admin/invites/{code}/delete", adminHandler.DeleteInvite)
+	mux.HandleFunc("POST /admin/invites", RequireCSRF(adminHandler.CreateInvite))
+	mux.HandleFunc("POST /admin/invites/{code}/delete", RequireCSRF(adminHandler.DeleteInvite))
 	mux.HandleFunc("GET /admin/oauth-test", adminHandler.OAuthTest)
 
 	return mux

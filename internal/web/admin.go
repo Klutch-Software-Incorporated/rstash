@@ -1,4 +1,4 @@
-package handler
+package web
 
 import (
 	"fmt"
@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"strconv"
 
-	"gosilo/internal/db"
 	"gosilo/internal/ui"
 )
 
@@ -31,27 +30,19 @@ func (h *adminHandler) Dashboard(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	count, err := db.UserCount(r.Context(), h.deps.DB)
+	count, err := h.deps.Auth.UserCount(r.Context())
 	if err != nil {
 		slog.Error("failed to get user count", "error", err)
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		return
 	}
 
-	user := CurrentUser(r)
-	h.deps.Renderer.Render(w, "admin_dashboard", ui.PageData{
-		Title:            "Admin — Gosilo",
-		CurrentUser:      userInfo(user),
-		CSRFToken:        CSRFToken(r),
-		Flash:            GetFlash(w, r),
+	h.deps.Renderer.Render(w, "admin_dashboard", h.deps.pageData(w, r, "Admin — Gosilo", &dashboardContent{
+		UserCount:        count,
 		RegistrationMode: h.deps.Config.RegistrationMode,
-		Content: &dashboardContent{
-			UserCount:        count,
-			RegistrationMode: h.deps.Config.RegistrationMode,
-			BaseURL:          h.deps.Config.BaseURL,
-			BlobBackend:      h.deps.Config.BlobBackend,
-		},
-	})
+		BaseURL:          h.deps.Config.BaseURL,
+		BlobBackend:      h.deps.Config.BlobBackend,
+	}))
 }
 
 type usersContent struct {
@@ -71,7 +62,7 @@ func (h *adminHandler) Users(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	users, err := db.ListUsers(r.Context(), h.deps.DB)
+	users, err := h.deps.Auth.ListUsers(r.Context())
 	if err != nil {
 		slog.Error("failed to list users", "error", err)
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
@@ -90,22 +81,11 @@ func (h *adminHandler) Users(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	h.deps.Renderer.Render(w, "admin_users", ui.PageData{
-		Title:            "Users — Admin — Gosilo",
-		CurrentUser:      userInfo(currentUser),
-		CSRFToken:        CSRFToken(r),
-		Flash:            GetFlash(w, r),
-		RegistrationMode: h.deps.Config.RegistrationMode,
-		Content:          &usersContent{Users: rows},
-	})
+	h.deps.Renderer.Render(w, "admin_users", h.deps.pageData(w, r, "Users — Admin — Gosilo", &usersContent{Users: rows}))
 }
 
 func (h *adminHandler) DeleteUser(w http.ResponseWriter, r *http.Request) {
 	if !RequireAuth(w, r) || !RequireAdmin(w, r) {
-		return
-	}
-	if !ValidateCSRF(r) {
-		http.Error(w, "Forbidden", http.StatusForbidden)
 		return
 	}
 
@@ -118,23 +98,19 @@ func (h *adminHandler) DeleteUser(w http.ResponseWriter, r *http.Request) {
 
 	currentUser := CurrentUser(r)
 	if id == currentUser.ID {
-		SetFlash(w, "You cannot delete your own account.")
+		ui.SetFlash(w, "You cannot delete your own account.")
 		http.Redirect(w, r, "/admin/users", http.StatusSeeOther)
 		return
 	}
 
-	// Delete user's sessions first, then the user.
-	if err := db.DeleteUserSessions(r.Context(), h.deps.DB, id); err != nil {
-		slog.Error("failed to delete user sessions", "error", err)
-	}
-	if err := db.DeleteUser(r.Context(), h.deps.DB, id); err != nil {
+	if err := h.deps.Auth.DeleteUser(r.Context(), id); err != nil {
 		slog.Error("failed to delete user", "error", err)
-		SetFlash(w, "Failed to delete user.")
+		ui.SetFlash(w, "Failed to delete user.")
 		http.Redirect(w, r, "/admin/users", http.StatusSeeOther)
 		return
 	}
 
-	SetFlash(w, fmt.Sprintf("User deleted."))
+	ui.SetFlash(w, fmt.Sprintf("User deleted."))
 	http.Redirect(w, r, "/admin/users", http.StatusSeeOther)
 }
 
@@ -170,14 +146,7 @@ func (h *adminHandler) OAuthTest(w http.ResponseWriter, r *http.Request) {
 		content.Error = r.URL.Query().Get("error")
 	}
 
-	h.deps.Renderer.Render(w, "admin_oauth_test", ui.PageData{
-		Title:            "OAuth Test — Admin — Gosilo",
-		CurrentUser:      userInfo(user),
-		CSRFToken:        CSRFToken(r),
-		Flash:            GetFlash(w, r),
-		RegistrationMode: h.deps.Config.RegistrationMode,
-		Content:          content,
-	})
+	h.deps.Renderer.Render(w, "admin_oauth_test", h.deps.pageData(w, r, "OAuth Test — Admin — Gosilo", content))
 }
 
 type invitesContent struct {
@@ -195,7 +164,7 @@ func (h *adminHandler) Invites(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	invites, err := db.ListInviteCodes(r.Context(), h.deps.DB)
+	invites, err := h.deps.Auth.ListInvites(r.Context())
 	if err != nil {
 		slog.Error("failed to list invite codes", "error", err)
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
@@ -211,36 +180,24 @@ func (h *adminHandler) Invites(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	user := CurrentUser(r)
-	h.deps.Renderer.Render(w, "admin_invites", ui.PageData{
-		Title:            "Invites — Admin — Gosilo",
-		CurrentUser:      userInfo(user),
-		CSRFToken:        CSRFToken(r),
-		Flash:            GetFlash(w, r),
-		RegistrationMode: h.deps.Config.RegistrationMode,
-		Content:          &invitesContent{Invites: rows},
-	})
+	h.deps.Renderer.Render(w, "admin_invites", h.deps.pageData(w, r, "Invites — Admin — Gosilo", &invitesContent{Invites: rows}))
 }
 
 func (h *adminHandler) CreateInvite(w http.ResponseWriter, r *http.Request) {
 	if !RequireAuth(w, r) || !RequireAdmin(w, r) {
 		return
 	}
-	if !ValidateCSRF(r) {
-		http.Error(w, "Forbidden", http.StatusForbidden)
-		return
-	}
 
 	user := CurrentUser(r)
-	inv, err := db.CreateInviteCode(r.Context(), h.deps.DB, user.ID)
+	inv, err := h.deps.Auth.CreateInvite(r.Context(), user.ID)
 	if err != nil {
 		slog.Error("failed to create invite code", "error", err)
-		SetFlash(w, "Failed to generate invite code.")
+		ui.SetFlash(w, "Failed to generate invite code.")
 		http.Redirect(w, r, "/admin/invites", http.StatusSeeOther)
 		return
 	}
 
-	SetFlash(w, fmt.Sprintf("Invite code created: %s", inv.Code))
+	ui.SetFlash(w, fmt.Sprintf("Invite code created: %s", inv.Code))
 	http.Redirect(w, r, "/admin/invites", http.StatusSeeOther)
 }
 
@@ -248,19 +205,15 @@ func (h *adminHandler) DeleteInvite(w http.ResponseWriter, r *http.Request) {
 	if !RequireAuth(w, r) || !RequireAdmin(w, r) {
 		return
 	}
-	if !ValidateCSRF(r) {
-		http.Error(w, "Forbidden", http.StatusForbidden)
-		return
-	}
 
 	code := r.PathValue("code")
-	if err := db.DeleteInviteCode(r.Context(), h.deps.DB, code); err != nil {
+	if err := h.deps.Auth.DeleteInvite(r.Context(), code); err != nil {
 		slog.Error("failed to delete invite code", "error", err)
-		SetFlash(w, "Failed to delete invite code.")
+		ui.SetFlash(w, "Failed to delete invite code.")
 		http.Redirect(w, r, "/admin/invites", http.StatusSeeOther)
 		return
 	}
 
-	SetFlash(w, "Invite code deleted.")
+	ui.SetFlash(w, "Invite code deleted.")
 	http.Redirect(w, r, "/admin/invites", http.StatusSeeOther)
 }

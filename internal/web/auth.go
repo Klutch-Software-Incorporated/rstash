@@ -1,11 +1,12 @@
-package handler
+package web
 
 import (
+	"errors"
 	"log/slog"
 	"net/http"
 	"strings"
 
-	"gosilo/internal/db"
+	"gosilo/internal/auth"
 	"gosilo/internal/ui"
 )
 
@@ -32,12 +33,7 @@ func (h *authHandler) ShowLogin(w http.ResponseWriter, r *http.Request) {
 
 	redirectTo := r.URL.Query().Get("redirect")
 
-	h.deps.Renderer.Render(w, "login", ui.PageData{
-		Title:            "Login — Gosilo",
-		Flash:            GetFlash(w, r),
-		Content:          &loginContent{RedirectTo: redirectTo},
-		RegistrationMode: h.deps.Config.RegistrationMode,
-	})
+	h.deps.Renderer.Render(w, "login", h.deps.pageData(w, r, "Login — Gosilo", &loginContent{RedirectTo: redirectTo}))
 }
 
 func (h *authHandler) DoLogin(w http.ResponseWriter, r *http.Request) {
@@ -52,25 +48,25 @@ func (h *authHandler) DoLogin(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 
-	user, err := db.GetUserByUsername(r.Context(), h.deps.DB, username)
+	user, err := h.deps.Auth.Authenticate(r.Context(), username, password)
 	if err != nil {
-		slog.Error("failed to look up user", "error", err)
-		renderErr("An error occurred. Please try again.")
-		return
-	}
-	if user == nil || !db.CheckPassword(user, password) {
-		renderErr("Invalid username or password.")
+		if errors.Is(err, auth.ErrInvalidCredentials) {
+			renderErr("Invalid username or password.")
+		} else {
+			slog.Error("failed to authenticate", "error", err)
+			renderErr("An error occurred. Please try again.")
+		}
 		return
 	}
 
-	sess, err := db.CreateSession(r.Context(), h.deps.DB, user.ID)
+	sess, err := h.deps.Auth.CreateSession(r.Context(), user.ID)
 	if err != nil {
 		slog.Error("failed to create session", "error", err)
 		renderErr("An error occurred. Please try again.")
 		return
 	}
 
-	SetSessionCookie(w, sess.Token)
+	auth.SetSessionCookie(w, sess.Token)
 
 	// Redirect to the originally requested page, or home.
 	redirectTo := r.FormValue("redirect")
@@ -81,18 +77,13 @@ func (h *authHandler) DoLogin(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *authHandler) DoLogout(w http.ResponseWriter, r *http.Request) {
-	if !ValidateCSRF(r) {
-		http.Error(w, "Forbidden", http.StatusForbidden)
-		return
-	}
-
 	sess := CurrentSession(r)
 	if sess != nil {
-		if err := db.DeleteSession(r.Context(), h.deps.DB, sess.Token); err != nil {
+		if err := h.deps.Auth.DestroySession(r.Context(), sess.Token); err != nil {
 			slog.Error("failed to delete session", "error", err)
 		}
 	}
 
-	ClearSessionCookie(w)
+	auth.ClearSessionCookie(w)
 	http.Redirect(w, r, "/", http.StatusSeeOther)
 }

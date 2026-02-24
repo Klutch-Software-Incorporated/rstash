@@ -10,7 +10,7 @@ import (
 
 // CreateInviteCode generates a new invite code (8-byte hex = 16 chars).
 func CreateInviteCode(ctx context.Context, q Querier, createdBy int64) (*model.InviteCode, error) {
-	code, err := randomHex(8)
+	code, err := RandomHex(8)
 	if err != nil {
 		return nil, fmt.Errorf("generate invite code: %w", err)
 	}

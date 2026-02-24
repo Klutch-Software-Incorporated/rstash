@@ -1,0 +1,114 @@
+package auth
+
+import (
+	"context"
+	"database/sql"
+
+	"gosilo/internal/db"
+	"gosilo/internal/model"
+)
+
+// LocalService implements Service using the local SQLite database.
+type LocalService struct {
+	db *sql.DB
+}
+
+// NewLocalService returns a Service backed by the given database.
+func NewLocalService(database *sql.DB) *LocalService {
+	return &LocalService{db: database}
+}
+
+// --- Authentication ---
+
+func (s *LocalService) Authenticate(ctx context.Context, username, password string) (*model.User, error) {
+	user, err := db.GetUserByUsername(ctx, s.db, username)
+	if err != nil {
+		return nil, err
+	}
+	if user == nil || !db.CheckPassword(user, password) {
+		return nil, ErrInvalidCredentials
+	}
+	return user, nil
+}
+
+func (s *LocalService) CheckPassword(user *model.User, password string) bool {
+	return db.CheckPassword(user, password)
+}
+
+// --- Sessions ---
+
+func (s *LocalService) CreateSession(ctx context.Context, userID int64) (*model.Session, error) {
+	return db.CreateSession(ctx, s.db, userID)
+}
+
+func (s *LocalService) GetSession(ctx context.Context, token string) (*model.Session, error) {
+	return db.GetSessionByToken(ctx, s.db, token)
+}
+
+func (s *LocalService) DestroySession(ctx context.Context, token string) error {
+	return db.DeleteSession(ctx, s.db, token)
+}
+
+func (s *LocalService) InvalidateOtherSessions(ctx context.Context, userID int64, keepToken string) error {
+	return db.DeleteUserSessionsExcept(ctx, s.db, userID, keepToken)
+}
+
+func (s *LocalService) CleanupExpiredSessions(ctx context.Context) error {
+	return db.DeleteExpiredSessions(ctx, s.db)
+}
+
+// --- User CRUD ---
+
+func (s *LocalService) CreateUser(ctx context.Context, username, password string, isAdmin bool) (*model.User, error) {
+	return db.CreateUser(ctx, s.db, username, password, isAdmin)
+}
+
+func (s *LocalService) GetUser(ctx context.Context, id int64) (*model.User, error) {
+	return db.GetUserByID(ctx, s.db, id)
+}
+
+func (s *LocalService) GetUserByUsername(ctx context.Context, username string) (*model.User, error) {
+	return db.GetUserByUsername(ctx, s.db, username)
+}
+
+func (s *LocalService) ListUsers(ctx context.Context) ([]*model.User, error) {
+	return db.ListUsers(ctx, s.db)
+}
+
+func (s *LocalService) DeleteUser(ctx context.Context, id int64) error {
+	// Delete all sessions first, then the user record.
+	if err := db.DeleteUserSessions(ctx, s.db, id); err != nil {
+		return err
+	}
+	return db.DeleteUser(ctx, s.db, id)
+}
+
+func (s *LocalService) UpdatePassword(ctx context.Context, userID int64, newPassword string) error {
+	return db.UpdateUserPassword(ctx, s.db, userID, newPassword)
+}
+
+func (s *LocalService) UserCount(ctx context.Context) (int64, error) {
+	return db.UserCount(ctx, s.db)
+}
+
+// --- Invites ---
+
+func (s *LocalService) CreateInvite(ctx context.Context, createdBy int64) (*model.InviteCode, error) {
+	return db.CreateInviteCode(ctx, s.db, createdBy)
+}
+
+func (s *LocalService) GetInvite(ctx context.Context, code string) (*model.InviteCode, error) {
+	return db.GetInviteCode(ctx, s.db, code)
+}
+
+func (s *LocalService) RedeemInvite(ctx context.Context, code string, usedBy int64) error {
+	return db.RedeemInviteCode(ctx, s.db, code, usedBy)
+}
+
+func (s *LocalService) ListInvites(ctx context.Context) ([]*model.InviteCode, error) {
+	return db.ListInviteCodes(ctx, s.db)
+}
+
+func (s *LocalService) DeleteInvite(ctx context.Context, code string) error {
+	return db.DeleteInviteCode(ctx, s.db, code)
+}

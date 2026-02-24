@@ -9,31 +9,53 @@ import (
 	"gosilo/internal/model"
 )
 
-// GetNode returns the node at the given path for the user, or nil if not found.
-func GetNode(ctx context.Context, q Querier, userID int64, path string) (*model.Node, error) {
+// nodeColumns is the SELECT column list shared by all node queries.
+const nodeColumns = `id, user_id, path, is_folder,
+        COALESCE(content_type, ''), COALESCE(content_length, 0),
+        etag, created_at, updated_at`
+
+// scanNode scans a single node row into a model.Node.
+func scanNode(s interface{ Scan(...any) error }) (*model.Node, error) {
 	var n model.Node
-	err := q.QueryRowContext(ctx,
-		`SELECT id, user_id, path, is_folder,
-		        COALESCE(content_type, ''), COALESCE(content_length, 0),
-		        etag, created_at, updated_at
-		 FROM nodes WHERE user_id = ? AND path = ?`,
-		userID, path,
-	).Scan(&n.ID, &n.UserID, &n.Path, &n.IsFolder,
+	err := s.Scan(&n.ID, &n.UserID, &n.Path, &n.IsFolder,
 		&n.ContentType, &n.ContentLength,
 		&n.ETag, &n.CreatedAt, &n.UpdatedAt)
+	return &n, err
+}
+
+// scanNodes scans all rows into a slice of model.Node pointers.
+func scanNodes(rows *sql.Rows) ([]*model.Node, error) {
+	defer rows.Close()
+	var nodes []*model.Node
+	for rows.Next() {
+		n, err := scanNode(rows)
+		if err != nil {
+			return nil, fmt.Errorf("scan node: %w", err)
+		}
+		nodes = append(nodes, n)
+	}
+	return nodes, rows.Err()
+}
+
+// GetNode returns the node at the given path for the user, or nil if not found.
+func GetNode(ctx context.Context, q Querier, userID int64, path string) (*model.Node, error) {
+	row := q.QueryRowContext(ctx,
+		`SELECT `+nodeColumns+` FROM nodes WHERE user_id = ? AND path = ?`,
+		userID, path,
+	)
+	n, err := scanNode(row)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
 	if err != nil {
 		return nil, fmt.Errorf("get node: %w", err)
 	}
-	return &n, nil
+	return n, nil
 }
 
 // UpsertNode creates or updates a node, returning the resulting row.
 func UpsertNode(ctx context.Context, q Querier, userID int64, path string, isFolder bool, contentType string, contentLength int64, etag string) (*model.Node, error) {
-	var n model.Node
-	err := q.QueryRowContext(ctx,
+	row := q.QueryRowContext(ctx,
 		`INSERT INTO nodes (user_id, path, is_folder, content_type, content_length, etag)
 		 VALUES (?, ?, ?, ?, ?, ?)
 		 ON CONFLICT(user_id, path) DO UPDATE SET
@@ -41,17 +63,14 @@ func UpsertNode(ctx context.Context, q Querier, userID int64, path string, isFol
 		     content_length = excluded.content_length,
 		     etag = excluded.etag,
 		     updated_at = datetime('now')
-		 RETURNING id, user_id, path, is_folder,
-		           COALESCE(content_type, ''), COALESCE(content_length, 0),
-		           etag, created_at, updated_at`,
+		 RETURNING `+nodeColumns,
 		userID, path, isFolder, contentType, contentLength, etag,
-	).Scan(&n.ID, &n.UserID, &n.Path, &n.IsFolder,
-		&n.ContentType, &n.ContentLength,
-		&n.ETag, &n.CreatedAt, &n.UpdatedAt)
+	)
+	n, err := scanNode(row)
 	if err != nil {
 		return nil, fmt.Errorf("upsert node: %w", err)
 	}
-	return &n, nil
+	return n, nil
 }
 
 // DeleteNode removes the node at the given path for the user.
@@ -69,9 +88,7 @@ func DeleteNode(ctx context.Context, q Querier, userID int64, path string) error
 // ListChildren returns the direct children of a folder.
 func ListChildren(ctx context.Context, q Querier, userID int64, folderPath string) ([]*model.Node, error) {
 	rows, err := q.QueryContext(ctx,
-		`SELECT id, user_id, path, is_folder,
-		        COALESCE(content_type, ''), COALESCE(content_length, 0),
-		        etag, created_at, updated_at
+		`SELECT `+nodeColumns+`
 		 FROM nodes
 		 WHERE user_id = ? AND path LIKE ? AND path != ?`,
 		userID, folderPath+"%", folderPath,
@@ -83,10 +100,8 @@ func ListChildren(ctx context.Context, q Querier, userID int64, folderPath strin
 
 	var nodes []*model.Node
 	for rows.Next() {
-		var n model.Node
-		if err := rows.Scan(&n.ID, &n.UserID, &n.Path, &n.IsFolder,
-			&n.ContentType, &n.ContentLength,
-			&n.ETag, &n.CreatedAt, &n.UpdatedAt); err != nil {
+		n, err := scanNode(rows)
+		if err != nil {
 			return nil, fmt.Errorf("scan node: %w", err)
 		}
 		// Filter to direct children only: the remainder after folderPath
@@ -94,7 +109,7 @@ func ListChildren(ctx context.Context, q Querier, userID int64, folderPath strin
 		rest := strings.TrimPrefix(n.Path, folderPath)
 		slashIdx := strings.Index(rest, "/")
 		if slashIdx == -1 || slashIdx == len(rest)-1 {
-			nodes = append(nodes, &n)
+			nodes = append(nodes, n)
 		}
 	}
 	return nodes, rows.Err()
@@ -159,9 +174,7 @@ func GetUserModuleStats(ctx context.Context, q Querier, userID int64) ([]*Module
 // GetRecentUserNodes returns the most recently modified non-folder nodes for a user.
 func GetRecentUserNodes(ctx context.Context, q Querier, userID int64, limit int) ([]*model.Node, error) {
 	rows, err := q.QueryContext(ctx,
-		`SELECT id, user_id, path, is_folder,
-		        COALESCE(content_type, ''), COALESCE(content_length, 0),
-		        etag, created_at, updated_at
+		`SELECT `+nodeColumns+`
 		 FROM nodes
 		 WHERE user_id = ? AND is_folder = 0
 		 ORDER BY updated_at DESC
@@ -171,19 +184,7 @@ func GetRecentUserNodes(ctx context.Context, q Querier, userID int64, limit int)
 	if err != nil {
 		return nil, fmt.Errorf("get recent user nodes: %w", err)
 	}
-	defer rows.Close()
-
-	var nodes []*model.Node
-	for rows.Next() {
-		var n model.Node
-		if err := rows.Scan(&n.ID, &n.UserID, &n.Path, &n.IsFolder,
-			&n.ContentType, &n.ContentLength,
-			&n.ETag, &n.CreatedAt, &n.UpdatedAt); err != nil {
-			return nil, fmt.Errorf("scan node: %w", err)
-		}
-		nodes = append(nodes, &n)
-	}
-	return nodes, rows.Err()
+	return scanNodes(rows)
 }
 
 // GetSubtreeSize returns the total content_length of all non-folder descendants
@@ -204,9 +205,7 @@ func GetSubtreeSize(ctx context.Context, q Querier, userID int64, folderPath str
 // ListDescendantFiles returns all non-folder nodes under a folder path (recursive).
 func ListDescendantFiles(ctx context.Context, q Querier, userID int64, folderPath string) ([]*model.Node, error) {
 	rows, err := q.QueryContext(ctx,
-		`SELECT id, user_id, path, is_folder,
-		        COALESCE(content_type, ''), COALESCE(content_length, 0),
-		        etag, created_at, updated_at
+		`SELECT `+nodeColumns+`
 		 FROM nodes
 		 WHERE user_id = ? AND path LIKE ? || '%' AND is_folder = 0 AND path != ?`,
 		userID, folderPath, folderPath,
@@ -214,19 +213,7 @@ func ListDescendantFiles(ctx context.Context, q Querier, userID int64, folderPat
 	if err != nil {
 		return nil, fmt.Errorf("list descendant files: %w", err)
 	}
-	defer rows.Close()
-
-	var nodes []*model.Node
-	for rows.Next() {
-		var n model.Node
-		if err := rows.Scan(&n.ID, &n.UserID, &n.Path, &n.IsFolder,
-			&n.ContentType, &n.ContentLength,
-			&n.ETag, &n.CreatedAt, &n.UpdatedAt); err != nil {
-			return nil, fmt.Errorf("scan node: %w", err)
-		}
-		nodes = append(nodes, &n)
-	}
-	return nodes, rows.Err()
+	return scanNodes(rows)
 }
 
 // DeleteSubtree removes all nodes (files and folders) under a given folder path,

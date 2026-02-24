@@ -40,7 +40,8 @@ All configuration is via environment variables:
 - `internal/db/` — SQLite database initialization and migrations
 - `internal/model/` — domain types (User, OAuthClient, OAuthToken, Node)
 - `internal/blob/` — pluggable blob storage interface and backends (SQLite, filesystem, S3)
-- `internal/handler/` — HTTP handlers: WebFinger, OAuth, storage API, web UI
+- `internal/api/` — remoteStorage protocol handlers (storage API, WebFinger, OAuth token), CORS, scope checking, request logging
+- `internal/web/` — web UI handlers (login, setup, registration, admin, file browser, OAuth authorize), session middleware, CSRF
 - `internal/ui/` — embedded templates and static assets (go:embed)
 
 ## Key Conventions

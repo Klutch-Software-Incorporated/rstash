@@ -1,4 +1,4 @@
-package handler
+package web
 
 import (
 	"fmt"
@@ -88,12 +88,12 @@ func (h *filesHandler) browseFolder(w http.ResponseWriter, r *http.Request, user
 			if err != nil {
 				slog.Error("failed to get subtree size", "error", err, "path", storagePath+name)
 			} else {
-				fi.Size = humanSize(subtreeSize)
+				fi.Size = formatBytes(subtreeSize)
 			}
 		} else {
 			fi.ContentType = item.ContentType
 			if item.ContentLength != nil {
-				fi.Size = humanSize(*item.ContentLength)
+				fi.Size = formatBytes(*item.ContentLength)
 			}
 		}
 		items = append(items, fi)
@@ -109,18 +109,12 @@ func (h *filesHandler) browseFolder(w http.ResponseWriter, r *http.Request, user
 
 	breadcrumbs := buildBreadcrumbs(storagePath)
 
-	h.deps.Renderer.Render(w, "files", ui.PageData{
-		Title:       "Files — " + storagePath,
-		CurrentUser: userInfo(CurrentUser(r)),
-		CSRFToken:   CSRFToken(r),
-		Flash:       GetFlash(w, r),
-		Content: filesContent{
-			Username:    username,
-			CurrentPath: storagePath,
-			Breadcrumbs: breadcrumbs,
-			Items:       items,
-		},
-	})
+	h.deps.Renderer.Render(w, "files", h.deps.pageData(w, r, "Files — "+storagePath, filesContent{
+		Username:    username,
+		CurrentPath: storagePath,
+		Breadcrumbs: breadcrumbs,
+		Items:       items,
+	}))
 }
 
 func (h *filesHandler) downloadFile(w http.ResponseWriter, r *http.Request, userID int64, storagePath string) {
@@ -149,10 +143,6 @@ func (h *filesHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	if !RequireAuth(w, r) {
 		return
 	}
-	if !ValidateCSRF(r) {
-		http.Error(w, "Forbidden", http.StatusForbidden)
-		return
-	}
 	user := CurrentUser(r)
 
 	deletePath := r.FormValue("path")
@@ -166,20 +156,20 @@ func (h *filesHandler) Delete(w http.ResponseWriter, r *http.Request) {
 		count, err := h.deps.Storage.DeleteFolder(r.Context(), user.ID, deletePath)
 		if err != nil {
 			slog.Error("failed to delete folder", "error", err, "path", deletePath)
-			SetFlash(w, "Delete failed: "+err.Error())
+			ui.SetFlash(w, "Delete failed: "+err.Error())
 		} else {
 			name := strings.TrimSuffix(path.Base(strings.TrimSuffix(deletePath, "/")), "/")
-			SetFlash(w, fmt.Sprintf("Deleted %s/ (%d files)", name, count))
+			ui.SetFlash(w, fmt.Sprintf("Deleted %s/ (%d files)", name, count))
 		}
 	} else {
 		// Single file delete.
 		_, err := h.deps.Storage.DeleteDocument(r.Context(), user.ID, deletePath, storage.Conditions{})
 		if err != nil {
 			slog.Error("failed to delete document", "error", err, "path", deletePath)
-			SetFlash(w, "Delete failed: "+err.Error())
+			ui.SetFlash(w, "Delete failed: "+err.Error())
 		} else {
 			name := path.Base(deletePath)
-			SetFlash(w, fmt.Sprintf("Deleted %s", name))
+			ui.SetFlash(w, fmt.Sprintf("Deleted %s", name))
 		}
 	}
 
@@ -205,18 +195,4 @@ func buildBreadcrumbs(storagePath string) []breadcrumb {
 		crumbs = append(crumbs, breadcrumb{Name: part, Path: href})
 	}
 	return crumbs
-}
-
-// humanSize formats bytes into a human-readable string.
-func humanSize(bytes int64) string {
-	switch {
-	case bytes >= 1<<30:
-		return fmt.Sprintf("%.1f GB", float64(bytes)/float64(1<<30))
-	case bytes >= 1<<20:
-		return fmt.Sprintf("%.1f MB", float64(bytes)/float64(1<<20))
-	case bytes >= 1<<10:
-		return fmt.Sprintf("%.1f KB", float64(bytes)/float64(1<<10))
-	default:
-		return fmt.Sprintf("%d B", bytes)
-	}
 }

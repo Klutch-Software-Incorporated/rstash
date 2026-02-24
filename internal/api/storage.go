@@ -1,4 +1,4 @@
-package handler
+package api
 
 import (
 	"database/sql"
@@ -90,7 +90,7 @@ func Storage(database *sql.DB, svc *storage.Service) http.Handler {
 			}
 		case http.MethodHead:
 			if isFolder {
-				handleHeadFolder(w, r, svc, user.ID, storagePath, cond)
+				handleGetFolder(w, r, svc, user.ID, storagePath, cond)
 			} else {
 				handleHeadDocument(w, r, svc, user.ID, storagePath, cond)
 			}
@@ -172,26 +172,6 @@ func handleGetFolder(w http.ResponseWriter, r *http.Request, svc *storage.Servic
 	w.Header().Set("Cache-Control", "no-cache")
 	w.WriteHeader(http.StatusOK)
 	w.Write(body)
-}
-
-func handleHeadFolder(w http.ResponseWriter, r *http.Request, svc *storage.Service, userID int64, path string, cond storage.Conditions) {
-	desc, etag, err := svc.GetFolder(r.Context(), userID, path, cond)
-	if err != nil {
-		writeServiceError(w, err)
-		return
-	}
-
-	body, err := json.Marshal(desc)
-	if err != nil {
-		http.Error(w, "internal error", http.StatusInternalServerError)
-		return
-	}
-
-	w.Header().Set("ETag", storage.QuoteETag(etag))
-	w.Header().Set("Content-Type", "application/ld+json")
-	w.Header().Set("Content-Length", fmt.Sprintf("%d", len(body)))
-	w.Header().Set("Cache-Control", "no-cache")
-	w.WriteHeader(http.StatusOK)
 }
 
 func handlePutDocument(w http.ResponseWriter, r *http.Request, svc *storage.Service, userID int64, path string, cond storage.Conditions) {

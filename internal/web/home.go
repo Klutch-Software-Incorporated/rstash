@@ -1,15 +1,13 @@
-package handler
+package web
 
 import (
 	"context"
 	"database/sql"
-	"fmt"
 	"log/slog"
 	"net/http"
 	"sort"
 
 	"gosilo/internal/db"
-	"gosilo/internal/ui"
 )
 
 type homeHandler struct {
@@ -55,12 +53,7 @@ func (h *homeHandler) Show(w http.ResponseWriter, r *http.Request) {
 
 	user := CurrentUser(r)
 	if user == nil {
-		h.deps.Renderer.Render(w, "home", ui.PageData{
-			Title:            "Gosilo",
-			CSRFToken:        CSRFToken(r),
-			Flash:            GetFlash(w, r),
-			RegistrationMode: h.deps.Config.RegistrationMode,
-		})
+		h.deps.Renderer.Render(w, "home", h.deps.pageData(w, r, "Gosilo", nil))
 		return
 	}
 
@@ -98,22 +91,15 @@ func (h *homeHandler) Show(w http.ResponseWriter, r *http.Request) {
 
 	activity := buildActivityFeed(ctx, h.deps.DB, user.ID)
 
-	h.deps.Renderer.Render(w, "home", ui.PageData{
-		Title:            "Gosilo",
-		CurrentUser:      userInfo(user),
-		CSRFToken:        CSRFToken(r),
-		Flash:            GetFlash(w, r),
-		RegistrationMode: h.deps.Config.RegistrationMode,
-		Content: &homeContent{
-			Stats: &homeStats{
-				FileCount:   stats.FileCount,
-				StorageUsed: formatBytes(stats.TotalBytes),
-				OAuthApps:   tokenCount,
-			},
-			Modules:  moduleRows,
-			Activity: activity,
+	h.deps.Renderer.Render(w, "home", h.deps.pageData(w, r, "Gosilo", &homeContent{
+		Stats: &homeStats{
+			FileCount:   stats.FileCount,
+			StorageUsed: formatBytes(stats.TotalBytes),
+			OAuthApps:   tokenCount,
 		},
-	})
+		Modules:  moduleRows,
+		Activity: activity,
+	}))
 }
 
 func buildActivityFeed(ctx context.Context, database *sql.DB, userID int64) []*activityEvent {
@@ -169,17 +155,4 @@ func buildActivityFeed(ctx context.Context, database *sql.DB, userID int64) []*a
 	}
 
 	return events
-}
-
-func formatBytes(b int64) string {
-	switch {
-	case b >= 1<<30:
-		return fmt.Sprintf("%.1f GB", float64(b)/float64(1<<30))
-	case b >= 1<<20:
-		return fmt.Sprintf("%.1f MB", float64(b)/float64(1<<20))
-	case b >= 1<<10:
-		return fmt.Sprintf("%.1f KB", float64(b)/float64(1<<10))
-	default:
-		return fmt.Sprintf("%d B", b)
-	}
 }

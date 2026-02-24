@@ -1,14 +1,12 @@
-package handler
+package web
 
 import (
 	"context"
-	"database/sql"
 	"log/slog"
 	"net/http"
 	"sync/atomic"
-	"time"
 
-	"gosilo/internal/db"
+	"gosilo/internal/auth"
 	"gosilo/internal/model"
 	"gosilo/internal/ui"
 )
@@ -22,7 +20,7 @@ const (
 
 // AuthLoader returns middleware that reads the session cookie and loads
 // the user into the request context.
-func AuthLoader(database *sql.DB) func(http.Handler) http.Handler {
+func AuthLoader(authSvc auth.Service) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			cookie, err := r.Cookie("gosilo_session")
@@ -31,7 +29,7 @@ func AuthLoader(database *sql.DB) func(http.Handler) http.Handler {
 				return
 			}
 
-			sess, err := db.GetSessionByToken(r.Context(), database, cookie.Value)
+			sess, err := authSvc.GetSession(r.Context(), cookie.Value)
 			if err != nil {
 				slog.Error("failed to get session", "error", err)
 				next.ServeHTTP(w, r)
@@ -39,19 +37,12 @@ func AuthLoader(database *sql.DB) func(http.Handler) http.Handler {
 			}
 			if sess == nil {
 				// Expired or invalid — clear cookie.
-				http.SetCookie(w, &http.Cookie{
-					Name:     "gosilo_session",
-					Value:    "",
-					Path:     "/",
-					MaxAge:   -1,
-					HttpOnly: true,
-					SameSite: http.SameSiteLaxMode,
-				})
+				auth.ClearSessionCookie(w)
 				next.ServeHTTP(w, r)
 				return
 			}
 
-			user, err := db.GetUserByID(r.Context(), database, sess.UserID)
+			user, err := authSvc.GetUser(r.Context(), sess.UserID)
 			if err != nil || user == nil {
 				next.ServeHTTP(w, r)
 				return
@@ -94,6 +85,17 @@ func ValidateCSRF(r *http.Request) bool {
 	return r.FormValue("csrf_token") == sess.CSRFToken
 }
 
+// RequireCSRF wraps a handler to reject requests with an invalid CSRF token.
+func RequireCSRF(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if !ValidateCSRF(r) {
+			http.Error(w, "Forbidden", http.StatusForbidden)
+			return
+		}
+		next(w, r)
+	}
+}
+
 // RequireAuth redirects to /login if not authenticated.
 func RequireAuth(w http.ResponseWriter, r *http.Request) bool {
 	if CurrentUser(r) == nil {
@@ -114,7 +116,7 @@ func RequireAdmin(w http.ResponseWriter, r *http.Request) bool {
 }
 
 // SetupGuard returns middleware that redirects to /setup when no users exist.
-func SetupGuard(database *sql.DB) func(http.Handler) http.Handler {
+func SetupGuard(authSvc auth.Service) func(http.Handler) http.Handler {
 	var hasUsers atomic.Bool
 
 	return func(next http.Handler) http.Handler {
@@ -126,7 +128,7 @@ func SetupGuard(database *sql.DB) func(http.Handler) http.Handler {
 			}
 
 			if !hasUsers.Load() {
-				count, err := db.UserCount(r.Context(), database)
+				count, err := authSvc.UserCount(r.Context())
 				if err != nil {
 					slog.Error("failed to check user count", "error", err)
 					next.ServeHTTP(w, r)
@@ -142,79 +144,6 @@ func SetupGuard(database *sql.DB) func(http.Handler) http.Handler {
 			next.ServeHTTP(w, r)
 		})
 	}
-}
-
-// SetFlash sets a flash message cookie.
-func SetFlash(w http.ResponseWriter, message string) {
-	http.SetCookie(w, &http.Cookie{
-		Name:     "gosilo_flash",
-		Value:    message,
-		Path:     "/",
-		MaxAge:   60,
-		HttpOnly: true,
-		SameSite: http.SameSiteLaxMode,
-	})
-}
-
-// GetFlash reads and clears the flash message cookie.
-func GetFlash(w http.ResponseWriter, r *http.Request) string {
-	cookie, err := r.Cookie("gosilo_flash")
-	if err != nil {
-		return ""
-	}
-	// Clear it.
-	http.SetCookie(w, &http.Cookie{
-		Name:     "gosilo_flash",
-		Value:    "",
-		Path:     "/",
-		MaxAge:   -1,
-		HttpOnly: true,
-		SameSite: http.SameSiteLaxMode,
-	})
-	return cookie.Value
-}
-
-// SetSessionCookie sets the session cookie.
-func SetSessionCookie(w http.ResponseWriter, token string) {
-	http.SetCookie(w, &http.Cookie{
-		Name:     "gosilo_session",
-		Value:    token,
-		Path:     "/",
-		MaxAge:   7 * 24 * int(time.Hour/time.Second),
-		HttpOnly: true,
-		SameSite: http.SameSiteLaxMode,
-	})
-}
-
-// ClearSessionCookie removes the session cookie.
-func ClearSessionCookie(w http.ResponseWriter) {
-	http.SetCookie(w, &http.Cookie{
-		Name:     "gosilo_session",
-		Value:    "",
-		Path:     "/",
-		MaxAge:   -1,
-		HttpOnly: true,
-		SameSite: http.SameSiteLaxMode,
-	})
-}
-
-// CORS wraps a handler with the CORS headers required by
-// draft-dejong-remotestorage-26 (storage API and WebFinger).
-func CORS(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Access-Control-Allow-Origin", "*")
-		w.Header().Set("Access-Control-Allow-Methods", "GET, HEAD, PUT, DELETE")
-		w.Header().Set("Access-Control-Allow-Headers",
-			"Authorization, Content-Length, Content-Type, Origin, X-Requested-With, If-Match, If-None-Match")
-		w.Header().Set("Access-Control-Expose-Headers", "Content-Length, Content-Type, ETag")
-		w.Header().Set("Access-Control-Max-Age", "86400")
-
-		if r.Method == http.MethodOptions {
-			w.WriteHeader(http.StatusOK)
-			return
-		}
-		next.ServeHTTP(w, r)
-	})
 }
 
 // userInfo converts a model.User to a ui.UserInfo, or nil if user is nil.

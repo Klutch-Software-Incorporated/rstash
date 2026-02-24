@@ -1,4 +1,4 @@
-package handler
+package web
 
 import (
 	"log/slog"
@@ -58,14 +58,7 @@ func (h *settingsHandler) ShowSettings(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	h.deps.Renderer.Render(w, "settings", ui.PageData{
-		Title:            "Settings — Gosilo",
-		CurrentUser:      userInfo(user),
-		CSRFToken:        CSRFToken(r),
-		Flash:            GetFlash(w, r),
-		RegistrationMode: h.deps.Config.RegistrationMode,
-		Content:          &settingsContent{Tokens: rows},
-	})
+	h.deps.Renderer.Render(w, "settings", h.deps.pageData(w, r, "Settings — Gosilo", &settingsContent{Tokens: rows}))
 }
 
 func (h *settingsHandler) ShowChangePassword(w http.ResponseWriter, r *http.Request) {
@@ -73,23 +66,11 @@ func (h *settingsHandler) ShowChangePassword(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	user := CurrentUser(r)
-	h.deps.Renderer.Render(w, "change_password", ui.PageData{
-		Title:            "Change Password — Gosilo",
-		CurrentUser:      userInfo(user),
-		CSRFToken:        CSRFToken(r),
-		Flash:            GetFlash(w, r),
-		RegistrationMode: h.deps.Config.RegistrationMode,
-		Content:          &changePasswordContent{},
-	})
+	h.deps.Renderer.Render(w, "change_password", h.deps.pageData(w, r, "Change Password — Gosilo", &changePasswordContent{}))
 }
 
 func (h *settingsHandler) ChangePassword(w http.ResponseWriter, r *http.Request) {
 	if !RequireAuth(w, r) {
-		return
-	}
-	if !ValidateCSRF(r) {
-		http.Error(w, "Forbidden", http.StatusForbidden)
 		return
 	}
 
@@ -108,13 +89,13 @@ func (h *settingsHandler) ChangePassword(w http.ResponseWriter, r *http.Request)
 		})
 	}
 
-	if !db.CheckPassword(user, currentPassword) {
+	if !h.deps.Auth.CheckPassword(user, currentPassword) {
 		renderErr("Current password is incorrect.")
 		return
 	}
 
-	if len(newPassword) < 8 {
-		renderErr("New password must be at least 8 characters.")
+	if msg := validatePassword(newPassword); msg != "" {
+		renderErr(msg)
 		return
 	}
 
@@ -123,7 +104,7 @@ func (h *settingsHandler) ChangePassword(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	if err := db.UpdateUserPassword(r.Context(), h.deps.DB, user.ID, newPassword); err != nil {
+	if err := h.deps.Auth.UpdatePassword(r.Context(), user.ID, newPassword); err != nil {
 		slog.Error("failed to update password", "error", err)
 		renderErr("An error occurred. Please try again.")
 		return
@@ -131,20 +112,16 @@ func (h *settingsHandler) ChangePassword(w http.ResponseWriter, r *http.Request)
 
 	// Invalidate all other sessions.
 	sess := CurrentSession(r)
-	if err := db.DeleteUserSessionsExcept(r.Context(), h.deps.DB, user.ID, sess.Token); err != nil {
+	if err := h.deps.Auth.InvalidateOtherSessions(r.Context(), user.ID, sess.Token); err != nil {
 		slog.Error("failed to invalidate other sessions", "error", err)
 	}
 
-	SetFlash(w, "Password changed successfully.")
+	ui.SetFlash(w, "Password changed successfully.")
 	http.Redirect(w, r, "/settings", http.StatusSeeOther)
 }
 
 func (h *settingsHandler) RevokeToken(w http.ResponseWriter, r *http.Request) {
 	if !RequireAuth(w, r) {
-		return
-	}
-	if !ValidateCSRF(r) {
-		http.Error(w, "Forbidden", http.StatusForbidden)
 		return
 	}
 
@@ -155,23 +132,23 @@ func (h *settingsHandler) RevokeToken(w http.ResponseWriter, r *http.Request) {
 	t, err := db.GetOAuthToken(r.Context(), h.deps.DB, token)
 	if err != nil {
 		slog.Error("failed to get oauth token", "error", err)
-		SetFlash(w, "Failed to revoke token.")
+		ui.SetFlash(w, "Failed to revoke token.")
 		http.Redirect(w, r, "/settings", http.StatusSeeOther)
 		return
 	}
 	if t == nil || t.UserID != user.ID {
-		SetFlash(w, "Token not found.")
+		ui.SetFlash(w, "Token not found.")
 		http.Redirect(w, r, "/settings", http.StatusSeeOther)
 		return
 	}
 
 	if err := db.DeleteOAuthToken(r.Context(), h.deps.DB, token); err != nil {
 		slog.Error("failed to revoke oauth token", "error", err)
-		SetFlash(w, "Failed to revoke token.")
+		ui.SetFlash(w, "Failed to revoke token.")
 		http.Redirect(w, r, "/settings", http.StatusSeeOther)
 		return
 	}
 
-	SetFlash(w, "Token revoked.")
+	ui.SetFlash(w, "Token revoked.")
 	http.Redirect(w, r, "/settings", http.StatusSeeOther)
 }

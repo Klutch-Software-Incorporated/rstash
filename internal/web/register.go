@@ -1,11 +1,11 @@
-package handler
+package web
 
 import (
 	"log/slog"
 	"net/http"
 	"strings"
 
-	"gosilo/internal/db"
+	"gosilo/internal/auth"
 	"gosilo/internal/ui"
 )
 
@@ -38,12 +38,7 @@ func (h *registerHandler) ShowRegister(w http.ResponseWriter, r *http.Request) {
 		InviteMode: mode == "invite",
 	}
 
-	h.deps.Renderer.Render(w, "register", ui.PageData{
-		Title:            "Register — Gosilo",
-		Flash:            GetFlash(w, r),
-		Content:          content,
-		RegistrationMode: mode,
-	})
+	h.deps.Renderer.Render(w, "register", h.deps.pageData(w, r, "Register — Gosilo", content))
 }
 
 func (h *registerHandler) DoRegister(w http.ResponseWriter, r *http.Request) {
@@ -76,8 +71,8 @@ func (h *registerHandler) DoRegister(w http.ResponseWriter, r *http.Request) {
 		renderErr("Username is required.")
 		return
 	}
-	if len(password) < 8 {
-		renderErr("Password must be at least 8 characters.")
+	if msg := validatePassword(password); msg != "" {
+		renderErr(msg)
 		return
 	}
 	if password != confirm {
@@ -91,7 +86,7 @@ func (h *registerHandler) DoRegister(w http.ResponseWriter, r *http.Request) {
 			renderErr("Invite code is required.")
 			return
 		}
-		inv, err := db.GetInviteCode(r.Context(), h.deps.DB, inviteCode)
+		inv, err := h.deps.Auth.GetInvite(r.Context(), inviteCode)
 		if err != nil {
 			slog.Error("failed to look up invite code", "error", err)
 			renderErr("An error occurred. Please try again.")
@@ -104,7 +99,7 @@ func (h *registerHandler) DoRegister(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Create user.
-	user, err := db.CreateUser(r.Context(), h.deps.DB, username, password, false)
+	user, err := h.deps.Auth.CreateUser(r.Context(), username, password, false)
 	if err != nil {
 		slog.Error("failed to create user", "error", err)
 		renderErr("Failed to create user. Username may already be taken.")
@@ -113,21 +108,21 @@ func (h *registerHandler) DoRegister(w http.ResponseWriter, r *http.Request) {
 
 	// Redeem invite code if applicable.
 	if mode == "invite" {
-		if err := db.RedeemInviteCode(r.Context(), h.deps.DB, inviteCode, user.ID); err != nil {
+		if err := h.deps.Auth.RedeemInvite(r.Context(), inviteCode, user.ID); err != nil {
 			slog.Error("failed to redeem invite code", "error", err)
 			// User was created but invite redeem failed — still log them in.
 		}
 	}
 
 	// Create session.
-	sess, err := db.CreateSession(r.Context(), h.deps.DB, user.ID)
+	sess, err := h.deps.Auth.CreateSession(r.Context(), user.ID)
 	if err != nil {
 		slog.Error("failed to create session", "error", err)
 		http.Redirect(w, r, "/login", http.StatusSeeOther)
 		return
 	}
 
-	SetSessionCookie(w, sess.Token)
-	SetFlash(w, "Account created successfully.")
+	auth.SetSessionCookie(w, sess.Token)
+	ui.SetFlash(w, "Account created successfully.")
 	http.Redirect(w, r, "/", http.StatusSeeOther)
 }

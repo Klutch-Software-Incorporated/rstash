@@ -1,4 +1,4 @@
-package handler_test
+package web_test
 
 import (
 	"context"
@@ -8,13 +8,14 @@ import (
 	"strings"
 	"testing"
 
+	"gosilo/internal/auth"
 	"gosilo/internal/config"
 	"gosilo/internal/db"
-	"gosilo/internal/handler"
 	"gosilo/internal/ui"
+	"gosilo/internal/web"
 )
 
-func setupTestServer(t *testing.T, regMode string) (*httptest.Server, *handler.UIDeps) {
+func setupTestServer(t *testing.T, regMode string) (*httptest.Server, *web.UIDeps) {
 	t.Helper()
 
 	database, err := db.Open(":memory:")
@@ -33,15 +34,18 @@ func setupTestServer(t *testing.T, regMode string) (*httptest.Server, *handler.U
 		LogLevel:         "error",
 	}
 
-	deps := &handler.UIDeps{
+	localAuth := auth.NewLocalService(database)
+
+	deps := &web.UIDeps{
+		Auth:     localAuth,
 		DB:       database,
 		Renderer: renderer,
 		Config:   cfg,
 	}
 
-	uiHandler := handler.UI(deps)
-	wrapped := handler.AuthLoader(database)(
-		handler.SetupGuard(database)(uiHandler),
+	uiHandler := web.Routes(deps)
+	wrapped := web.AuthLoader(localAuth)(
+		web.SetupGuard(localAuth)(uiHandler),
 	)
 
 	ts := httptest.NewServer(wrapped)
