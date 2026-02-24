@@ -3,6 +3,7 @@ package db
 import (
 	"database/sql"
 	"fmt"
+	"strings"
 
 	_ "modernc.org/sqlite"
 )
@@ -63,14 +64,6 @@ CREATE TABLE IF NOT EXISTS audit_log (
 );
 CREATE INDEX IF NOT EXISTS idx_audit_log_created ON audit_log(created_at);
 
-CREATE TABLE IF NOT EXISTS invite_codes (
-    code TEXT PRIMARY KEY,
-    created_by INTEGER NOT NULL REFERENCES users(id),
-    used_by INTEGER REFERENCES users(id),
-    created_at TEXT NOT NULL DEFAULT (datetime('now')),
-    used_at TEXT
-);
-
 CREATE TABLE IF NOT EXISTS authorization_codes (
     code TEXT PRIMARY KEY,
     user_id INTEGER NOT NULL REFERENCES users(id),
@@ -91,9 +84,16 @@ CREATE TABLE IF NOT EXISTS settings (
 );
 `
 
-// Open opens a SQLite database at the given path, enables WAL mode and
+// Open opens a SQLite database at the given DSN, enables WAL mode and
 // foreign keys, and runs schema migrations.
-func Open(path string) (*sql.DB, error) {
+// The dsn may be a bare path or a "sqlite:path" DSN; the "sqlite:" prefix
+// is stripped if present.
+func Open(dsn string) (*sql.DB, error) {
+	path := dsn
+	if after, ok := strings.CutPrefix(dsn, "sqlite:"); ok {
+		path = after
+	}
+
 	db, err := sql.Open("sqlite", path)
 	if err != nil {
 		return nil, fmt.Errorf("open database: %w", err)

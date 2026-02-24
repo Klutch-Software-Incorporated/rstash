@@ -10,15 +10,15 @@ func validConfig() *Config {
 	return &Config{
 		Addr:             ":8080",
 		BaseURL:          "http://localhost:8080",
-		DatabasePath:     "gosilo.db",
-		BlobBackend:      "sqlite",
-		BlobPath:         "",
+		DatabaseDSN:      "sqlite:gosilo.db",
+		BlobDSN:          "sqlite:gosilo-blobs.db",
 		RegistrationMode: "closed",
 		LogLevel:         "info",
 		RateLimitRate:    10,
 		RateLimitBurst:   20,
 		QuotaMode:        "off",
 		MaxUploadSize:    50 << 20, // 50MB
+		WebMode:          "full",
 	}
 }
 
@@ -95,65 +95,50 @@ func TestValidate_BaseURL_TrailingSlash(t *testing.T) {
 	}
 }
 
-func TestValidate_EmptyDatabasePath(t *testing.T) {
-	cfg := validConfig()
-	cfg.DatabasePath = ""
-	err := cfg.Validate()
-	if err == nil {
-		t.Fatal("expected error for empty database path")
-	}
-	if !strings.Contains(err.Error(), "GOSILO_DB_PATH") {
-		t.Fatalf("error should mention GOSILO_DB_PATH, got: %v", err)
-	}
-}
-
-func TestValidate_BlobBackend(t *testing.T) {
-	for _, backend := range []string{"sqlite", "fs"} {
+func TestValidate_DatabaseDSN(t *testing.T) {
+	// Valid sqlite DSNs.
+	for _, dsn := range []string{"sqlite:gosilo.db", "sqlite::memory:"} {
 		cfg := validConfig()
-		cfg.BlobBackend = backend
-		if backend == "fs" {
-			cfg.BlobPath = "/tmp/blobs"
-		}
+		cfg.DatabaseDSN = dsn
 		if err := cfg.Validate(); err != nil {
-			t.Errorf("backend %q should be valid, got: %v", backend, err)
+			t.Errorf("database DSN %q should be valid, got: %v", dsn, err)
+		}
+	}
+
+	// Invalid scheme.
+	cfg := validConfig()
+	cfg.DatabaseDSN = "postgres:host=localhost"
+	err := cfg.Validate()
+	if err == nil {
+		t.Fatal("expected error for non-sqlite database DSN")
+	}
+	if !strings.Contains(err.Error(), "GOSILO_DB") {
+		t.Fatalf("error should mention GOSILO_DB, got: %v", err)
+	}
+}
+
+func TestValidate_BlobDSN(t *testing.T) {
+	for _, dsn := range []string{"sqlite:blobs.db", "fs:/tmp/blobs"} {
+		cfg := validConfig()
+		cfg.BlobDSN = dsn
+		if err := cfg.Validate(); err != nil {
+			t.Errorf("blob DSN %q should be valid, got: %v", dsn, err)
 		}
 	}
 
 	cfg := validConfig()
-	cfg.BlobBackend = "s3"
+	cfg.BlobDSN = "s3:mybucket"
 	err := cfg.Validate()
 	if err == nil {
-		t.Fatal("expected error for invalid blob backend")
+		t.Fatal("expected error for unsupported blob backend scheme")
 	}
-	if !strings.Contains(err.Error(), `got "s3"`) {
-		t.Fatalf("error should mention s3, got: %v", err)
-	}
-}
-
-func TestValidate_BlobPath_RequiredForFS(t *testing.T) {
-	cfg := validConfig()
-	cfg.BlobBackend = "fs"
-	cfg.BlobPath = ""
-	err := cfg.Validate()
-	if err == nil {
-		t.Fatal("expected error for fs backend without blob path")
-	}
-	if !strings.Contains(err.Error(), "GOSILO_BLOB_PATH") {
-		t.Fatalf("error should mention GOSILO_BLOB_PATH, got: %v", err)
-	}
-}
-
-func TestValidate_BlobPath_NotRequiredForSQLite(t *testing.T) {
-	cfg := validConfig()
-	cfg.BlobBackend = "sqlite"
-	cfg.BlobPath = ""
-	if err := cfg.Validate(); err != nil {
-		t.Fatalf("blob path should not be required for sqlite, got: %v", err)
+	if !strings.Contains(err.Error(), "GOSILO_BLOB") {
+		t.Fatalf("error should mention GOSILO_BLOB, got: %v", err)
 	}
 }
 
 func TestValidate_RegistrationMode(t *testing.T) {
-	for _, mode := range []string{"open", "invite", "closed"} {
+	for _, mode := range []string{"open", "closed"} {
 		cfg := validConfig()
 		cfg.RegistrationMode = mode
 		if err := cfg.Validate(); err != nil {
@@ -239,18 +224,19 @@ func TestValidate_MultipleErrors(t *testing.T) {
 	cfg := &Config{
 		Addr:             "bad",
 		BaseURL:          "ftp://x.com",
-		DatabasePath:     "",
-		BlobBackend:      "s3",
+		DatabaseDSN:      "postgres:host=localhost",
+		BlobDSN:          "s3:mybucket",
 		RegistrationMode: "maybe",
 		LogLevel:         "trace",
 		QuotaMode:        "off",
+		WebMode:          "full",
 	}
 	err := cfg.Validate()
 	if err == nil {
 		t.Fatal("expected multiple errors")
 	}
 	msg := err.Error()
-	for _, want := range []string{"GOSILO_ADDR", "GOSILO_BASE_URL", "GOSILO_DB_PATH", "GOSILO_BLOB_BACKEND", "GOSILO_REGISTRATION", "GOSILO_LOG_LEVEL"} {
+	for _, want := range []string{"GOSILO_ADDR", "GOSILO_BASE_URL", "GOSILO_DB", "GOSILO_BLOB", "GOSILO_REGISTRATION", "GOSILO_LOG_LEVEL"} {
 		if !strings.Contains(msg, want) {
 			t.Errorf("expected error to contain %q, got: %v", want, msg)
 		}

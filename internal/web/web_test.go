@@ -29,8 +29,8 @@ func setupTestServer(t *testing.T, regMode string) (*httptest.Server, *web.UIDep
 	cfg := &config.Config{
 		Addr:             ":8080",
 		BaseURL:          "http://localhost:8080",
-		DatabasePath:     ":memory:",
-		BlobBackend:      "sqlite",
+		DatabaseDSN:      "sqlite::memory:",
+		BlobDSN:          "sqlite::memory:",
 		RegistrationMode: regMode,
 		LogLevel:         "error",
 	}

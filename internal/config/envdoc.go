@@ -25,26 +25,20 @@ func EnvVars() []EnvVar {
 			Description: "Public URL of the server. Used for WebFinger and OAuth redirects.",
 		},
 		{
-			Name:        "GOSILO_DB_PATH",
-			Default:     "gosilo.db",
-			Description: "Path to the SQLite database file.",
+			Name:        "GOSILO_DB",
+			Default:     "sqlite:gosilo.db",
+			Description: "Metadata database DSN. Only SQLite is supported (sqlite:path or sqlite::memory:).",
 		},
 		{
-			Name:        "GOSILO_BLOB_BACKEND",
-			Default:     "sqlite",
-			Description: "Blob storage backend.",
-			ValidValues: []string{"sqlite", "fs"},
-		},
-		{
-			Name:         "GOSILO_BLOB_PATH",
-			Description:  "Directory for filesystem blob storage.",
-			RequiredWhen: "GOSILO_BLOB_BACKEND=fs",
+			Name:        "GOSILO_BLOB",
+			Default:     "sqlite:gosilo-blobs.db",
+			Description: "Blob store DSN. Supported schemes: sqlite:path, fs:/path/to/dir.",
 		},
 		{
 			Name:        "GOSILO_REGISTRATION",
 			Default:     "closed",
 			Description: "User registration mode.",
-			ValidValues: []string{"open", "invite", "closed"},
+			ValidValues: []string{"open", "closed"},
 		},
 		{
 			Name:        "GOSILO_LOG_LEVEL",
@@ -82,6 +76,12 @@ func EnvVars() []EnvVar {
 			Name:        "GOSILO_MAX_UPLOAD",
 			Default:     "50MB",
 			Description: "Maximum upload size per request (e.g. 50MB, 1GB).",
+		},
+		{
+			Name:        "GOSILO_WEB_MODE",
+			Default:     "full",
+			Description: "Web UI mode. full=all routes, oauth=login+OAuth only, off=API only.",
+			ValidValues: []string{"full", "oauth", "off"},
 		},
 	}
 }

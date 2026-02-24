@@ -19,11 +19,9 @@ func RegisterHandler(deps *UIDeps) *registerHandler {
 }
 
 type registerContent struct {
-	Username   string
-	InviteCode string
-	InviteMode bool
-	Closed     bool
-	Error      string
+	Username string
+	Closed   bool
+	Error    string
 }
 
 func (h *registerHandler) ShowRegister(w http.ResponseWriter, r *http.Request) {
@@ -34,8 +32,7 @@ func (h *registerHandler) ShowRegister(w http.ResponseWriter, r *http.Request) {
 
 	mode := h.deps.Settings.Load().RegistrationMode
 	content := &registerContent{
-		Closed:     mode == "closed",
-		InviteMode: mode == "invite",
+		Closed: mode == "closed",
 	}
 
 	h.deps.Renderer.Render(w, "register", h.deps.pageData(w, r, "Register — Gosilo", content))
@@ -52,16 +49,13 @@ func (h *registerHandler) DoRegister(w http.ResponseWriter, r *http.Request) {
 	username := strings.TrimSpace(r.FormValue("username"))
 	password := r.FormValue("password")
 	confirm := r.FormValue("password_confirm")
-	inviteCode := strings.TrimSpace(r.FormValue("invite_code"))
 
 	renderErr := func(msg string) {
 		h.deps.Renderer.Render(w, "register", ui.PageData{
 			Title: "Register — Gosilo",
 			Content: &registerContent{
-				Username:   username,
-				InviteCode: inviteCode,
-				InviteMode: mode == "invite",
-				Error:      msg,
+				Username: username,
+				Error:    msg,
 			},
 			RegistrationMode: mode,
 		})
@@ -80,38 +74,12 @@ func (h *registerHandler) DoRegister(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Check invite code if needed.
-	if mode == "invite" {
-		if inviteCode == "" {
-			renderErr("Invite code is required.")
-			return
-		}
-		inv, err := h.deps.Auth.GetInvite(r.Context(), inviteCode)
-		if err != nil {
-			slog.Error("failed to look up invite code", "error", err)
-			renderErr("An error occurred. Please try again.")
-			return
-		}
-		if inv == nil || inv.UsedBy != nil {
-			renderErr("Invalid or already used invite code.")
-			return
-		}
-	}
-
 	// Create user.
 	user, err := h.deps.Auth.CreateUser(r.Context(), username, password, false)
 	if err != nil {
 		slog.Error("failed to create user", "error", err)
 		renderErr("Failed to create user. Username may already be taken.")
 		return
-	}
-
-	// Redeem invite code if applicable.
-	if mode == "invite" {
-		if err := h.deps.Auth.RedeemInvite(r.Context(), inviteCode, user.ID); err != nil {
-			slog.Error("failed to redeem invite code", "error", err)
-			// User was created but invite redeem failed — still log them in.
-		}
 	}
 
 	// Create session.

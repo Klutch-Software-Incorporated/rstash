@@ -22,14 +22,6 @@
                         value="{{.Username}}">
                 </div>
 
-                {{if .InviteMode}}
-                    <div>
-                        <label for="invite_code">Invite Code</label>
-                        <input type="text" id="invite_code" name="invite_code" required
-                            value="{{.InviteCode}}">
-                    </div>
-                {{end}}
-
                 <div>
                     <label for="password">Password</label>
                     <input type="password" id="password" name="password" required autocomplete="new-password" minlength="8">

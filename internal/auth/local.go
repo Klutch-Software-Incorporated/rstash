@@ -120,24 +120,3 @@ func (s *LocalService) TerminateAllSessions(ctx context.Context, userID int64) e
 	return db.DeleteUserSessions(ctx, s.db, userID)
 }
 
-// --- Invites ---
-
-func (s *LocalService) CreateInvite(ctx context.Context, createdBy int64) (*model.InviteCode, error) {
-	return db.CreateInviteCode(ctx, s.db, createdBy)
-}
-
-func (s *LocalService) GetInvite(ctx context.Context, code string) (*model.InviteCode, error) {
-	return db.GetInviteCode(ctx, s.db, code)
-}
-
-func (s *LocalService) RedeemInvite(ctx context.Context, code string, usedBy int64) error {
-	return db.RedeemInviteCode(ctx, s.db, code, usedBy)
-}
-
-func (s *LocalService) ListInvites(ctx context.Context) ([]*model.InviteCode, error) {
-	return db.ListInviteCodes(ctx, s.db)
-}
-
-func (s *LocalService) DeleteInvite(ctx context.Context, code string) error {
-	return db.DeleteInviteCode(ctx, s.db, code)
-}

@@ -20,10 +20,11 @@ func setup(t *testing.T) (*storage.Service, int64) {
 	}
 	t.Cleanup(func() { database.Close() })
 
-	blobs, err := blob.NewSQLiteStore(database)
+	blobs, err := blob.NewSQLiteStore(":memory:")
 	if err != nil {
 		t.Fatal(err)
 	}
+	t.Cleanup(func() { blobs.Close() })
 
 	svc := storage.NewService(database, blobs, nil)
 

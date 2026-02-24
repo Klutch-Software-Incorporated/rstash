@@ -46,11 +46,4 @@ type Service interface {
 	CountUserSessions(ctx context.Context, userID int64) (int64, error)
 	TerminateSession(ctx context.Context, token string) error
 	TerminateAllSessions(ctx context.Context, userID int64) error
-
-	// Invites
-	CreateInvite(ctx context.Context, createdBy int64) (*model.InviteCode, error)
-	GetInvite(ctx context.Context, code string) (*model.InviteCode, error)
-	RedeemInvite(ctx context.Context, code string, usedBy int64) error
-	ListInvites(ctx context.Context) ([]*model.InviteCode, error)
-	DeleteInvite(ctx context.Context, code string) error
 }

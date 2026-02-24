@@ -45,14 +45,6 @@ type Session struct {
 	ExpiresAt string
 }
 
-type InviteCode struct {
-	Code      string
-	CreatedBy int64
-	UsedBy    *int64
-	CreatedAt string
-	UsedAt    *string
-}
-
 type AuditEntry struct {
 	ID         int64
 	ActorID    int64

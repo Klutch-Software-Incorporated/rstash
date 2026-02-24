@@ -27,7 +27,7 @@ type adminDashboardContent struct {
 	UserCount        int64
 	RegistrationMode string
 	BaseURL          string
-	BlobBackend      string
+	BlobDSN          string
 	TotalStorageUsed string
 	QuotaMode        string
 	QuotaLimit       string
@@ -43,11 +43,6 @@ type adminUsersContent struct {
 
 type adminSettingsContent struct {
 	Settings []*adminSettingRow
-}
-
-type adminInvitesContent struct {
-	RegistrationMode string
-	Invites          []*inviteRow
 }
 
 type adminAuditContent struct {
@@ -72,12 +67,6 @@ type userRow struct {
 	StorageUsed  string
 	StorageQuota string // human-readable, empty if no quota
 	SessionCount int64
-}
-
-type inviteRow struct {
-	Code      string
-	UsedBy    *int64
-	CreatedAt string
 }
 
 type topUserRow struct {
@@ -132,7 +121,7 @@ func (h *adminHandler) ShowDashboard(w http.ResponseWriter, r *http.Request) {
 		UserCount:        count,
 		RegistrationMode: snap.RegistrationMode,
 		BaseURL:          h.deps.Config.BaseURL,
-		BlobBackend:      h.deps.Config.BlobBackend,
+		BlobDSN:          h.deps.Config.BlobDSN,
 		TotalStorageUsed: formatBytes(totalUsed),
 		QuotaMode:        snap.QuotaMode,
 	}
@@ -268,35 +257,6 @@ func (h *adminHandler) ShowSettings(w http.ResponseWriter, r *http.Request) {
 	h.deps.Renderer.Render(w, "admin_settings", h.deps.adminPageData(w, r, "Settings — Admin", "settings", content))
 }
 
-// ShowInvites handles GET /admin/invites — invite code management.
-func (h *adminHandler) ShowInvites(w http.ResponseWriter, r *http.Request) {
-	if !RequireAuth(w, r) || !RequireAdmin(w, r) {
-		return
-	}
-
-	snap := h.deps.Settings.Load()
-
-	invites, err := h.deps.Auth.ListInvites(r.Context())
-	if err != nil {
-		slog.Error("failed to list invite codes", "error", err)
-	}
-
-	rows := make([]*inviteRow, len(invites))
-	for i, inv := range invites {
-		rows[i] = &inviteRow{
-			Code:      inv.Code,
-			UsedBy:    inv.UsedBy,
-			CreatedAt: inv.CreatedAt,
-		}
-	}
-
-	content := &adminInvitesContent{
-		RegistrationMode: snap.RegistrationMode,
-		Invites:          rows,
-	}
-	h.deps.Renderer.Render(w, "admin_invites", h.deps.adminPageData(w, r, "Invites — Admin", "invites", content))
-}
-
 // ShowAudit handles GET /admin/audit — audit log.
 func (h *adminHandler) ShowAudit(w http.ResponseWriter, r *http.Request) {
 	if !RequireAuth(w, r) || !RequireAdmin(w, r) {
@@ -384,32 +344,6 @@ func (h *adminHandler) DeleteUser(w http.ResponseWriter, r *http.Request) {
 
 	ui.SetFlash(w, "User deleted.")
 	http.Redirect(w, r, "/admin/users", http.StatusSeeOther)
-}
-
-func (h *adminHandler) CreateInvite(w http.ResponseWriter, r *http.Request) {
-	if !RequireAuth(w, r) || !RequireAdmin(w, r) {
-		return
-	}
-
-	if h.deps.Settings.Load().RegistrationMode == "closed" {
-		ui.SetFlashError(w, "Cannot create invite codes while registration is closed.")
-		http.Redirect(w, r, "/admin/invites", http.StatusSeeOther)
-		return
-	}
-
-	user := CurrentUser(r)
-	inv, err := h.deps.Auth.CreateInvite(r.Context(), user.ID)
-	if err != nil {
-		slog.Error("failed to create invite code", "error", err)
-		ui.SetFlashError(w, "Failed to generate invite code.")
-		http.Redirect(w, r, "/admin/invites", http.StatusSeeOther)
-		return
-	}
-
-	h.audit(r, "invite.created", "invite", inv.Code, "")
-
-	ui.SetFlash(w, fmt.Sprintf("Invite code created: %s", inv.Code))
-	http.Redirect(w, r, "/admin/invites", http.StatusSeeOther)
 }
 
 func (h *adminHandler) SetUserQuota(w http.ResponseWriter, r *http.Request) {
@@ -762,25 +696,6 @@ func (h *adminHandler) UserActivity(w http.ResponseWriter, r *http.Request) {
 	}
 
 	h.deps.Renderer.Render(w, "admin_user", h.deps.adminPageData(w, r, fmt.Sprintf("User — %s", user.Username), "users", content))
-}
-
-func (h *adminHandler) DeleteInvite(w http.ResponseWriter, r *http.Request) {
-	if !RequireAuth(w, r) || !RequireAdmin(w, r) {
-		return
-	}
-
-	code := r.PathValue("code")
-	if err := h.deps.Auth.DeleteInvite(r.Context(), code); err != nil {
-		slog.Error("failed to delete invite code", "error", err)
-		ui.SetFlashError(w, "Failed to delete invite code.")
-		http.Redirect(w, r, "/admin/invites", http.StatusSeeOther)
-		return
-	}
-
-	h.audit(r, "invite.deleted", "invite", code, "")
-
-	ui.SetFlash(w, "Invite code deleted.")
-	http.Redirect(w, r, "/admin/invites", http.StatusSeeOther)
 }
 
 // settingFormKeys are the settings editable in the admin form.

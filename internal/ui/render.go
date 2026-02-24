@@ -49,7 +49,6 @@ func NewRenderer() *Renderer {
 		"templates/admin_dashboard.html",
 		"templates/admin_users.html",
 		"templates/admin_settings.html",
-		"templates/admin_invites.html",
 		"templates/admin_audit.html",
 		"templates/admin_oauth_test.html",
 		"templates/admin_sessions.html",

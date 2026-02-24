@@ -105,7 +105,7 @@ func TestFSStore_GetMissing(t *testing.T) {
 	}
 }
 
-func TestFSStore_DeleteTreeWith(t *testing.T) {
+func TestFSStore_DeleteTree(t *testing.T) {
 	store := newTestFSStore(t)
 	ctx := context.Background()
 
@@ -117,8 +117,8 @@ func TestFSStore_DeleteTreeWith(t *testing.T) {
 		}
 	}
 
-	if err := store.DeleteTreeWith(ctx, nil, 1, "photos/"); err != nil {
-		t.Fatalf("DeleteTreeWith: %v", err)
+	if err := store.DeleteTree(ctx, 1, "photos/"); err != nil {
+		t.Fatalf("DeleteTree: %v", err)
 	}
 
 	// All files should be gone.

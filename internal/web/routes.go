@@ -2,8 +2,27 @@ package web
 
 import "net/http"
 
-// Routes returns an http.Handler that serves the web UI routes.
-func Routes(deps *UIDeps) http.Handler {
+// OAuthRoutes returns an http.Handler with the minimal routes needed for
+// OAuth consent flow: login, logout, and setup (first-user bootstrap).
+func OAuthRoutes(deps *UIDeps) http.Handler {
+	mux := http.NewServeMux()
+
+	// Setup wizard (needed so first user can be created when CLI wasn't used).
+	setupHandler := SetupHandler(deps)
+	mux.HandleFunc("GET /setup", setupHandler.ShowSetup)
+	mux.HandleFunc("POST /setup", setupHandler.DoSetup)
+
+	// Auth (login/logout — needed for OAuth session).
+	authHandler := AuthHandler(deps)
+	mux.HandleFunc("GET /login", authHandler.ShowLogin)
+	mux.HandleFunc("POST /login", authHandler.DoLogin)
+	mux.HandleFunc("POST /logout", RequireCSRF(authHandler.DoLogout))
+
+	return mux
+}
+
+// FullRoutes returns an http.Handler with all web UI routes (the full web experience).
+func FullRoutes(deps *UIDeps) http.Handler {
 	mux := http.NewServeMux()
 
 	// Home page.
@@ -50,7 +69,6 @@ func Routes(deps *UIDeps) http.Handler {
 	mux.HandleFunc("GET /admin", adminHandler.ShowDashboard)
 	mux.HandleFunc("GET /admin/users", adminHandler.ShowUsers)
 	mux.HandleFunc("GET /admin/settings", adminHandler.ShowSettings)
-	mux.HandleFunc("GET /admin/invites", adminHandler.ShowInvites)
 	mux.HandleFunc("GET /admin/audit", adminHandler.ShowAudit)
 	mux.HandleFunc("GET /admin/oauth-test", adminHandler.ShowOAuthTest)
 	mux.HandleFunc("POST /admin/users/create", RequireCSRF(adminHandler.CreateUser))
@@ -64,8 +82,12 @@ func Routes(deps *UIDeps) http.Handler {
 	mux.HandleFunc("POST /admin/users/{id}/terminate-all", RequireCSRF(adminHandler.TerminateAllSessions))
 	mux.HandleFunc("POST /admin/settings", RequireCSRF(adminHandler.UpdateSettings))
 	mux.HandleFunc("POST /admin/settings/{key}/reset", RequireCSRF(adminHandler.ResetSetting))
-	mux.HandleFunc("POST /admin/invites", RequireCSRF(adminHandler.CreateInvite))
-	mux.HandleFunc("POST /admin/invites/{code}/delete", RequireCSRF(adminHandler.DeleteInvite))
 
 	return mux
+}
+
+// Routes returns an http.Handler that serves all web UI routes.
+// Deprecated: use FullRoutes instead.
+func Routes(deps *UIDeps) http.Handler {
+	return FullRoutes(deps)
 }

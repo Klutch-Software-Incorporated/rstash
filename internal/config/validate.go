@@ -30,30 +30,31 @@ func (c *Config) Validate() error {
 		c.BaseURL = strings.TrimRight(c.BaseURL, "/")
 	}
 
-	// DatabasePath
-	if c.DatabasePath == "" {
-		errs = append(errs, fmt.Errorf("GOSILO_DB_PATH: must not be empty"))
+	// DatabaseDSN
+	if dbScheme, _, err := ParseDSN(c.DatabaseDSN); err != nil {
+		errs = append(errs, fmt.Errorf("GOSILO_DB: %v", err))
+	} else if dbScheme != "sqlite" {
+		errs = append(errs, fmt.Errorf("GOSILO_DB: only sqlite is supported for metadata database — got %q", dbScheme))
 	}
 
-	// BlobBackend
-	switch c.BlobBackend {
-	case "sqlite", "fs":
-		// ok
-	default:
-		errs = append(errs, fmt.Errorf("GOSILO_BLOB_BACKEND: must be one of: sqlite, fs — got %q", c.BlobBackend))
-	}
-
-	// BlobPath required when backend is fs
-	if c.BlobBackend == "fs" && c.BlobPath == "" {
-		errs = append(errs, fmt.Errorf("GOSILO_BLOB_PATH: required when GOSILO_BLOB_BACKEND=fs"))
+	// BlobDSN
+	if blobScheme, _, err := ParseDSN(c.BlobDSN); err != nil {
+		errs = append(errs, fmt.Errorf("GOSILO_BLOB: %v", err))
+	} else {
+		switch blobScheme {
+		case "sqlite", "fs":
+			// ok
+		default:
+			errs = append(errs, fmt.Errorf("GOSILO_BLOB: unsupported blob backend scheme %q (supported: sqlite, fs)", blobScheme))
+		}
 	}
 
 	// RegistrationMode
 	switch c.RegistrationMode {
-	case "open", "invite", "closed":
+	case "open", "closed":
 		// ok
 	default:
-		errs = append(errs, fmt.Errorf("GOSILO_REGISTRATION: must be one of: open, invite, closed — got %q", c.RegistrationMode))
+		errs = append(errs, fmt.Errorf("GOSILO_REGISTRATION: must be one of: open, closed — got %q", c.RegistrationMode))
 	}
 
 	// LogLevel
@@ -95,6 +96,14 @@ func (c *Config) Validate() error {
 	// MaxUploadSize
 	if c.MaxUploadSize <= 0 {
 		errs = append(errs, fmt.Errorf("GOSILO_MAX_UPLOAD: must be > 0"))
+	}
+
+	// WebMode
+	switch c.WebMode {
+	case "full", "oauth", "off":
+		// ok
+	default:
+		errs = append(errs, fmt.Errorf("GOSILO_WEB_MODE: must be one of: full, oauth, off — got %q", c.WebMode))
 	}
 
 	return errors.Join(errs...)

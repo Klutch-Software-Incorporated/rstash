@@ -8,8 +8,6 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
-
-	"gosilo/internal/db"
 )
 
 // FSStore stores blobs as files on the filesystem.
@@ -100,23 +98,8 @@ func (s *FSStore) Delete(_ context.Context, userID int64, path string) error {
 	return nil
 }
 
-// GetWith delegates to Get (filesystem operations cannot participate in SQL transactions).
-func (s *FSStore) GetWith(ctx context.Context, _ db.Querier, userID int64, path string) (io.ReadCloser, error) {
-	return s.Get(ctx, userID, path)
-}
-
-// PutWith delegates to Put (filesystem operations cannot participate in SQL transactions).
-func (s *FSStore) PutWith(ctx context.Context, _ db.Querier, userID int64, path string, content io.Reader) error {
-	return s.Put(ctx, userID, path, content)
-}
-
-// DeleteWith delegates to Delete (filesystem operations cannot participate in SQL transactions).
-func (s *FSStore) DeleteWith(ctx context.Context, _ db.Querier, userID int64, path string) error {
-	return s.Delete(ctx, userID, path)
-}
-
-// DeleteTreeWith removes all blobs under a folder path by removing the directory.
-func (s *FSStore) DeleteTreeWith(_ context.Context, _ db.Querier, userID int64, folderPath string) error {
+// DeleteTree removes all blobs under a folder path by removing the directory.
+func (s *FSStore) DeleteTree(_ context.Context, userID int64, folderPath string) error {
 	p, err := s.blobPath(userID, folderPath)
 	if err != nil {
 		return err
@@ -124,5 +107,10 @@ func (s *FSStore) DeleteTreeWith(_ context.Context, _ db.Querier, userID int64, 
 	if err := os.RemoveAll(p); err != nil {
 		return fmt.Errorf("delete blob tree: %w", err)
 	}
+	return nil
+}
+
+// Close is a no-op for the filesystem backend.
+func (s *FSStore) Close() error {
 	return nil
 }

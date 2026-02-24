@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"io"
 
-	"gosilo/internal/db"
+	_ "modernc.org/sqlite"
 )
 
 const blobSchema = `
@@ -19,23 +19,35 @@ CREATE TABLE IF NOT EXISTS blobs (
 );
 `
 
-// SQLiteStore stores blobs in the SQLite database.
+// SQLiteStore stores blobs in a dedicated SQLite database file.
 type SQLiteStore struct {
 	db *sql.DB
 }
 
-// NewSQLiteStore creates a new SQLiteStore and ensures the blobs table exists.
-func NewSQLiteStore(database *sql.DB) (*SQLiteStore, error) {
-	if _, err := database.Exec(blobSchema); err != nil {
+// NewSQLiteStore opens a SQLite database at the given path and ensures
+// the blobs table exists. The store owns the connection and must be closed.
+func NewSQLiteStore(path string) (*SQLiteStore, error) {
+	db, err := sql.Open("sqlite", path)
+	if err != nil {
+		return nil, fmt.Errorf("open blob database: %w", err)
+	}
+
+	if _, err := db.Exec("PRAGMA journal_mode=WAL"); err != nil {
+		db.Close()
+		return nil, fmt.Errorf("enable WAL mode on blob database: %w", err)
+	}
+
+	if _, err := db.Exec(blobSchema); err != nil {
+		db.Close()
 		return nil, fmt.Errorf("create blobs table: %w", err)
 	}
-	return &SQLiteStore{db: database}, nil
+	return &SQLiteStore{db: db}, nil
 }
 
-// GetWith retrieves a blob using the provided Querier (supports transactions).
-func (s *SQLiteStore) GetWith(ctx context.Context, q db.Querier, userID int64, path string) (io.ReadCloser, error) {
+// Get retrieves a blob.
+func (s *SQLiteStore) Get(ctx context.Context, userID int64, path string) (io.ReadCloser, error) {
 	var data []byte
-	err := q.QueryRowContext(ctx,
+	err := s.db.QueryRowContext(ctx,
 		"SELECT data FROM blobs WHERE user_id = ? AND path = ?",
 		userID, path,
 	).Scan(&data)
@@ -45,18 +57,13 @@ func (s *SQLiteStore) GetWith(ctx context.Context, q db.Querier, userID int64, p
 	return io.NopCloser(bytes.NewReader(data)), nil
 }
 
-// Get retrieves a blob using the store's database connection.
-func (s *SQLiteStore) Get(ctx context.Context, userID int64, path string) (io.ReadCloser, error) {
-	return s.GetWith(ctx, s.db, userID, path)
-}
-
-// PutWith stores a blob using the provided Querier (supports transactions).
-func (s *SQLiteStore) PutWith(ctx context.Context, q db.Querier, userID int64, path string, content io.Reader) error {
+// Put stores a blob (insert or replace).
+func (s *SQLiteStore) Put(ctx context.Context, userID int64, path string, content io.Reader) error {
 	data, err := io.ReadAll(content)
 	if err != nil {
 		return fmt.Errorf("read content: %w", err)
 	}
-	_, err = q.ExecContext(ctx,
+	_, err = s.db.ExecContext(ctx,
 		"INSERT INTO blobs (user_id, path, data) VALUES (?, ?, ?) ON CONFLICT(user_id, path) DO UPDATE SET data = excluded.data",
 		userID, path, data,
 	)
@@ -66,14 +73,9 @@ func (s *SQLiteStore) PutWith(ctx context.Context, q db.Querier, userID int64, p
 	return nil
 }
 
-// Put stores a blob using the store's database connection.
-func (s *SQLiteStore) Put(ctx context.Context, userID int64, path string, content io.Reader) error {
-	return s.PutWith(ctx, s.db, userID, path, content)
-}
-
-// DeleteWith removes a blob using the provided Querier (supports transactions).
-func (s *SQLiteStore) DeleteWith(ctx context.Context, q db.Querier, userID int64, path string) error {
-	_, err := q.ExecContext(ctx,
+// Delete removes a blob.
+func (s *SQLiteStore) Delete(ctx context.Context, userID int64, path string) error {
+	_, err := s.db.ExecContext(ctx,
 		"DELETE FROM blobs WHERE user_id = ? AND path = ?",
 		userID, path,
 	)
@@ -83,15 +85,9 @@ func (s *SQLiteStore) DeleteWith(ctx context.Context, q db.Querier, userID int64
 	return nil
 }
 
-// Delete removes a blob using the store's database connection.
-func (s *SQLiteStore) Delete(ctx context.Context, userID int64, path string) error {
-	return s.DeleteWith(ctx, s.db, userID, path)
-}
-
-// DeleteTreeWith removes all blobs under a folder path prefix using the provided
-// Querier (supports transactions).
-func (s *SQLiteStore) DeleteTreeWith(ctx context.Context, q db.Querier, userID int64, folderPath string) error {
-	_, err := q.ExecContext(ctx,
+// DeleteTree removes all blobs under a folder path prefix.
+func (s *SQLiteStore) DeleteTree(ctx context.Context, userID int64, folderPath string) error {
+	_, err := s.db.ExecContext(ctx,
 		"DELETE FROM blobs WHERE user_id = ? AND path LIKE ? || '%'",
 		userID, folderPath,
 	)
@@ -99,4 +95,9 @@ func (s *SQLiteStore) DeleteTreeWith(ctx context.Context, q db.Querier, userID i
 		return fmt.Errorf("delete blob tree: %w", err)
 	}
 	return nil
+}
+
+// Close closes the underlying database connection.
+func (s *SQLiteStore) Close() error {
+	return s.db.Close()
 }

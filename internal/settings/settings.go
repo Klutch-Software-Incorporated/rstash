@@ -186,10 +186,10 @@ func validateSetting(key, value string) error {
 	switch key {
 	case "registration_mode":
 		switch value {
-		case "open", "invite", "closed":
+		case "open", "closed":
 			return nil
 		default:
-			return fmt.Errorf("registration_mode must be one of: open, invite, closed — got %q", value)
+			return fmt.Errorf("registration_mode must be one of: open, closed — got %q", value)
 		}
 
 	case "log_level":

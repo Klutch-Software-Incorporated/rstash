@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"strings"
 
@@ -56,7 +57,7 @@ type DeleteResult struct {
 	ETag string // ETag of the deleted version
 }
 
-// Service orchestrates storage operations (blob + node + ETags) in transactions.
+// Service orchestrates storage operations (blob + node + ETags).
 type Service struct {
 	database *sql.DB
 	blobs    blob.Store
@@ -69,6 +70,7 @@ func NewService(database *sql.DB, blobs blob.Store, quota *QuotaChecker) *Servic
 }
 
 // PutDocument stores a document and propagates folder ETags up to root.
+// Blob is written first (non-transactional), then metadata is updated in a TX.
 func (s *Service) PutDocument(ctx context.Context, userID int64, path string, content io.Reader, contentType string, cond Conditions) (*PutResult, error) {
 	if strings.HasSuffix(path, "/") {
 		return nil, ErrConflict
@@ -90,6 +92,12 @@ func (s *Service) PutDocument(ctx context.Context, userID int64, path string, co
 		defer s.quota.Unlock()
 	}
 
+	// Write blob first (non-transactional).
+	if err := s.blobs.Put(ctx, userID, path, bytes.NewReader(data)); err != nil {
+		return nil, err
+	}
+
+	// Now update metadata in a transaction.
 	tx, err := s.database.BeginTx(ctx, nil)
 	if err != nil {
 		return nil, fmt.Errorf("begin tx: %w", err)
@@ -131,10 +139,6 @@ func (s *Service) PutDocument(ctx context.Context, userID int64, path string, co
 
 	isNew := existing == nil
 
-	if err := s.blobs.PutWith(ctx, tx, userID, path, bytes.NewReader(data)); err != nil {
-		return nil, err
-	}
-
 	if _, err := db.UpsertNode(ctx, tx, userID, path, false, contentType, int64(len(data)), etag); err != nil {
 		return nil, err
 	}
@@ -144,6 +148,10 @@ func (s *Service) PutDocument(ctx context.Context, userID int64, path string, co
 	}
 
 	if err := tx.Commit(); err != nil {
+		// Best-effort blob cleanup on metadata TX failure.
+		if cleanErr := s.blobs.Delete(ctx, userID, path); cleanErr != nil {
+			slog.Warn("failed to clean up orphaned blob after TX failure", "path", path, "error", cleanErr)
+		}
 		return nil, fmt.Errorf("commit: %w", err)
 	}
 
@@ -200,6 +208,7 @@ func (s *Service) HeadDocument(ctx context.Context, userID int64, path string, c
 
 // DeleteDocument removes a document and propagates folder ETags, cleaning up
 // empty ancestor folders (except root "/").
+// Metadata is deleted in a TX first, then the blob is removed after commit.
 func (s *Service) DeleteDocument(ctx context.Context, userID int64, path string, cond Conditions) (*DeleteResult, error) {
 	tx, err := s.database.BeginTx(ctx, nil)
 	if err != nil {
@@ -221,9 +230,6 @@ func (s *Service) DeleteDocument(ctx context.Context, userID int64, path string,
 
 	deletedETag := node.ETag
 
-	if err := s.blobs.DeleteWith(ctx, tx, userID, path); err != nil {
-		return nil, err
-	}
 	if err := db.DeleteNode(ctx, tx, userID, path); err != nil {
 		return nil, err
 	}
@@ -257,11 +263,17 @@ func (s *Service) DeleteDocument(ctx context.Context, userID int64, path string,
 		return nil, fmt.Errorf("commit: %w", err)
 	}
 
+	// Delete blob after successful metadata commit (best-effort).
+	if err := s.blobs.Delete(ctx, userID, path); err != nil {
+		slog.Warn("failed to delete blob after metadata commit", "path", path, "error", err)
+	}
+
 	return &DeleteResult{ETag: deletedETag}, nil
 }
 
 // DeleteFolder recursively removes a folder and all its contents (files and
 // subfolders), then propagates ETags up to ancestor folders.
+// Metadata is deleted in a TX first, then blobs are removed after commit.
 func (s *Service) DeleteFolder(ctx context.Context, userID int64, folderPath string) (int, error) {
 	if !strings.HasSuffix(folderPath, "/") {
 		return 0, ErrConflict
@@ -282,11 +294,6 @@ func (s *Service) DeleteFolder(ctx context.Context, userID int64, folderPath str
 		return 0, err
 	}
 	fileCount := len(files)
-
-	// Delete all blobs under this folder.
-	if err := s.blobs.DeleteTreeWith(ctx, tx, userID, folderPath); err != nil {
-		return 0, err
-	}
 
 	// Delete all nodes (files + folders) under this path, including the folder itself.
 	if err := db.DeleteSubtree(ctx, tx, userID, folderPath); err != nil {
@@ -320,6 +327,11 @@ func (s *Service) DeleteFolder(ctx context.Context, userID int64, folderPath str
 
 	if err := tx.Commit(); err != nil {
 		return 0, fmt.Errorf("commit: %w", err)
+	}
+
+	// Delete blobs after successful metadata commit (best-effort).
+	if err := s.blobs.DeleteTree(ctx, userID, folderPath); err != nil {
+		slog.Warn("failed to delete blob tree after metadata commit", "folder", folderPath, "error", err)
 	}
 
 	return fileCount, nil
