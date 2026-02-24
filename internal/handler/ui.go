@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"gosilo/internal/config"
+	"gosilo/internal/storage"
 	"gosilo/internal/ui"
 )
 
@@ -13,6 +14,7 @@ type UIDeps struct {
 	DB       *sql.DB
 	Renderer *ui.Renderer
 	Config   *config.Config
+	Storage  *storage.Service
 }
 
 // UI returns an http.Handler that serves the web UI routes.
@@ -57,6 +59,14 @@ func UI(deps *UIDeps) http.Handler {
 	mux.HandleFunc("GET /settings/password", settingsHandler.ShowChangePassword)
 	mux.HandleFunc("POST /settings/password", settingsHandler.ChangePassword)
 	mux.HandleFunc("POST /settings/tokens/{token}/revoke", settingsHandler.RevokeToken)
+
+	// File browser.
+	filesHandler := FilesHandler(deps)
+	mux.HandleFunc("GET /files", func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, "/files/", http.StatusMovedPermanently)
+	})
+	mux.HandleFunc("GET /files/{path...}", filesHandler.Browse)
+	mux.HandleFunc("POST /files/delete", filesHandler.Delete)
 
 	// Admin (all routes require auth + admin, enforced inside handler).
 	adminHandler := AdminHandler(deps)

@@ -61,6 +61,7 @@ func main() {
 		DB:       database,
 		Renderer: renderer,
 		Config:   cfg,
+		Storage:  storageSvc,
 	}
 
 	// Build routes.

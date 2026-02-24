@@ -1,0 +1,57 @@
+{{define "files"}}
+<div>
+    {{with .Content}}
+    <div class="page-header">
+        <h1>Files</h1>
+    </div>
+
+    <!-- Breadcrumb navigation -->
+    <nav class="breadcrumb" aria-label="File path">
+        <a href="/files/">Home</a>
+        {{range .Breadcrumbs}}
+            <span class="breadcrumb-sep">/</span>
+            <a href="{{.Path}}">{{.Name}}</a>
+        {{end}}
+    </nav>
+
+    {{if .Items}}
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th scope="col">Name</th>
+                    <th scope="col">Size</th>
+                    <th scope="col">Type</th>
+                    <th scope="col">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {{range .Items}}
+                <tr>
+                    <td>
+                        {{if .IsFolder}}<span class="file-icon">&#128193;</span>{{else}}<span class="file-icon">&#128196;</span>{{end}}
+                        <a href="{{.BrowseURL}}">{{.Name}}</a>
+                    </td>
+                    <td>{{.Size}}</td>
+                    <td>{{.ContentType}}</td>
+                    <td>
+                        {{if not .IsFolder}}
+                        <form method="POST" action="/files/delete"
+                            onsubmit="return confirm('Delete {{.Name}}?')">
+                            <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
+                            <input type="hidden" name="path" value="{{.Path}}">
+                            <button type="submit" class="btn-danger">Delete</button>
+                        </form>
+                        {{end}}
+                    </td>
+                </tr>
+                {{end}}
+            </tbody>
+        </table>
+    </div>
+    {{else}}
+    <p class="empty-state">This folder is empty.</p>
+    {{end}}
+    {{end}}
+</div>
+{{end}}

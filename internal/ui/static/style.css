@@ -715,6 +715,28 @@ code {
     font-family: ui-monospace, "Cascadia Code", "Fira Code", Menlo, monospace;
 }
 
+/* ===== File Browser ===== */
+.breadcrumb {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    font-size: 0.875rem;
+    margin-bottom: 1rem;
+    padding: 0.5rem 0.75rem;
+    background: var(--color-surface-muted);
+    border-radius: var(--radius);
+}
+
+.breadcrumb-sep {
+    color: var(--color-text-muted);
+    user-select: none;
+}
+
+.file-icon {
+    margin-right: 0.375rem;
+    font-size: 0.875rem;
+}
+
 /* ===== Responsive ===== */
 @media (max-width: 640px) {
     .stats {
