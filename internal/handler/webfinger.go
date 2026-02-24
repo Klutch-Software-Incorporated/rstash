@@ -54,7 +54,6 @@ func WebFinger(cfg *config.Config) http.Handler {
 		}
 
 		w.Header().Set("Content-Type", "application/jrd+json")
-		w.Header().Set("Access-Control-Allow-Origin", "*")
 		json.NewEncoder(w).Encode(resp)
 	})
 }

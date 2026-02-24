@@ -1,10 +1,5 @@
 package api
 
-import _ "embed"
-
-//go:embed openapi.yaml
-var OpenAPISpec []byte
-
 // FolderItem represents an item in a remoteStorage folder listing.
 type FolderItem struct {
 	ETag          string `json:"ETag"`

@@ -66,7 +66,7 @@ func main() {
 	// Build routes.
 	mux := http.NewServeMux()
 
-	mux.Handle("GET /.well-known/webfinger", handler.WebFinger(cfg))
+	mux.Handle("/.well-known/webfinger", handler.CORS(handler.WebFinger(cfg)))
 
 	// OAuth routes (need auth loader + setup guard for session cookie support).
 	oauthH := handler.OAuthHandler(uiDeps)
@@ -77,11 +77,8 @@ func main() {
 	}
 	mux.Handle("GET /oauth/authorize", oauthWrap(oauthH.ShowAuthorize))
 	mux.Handle("POST /oauth/authorize", oauthWrap(oauthH.DoAuthorize))
-	mux.Handle("POST /oauth/token", handler.OAuthToken())
-	mux.Handle("/storage/{user}/{path...}", handler.Storage(database, storageSvc))
-
-	// API docs (Redoc + OpenAPI spec).
-	mux.Handle("/docs/", handler.Docs())
+	mux.Handle("POST /oauth/token", handler.CORS(handler.OAuthToken()))
+	mux.Handle("/storage/{user}/{path...}", handler.CORS(handler.Storage(database, storageSvc)))
 
 	// Static file server from embedded assets.
 	staticFS, err := fs.Sub(ui.Static, "static")

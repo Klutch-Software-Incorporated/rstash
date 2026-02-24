@@ -17,17 +17,6 @@ import (
 // Storage handles GET/PUT/DELETE/HEAD requests on /storage/{user}/{path...}.
 func Storage(database *sql.DB, svc *storage.Service) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// CORS headers on every response, including preflight.
-		w.Header().Set("Access-Control-Allow-Origin", "*")
-		w.Header().Set("Access-Control-Allow-Methods", "GET, PUT, DELETE, HEAD")
-		w.Header().Set("Access-Control-Allow-Headers", "Authorization, Content-Type, Origin, If-Match, If-None-Match")
-		w.Header().Set("Access-Control-Expose-Headers", "Content-Type, Content-Length, ETag")
-
-		if r.Method == http.MethodOptions {
-			w.WriteHeader(http.StatusOK)
-			return
-		}
-
 		username := r.PathValue("user")
 		pathVal := r.PathValue("path")
 		storagePath := "/" + pathVal
