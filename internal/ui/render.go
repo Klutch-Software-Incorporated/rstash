@@ -19,7 +19,7 @@ type PageData struct {
 	Title            string
 	CurrentUser      *UserInfo
 	CSRFToken        string
-	Flash            string
+	Flash            *FlashData
 	Content          any
 	RegistrationMode string
 	ActiveNav        string

@@ -17,8 +17,8 @@
 
     <main>
         {{if .Flash}}
-            <div role="alert">
-                {{.Flash}}
+            <div role="alert"{{if .Flash.IsError}} class="alert-error"{{end}}>
+                {{.Flash.Message}}
             </div>
         {{end}}
         {{template "content" .}}

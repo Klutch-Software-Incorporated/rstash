@@ -64,7 +64,7 @@
 
 <h2>Users</h2>
 {{if .Users}}
-<table>
+<table class="responsive-table">
     <thead>
         <tr>
             <th>Username</th>
@@ -79,18 +79,18 @@
     <tbody>
         {{range .Users}}
         <tr>
-            <td>{{.Username}}</td>
-            <td>{{if .IsAdmin}}<span class="badge badge-admin">admin</span>{{else}}user{{end}}</td>
-            <td>{{if .Disabled}}<span class="badge badge-disabled">disabled</span>{{else}}<span class="badge badge-active">active</span>{{end}}</td>
-            <td>
+            <td data-label="Username"><a href="/admin/users/{{.ID}}/activity">{{.Username}}</a></td>
+            <td data-label="Role">{{if .IsAdmin}}<span class="badge badge-admin">admin</span>{{else}}user{{end}}</td>
+            <td data-label="Status">{{if .Disabled}}<span class="badge badge-disabled">disabled</span>{{else}}<span class="badge badge-active">active</span>{{end}}</td>
+            <td data-label="Storage">
                 {{.StorageUsed}}
                 {{if $.Content.QuotaMode | eq "user"}}
                 <span style="color:#888;font-size:.75rem">/ {{.StorageQuota}}</span>
                 {{end}}
             </td>
-            <td><a href="/admin/users/{{.ID}}/sessions">{{.SessionCount}}</a></td>
-            <td><time datetime="{{.CreatedAt}}">{{.CreatedAt}}</time></td>
-            <td>
+            <td data-label="Sessions"><a href="/admin/users/{{.ID}}/sessions">{{.SessionCount}}</a></td>
+            <td data-label="Created"><time datetime="{{.CreatedAt}}">{{.CreatedAt}}</time></td>
+            <td data-label="Actions">
                 {{if not .IsSelf}}
                 <div style="display:flex;gap:.25rem;flex-wrap:wrap;justify-content:flex-end">
                     <form method="POST" action="/admin/users/{{.ID}}/toggle-admin">
@@ -135,7 +135,7 @@
 {{end}}
 
 {{if .Invites}}
-<table>
+<table class="responsive-table">
     <thead>
         <tr>
             <th>Code</th>
@@ -147,14 +147,14 @@
     <tbody>
         {{range .Invites}}
         <tr>
-            <td><code>{{.Code}}</code></td>
-            <td>
+            <td data-label="Code"><code>{{.Code}}</code></td>
+            <td data-label="Status">
                 {{if .UsedBy}}<span class="badge badge-used">used</span>
                 {{else}}<span class="badge badge-available">available</span>
                 {{end}}
             </td>
-            <td><time datetime="{{.CreatedAt}}">{{.CreatedAt}}</time></td>
-            <td>
+            <td data-label="Created"><time datetime="{{.CreatedAt}}">{{.CreatedAt}}</time></td>
+            <td data-label="Actions">
                 {{if not .UsedBy}}
                 <form method="POST" action="/admin/invites/{{.Code}}/delete">
                     <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
@@ -245,18 +245,18 @@
 
 <h2>Audit Log</h2>
 {{if .AuditLog}}
-<table>
+<table class="responsive-table">
     <thead>
         <tr><th>Actor</th><th>Action</th><th>Target</th><th>Details</th><th>Time</th></tr>
     </thead>
     <tbody>
         {{range .AuditLog}}
         <tr>
-            <td>{{.ActorUsername}}</td>
-            <td><code>{{.Action}}</code></td>
-            <td>{{.TargetType}}:{{.TargetID}}</td>
-            <td>{{.Details}}</td>
-            <td><time datetime="{{.CreatedAt}}">{{.CreatedAt}}</time></td>
+            <td data-label="Actor">{{.ActorUsername}}</td>
+            <td data-label="Action"><code>{{.Action}}</code></td>
+            <td data-label="Target">{{.TargetType}}:{{.TargetID}}</td>
+            <td data-label="Details">{{.Details}}</td>
+            <td data-label="Time"><time datetime="{{.CreatedAt}}">{{.CreatedAt}}</time></td>
         </tr>
         {{end}}
     </tbody>

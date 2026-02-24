@@ -20,17 +20,17 @@
 
 <h2>Recent Files</h2>
 {{if .RecentFiles}}
-<table>
+<table class="responsive-table">
     <thead>
         <tr><th>Path</th><th>Size</th><th>Type</th><th>Updated</th></tr>
     </thead>
     <tbody>
         {{range .RecentFiles}}
         <tr>
-            <td><code>{{.Path}}</code></td>
-            <td>{{.Size}}</td>
-            <td>{{.ContentType}}</td>
-            <td><time datetime="{{.UpdatedAt}}">{{.UpdatedAt}}</time></td>
+            <td data-label="Path"><code>{{.Path}}</code></td>
+            <td data-label="Size">{{.Size}}</td>
+            <td data-label="Type">{{.ContentType}}</td>
+            <td data-label="Updated"><time datetime="{{.UpdatedAt}}">{{.UpdatedAt}}</time></td>
         </tr>
         {{end}}
     </tbody>
@@ -41,17 +41,17 @@
 
 <h2>Audit Log</h2>
 {{if .AuditLog}}
-<table>
+<table class="responsive-table">
     <thead>
         <tr><th>Actor</th><th>Action</th><th>Details</th><th>Time</th></tr>
     </thead>
     <tbody>
         {{range .AuditLog}}
         <tr>
-            <td>{{.ActorUsername}}</td>
-            <td><code>{{.Action}}</code></td>
-            <td>{{.Details}}</td>
-            <td><time datetime="{{.CreatedAt}}">{{.CreatedAt}}</time></td>
+            <td data-label="Actor">{{.ActorUsername}}</td>
+            <td data-label="Action"><code>{{.Action}}</code></td>
+            <td data-label="Details">{{.Details}}</td>
+            <td data-label="Time"><time datetime="{{.CreatedAt}}">{{.CreatedAt}}</time></td>
         </tr>
         {{end}}
     </tbody>

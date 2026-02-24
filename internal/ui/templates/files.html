@@ -16,6 +16,16 @@
     </form>
 </div>
 
+{{if .IsRoot}}
+<form method="POST" action="/files/create-module" class="create-module-form">
+    <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
+    <div class="create-module-row">
+        <input type="text" name="name" placeholder="Module name (e.g. documents)"
+               pattern="[a-zA-Z0-9_-]+" required>
+        <button type="submit" class="btn-primary">Create Module</button>
+    </div>
+</form>
+{{else}}
 <details style="margin:.75rem 0">
     <summary style="cursor:pointer;font-size:.875rem;font-weight:500;color:var(--fg-muted)">Upload files</summary>
     <form method="POST" action="/files/upload" enctype="multipart/form-data" class="upload-area" id="upload-form">
@@ -28,6 +38,7 @@
         </div>
     </form>
 </details>
+{{end}}
 
 {{if .Items}}
 <form method="POST" action="/files/bulk-delete" id="bulk-form">
@@ -36,10 +47,10 @@
         <span class="bulk-count" id="bulk-count">0 selected</span>
         <button type="submit" class="btn-danger" onclick="return confirm('Delete selected items?')">Delete Selected</button>
     </div>
-    <table>
+    <table class="responsive-table">
         <thead>
             <tr>
-                <th style="width:2rem;text-align:center"><input type="checkbox" id="select-all" aria-label="Select all"></th>
+                <th class="bulk-check-col" style="width:2rem;text-align:center"><input type="checkbox" id="select-all" aria-label="Select all"></th>
                 <th>Name</th>
                 <th>Size</th>
                 <th>Type</th>
@@ -49,14 +60,14 @@
         <tbody>
             {{range .Items}}
             <tr>
-                <td style="text-align:center"><input type="checkbox" name="paths[]" value="{{.Path}}" class="bulk-check"></td>
-                <td>
+                <td class="bulk-check-col" style="text-align:center"><input type="checkbox" name="paths[]" value="{{.Path}}" class="bulk-check"></td>
+                <td data-label="Name">
                     {{if .IsFolder}}<span class="file-icon">&#128193;</span>{{else}}<span class="file-icon">&#128196;</span>{{end}}
                     <a href="{{.BrowseURL}}">{{.Name}}</a>
                 </td>
-                <td>{{.Size}}</td>
-                <td>{{.ContentType}}</td>
-                <td>
+                <td data-label="Size">{{.Size}}</td>
+                <td data-label="Type">{{.ContentType}}</td>
+                <td data-label="Actions">
                     {{if .IsFolder}}
                     <form method="POST" action="/files/delete"
                         onsubmit="return confirm('Delete folder {{.Name}} and ALL its contents?')">

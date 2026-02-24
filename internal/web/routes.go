@@ -43,6 +43,7 @@ func Routes(deps *UIDeps) http.Handler {
 	mux.HandleFunc("POST /files/delete", RequireCSRF(filesHandler.Delete))
 	mux.HandleFunc("POST /files/upload", RequireCSRF(filesHandler.Upload))
 	mux.HandleFunc("POST /files/bulk-delete", RequireCSRF(filesHandler.BulkDelete))
+	mux.HandleFunc("POST /files/create-module", RequireCSRF(filesHandler.CreateModule))
 
 	// Admin (single page, all sections combined).
 	adminHandler := AdminHandler(deps)

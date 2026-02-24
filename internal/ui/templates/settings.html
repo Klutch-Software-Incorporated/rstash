@@ -8,9 +8,9 @@
     <dt>Created</dt>
     <dd><time datetime="{{.CreatedAt}}">{{.CreatedAt}}</time></dd>
     <dt>User address</dt>
-    <dd><code>{{$.CurrentUser.Username}}@{{.BaseURL}}</code></dd>
+    <dd><code>{{$.CurrentUser.Username}}@{{.Host}}</code></dd>
     <dt>WebFinger</dt>
-    <dd><code>{{.BaseURL}}/.well-known/webfinger?resource=acct:{{$.CurrentUser.Username}}@{{.BaseURL}}</code></dd>
+    <dd><code>{{.BaseURL}}/.well-known/webfinger?resource=acct:{{$.CurrentUser.Username}}@{{.Host}}</code></dd>
     <dt>Storage root</dt>
     <dd><code>{{.BaseURL}}/storage/{{$.CurrentUser.Username}}/</code></dd>
     <dt>Protocol</dt>
@@ -45,20 +45,20 @@
 
 <h2>Active Sessions</h2>
 {{if .Sessions}}
-<table>
+<table class="responsive-table">
     <thead>
         <tr><th>Token</th><th>Created</th><th>Expires</th><th>Actions</th></tr>
     </thead>
     <tbody>
         {{range .Sessions}}
         <tr>
-            <td>
+            <td data-label="Token">
                 <code>{{.TokenPrefix}}</code>
                 {{if .IsCurrent}} <span class="badge badge-active">current</span>{{end}}
             </td>
-            <td><time datetime="{{.CreatedAt}}">{{.CreatedAt}}</time></td>
-            <td><time datetime="{{.ExpiresAt}}">{{.ExpiresAt}}</time></td>
-            <td>
+            <td data-label="Created"><time datetime="{{.CreatedAt}}">{{.CreatedAt}}</time></td>
+            <td data-label="Expires"><time datetime="{{.ExpiresAt}}">{{.ExpiresAt}}</time></td>
+            <td data-label="Actions">
                 {{if not .IsCurrent}}
                 <form method="POST" action="/settings/sessions/{{.TokenFull}}/terminate">
                     <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
@@ -76,17 +76,17 @@
 
 <h2>Connected Apps</h2>
 {{if .Tokens}}
-<table>
+<table class="responsive-table">
     <thead>
         <tr><th>Application</th><th>Scopes</th><th>Granted</th><th>Actions</th></tr>
     </thead>
     <tbody>
         {{range .Tokens}}
         <tr>
-            <td>{{.ClientID}}</td>
-            <td><code>{{.Scopes}}</code></td>
-            <td><time datetime="{{.CreatedAt}}">{{.CreatedAt}}</time></td>
-            <td>
+            <td data-label="Application">{{.ClientID}}</td>
+            <td data-label="Scopes"><code>{{.Scopes}}</code></td>
+            <td data-label="Granted"><time datetime="{{.CreatedAt}}">{{.CreatedAt}}</time></td>
+            <td data-label="Actions">
                 <form method="POST" action="/settings/tokens/{{.TokenFull}}/revoke"
                     onsubmit="return confirm('Revoke this token?')">
                     <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">

@@ -3,6 +3,7 @@ package web
 import (
 	"log/slog"
 	"net/http"
+	"net/url"
 	"strings"
 
 	"gosilo/internal/db"
@@ -28,6 +29,7 @@ type tokenRow struct {
 
 type settingsContent struct {
 	BaseURL   string
+	Host      string
 	Username  string
 	CreatedAt string
 	Tokens    []*tokenRow
@@ -122,8 +124,14 @@ func (h *settingsHandler) Show(w http.ResponseWriter, r *http.Request) {
 	}
 	hs.OAuthApps = tokenCount
 
+	host := h.deps.Config.BaseURL
+	if parsed, err := url.Parse(h.deps.Config.BaseURL); err == nil {
+		host = parsed.Host
+	}
+
 	h.deps.Renderer.Render(w, "settings", h.deps.pageData(w, r, "Settings — Gosilo", &settingsContent{
 		BaseURL:   h.deps.Config.BaseURL,
+		Host:      host,
 		Username:  user.Username,
 		CreatedAt: user.CreatedAt,
 		Tokens:    tokenRows,
@@ -142,7 +150,7 @@ func (h *settingsHandler) TerminateOwnSession(w http.ResponseWriter, r *http.Req
 	sess := CurrentSession(r)
 
 	if sess != nil && token == sess.Token {
-		ui.SetFlash(w, "You cannot terminate your current session.")
+		ui.SetFlashError(w, "You cannot terminate your current session.")
 		http.Redirect(w, r, "/settings", http.StatusSeeOther)
 		return
 	}
@@ -150,14 +158,14 @@ func (h *settingsHandler) TerminateOwnSession(w http.ResponseWriter, r *http.Req
 	// Verify the session belongs to the current user.
 	targetSess, err := h.deps.Auth.GetSession(r.Context(), token)
 	if err != nil || targetSess == nil || targetSess.UserID != CurrentUser(r).ID {
-		ui.SetFlash(w, "Session not found.")
+		ui.SetFlashError(w, "Session not found.")
 		http.Redirect(w, r, "/settings", http.StatusSeeOther)
 		return
 	}
 
 	if err := h.deps.Auth.TerminateSession(r.Context(), token); err != nil {
 		slog.Error("failed to terminate session", "error", err)
-		ui.SetFlash(w, "Failed to terminate session.")
+		ui.SetFlashError(w, "Failed to terminate session.")
 	} else {
 		ui.SetFlash(w, "Session terminated.")
 	}
@@ -176,26 +184,26 @@ func (h *settingsHandler) ChangePassword(w http.ResponseWriter, r *http.Request)
 	confirmPassword := r.FormValue("confirm_password")
 
 	if !h.deps.Auth.CheckPassword(user, currentPassword) {
-		ui.SetFlash(w, "Current password is incorrect.")
+		ui.SetFlashError(w, "Current password is incorrect.")
 		http.Redirect(w, r, "/settings", http.StatusSeeOther)
 		return
 	}
 
 	if msg := validatePassword(newPassword); msg != "" {
-		ui.SetFlash(w, msg)
+		ui.SetFlashError(w, msg)
 		http.Redirect(w, r, "/settings", http.StatusSeeOther)
 		return
 	}
 
 	if newPassword != confirmPassword {
-		ui.SetFlash(w, "New passwords do not match.")
+		ui.SetFlashError(w, "New passwords do not match.")
 		http.Redirect(w, r, "/settings", http.StatusSeeOther)
 		return
 	}
 
 	if err := h.deps.Auth.UpdatePassword(r.Context(), user.ID, newPassword); err != nil {
 		slog.Error("failed to update password", "error", err)
-		ui.SetFlash(w, "An error occurred. Please try again.")
+		ui.SetFlashError(w, "An error occurred. Please try again.")
 		http.Redirect(w, r, "/settings", http.StatusSeeOther)
 		return
 	}
@@ -222,19 +230,19 @@ func (h *settingsHandler) RevokeToken(w http.ResponseWriter, r *http.Request) {
 	t, err := db.GetOAuthToken(r.Context(), h.deps.DB, token)
 	if err != nil {
 		slog.Error("failed to get oauth token", "error", err)
-		ui.SetFlash(w, "Failed to revoke token.")
+		ui.SetFlashError(w, "Failed to revoke token.")
 		http.Redirect(w, r, "/settings", http.StatusSeeOther)
 		return
 	}
 	if t == nil || t.UserID != user.ID {
-		ui.SetFlash(w, "Token not found.")
+		ui.SetFlashError(w, "Token not found.")
 		http.Redirect(w, r, "/settings", http.StatusSeeOther)
 		return
 	}
 
 	if err := db.DeleteOAuthToken(r.Context(), h.deps.DB, token); err != nil {
 		slog.Error("failed to revoke oauth token", "error", err)
-		ui.SetFlash(w, "Failed to revoke token.")
+		ui.SetFlashError(w, "Failed to revoke token.")
 		http.Redirect(w, r, "/settings", http.StatusSeeOther)
 		return
 	}

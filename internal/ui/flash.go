@@ -1,8 +1,17 @@
 package ui
 
-import "net/http"
+import (
+	"net/http"
+	"strings"
+)
 
-// SetFlash sets a flash message cookie.
+// FlashData holds a flash message and its severity.
+type FlashData struct {
+	Message string
+	IsError bool
+}
+
+// SetFlash sets a flash message cookie (success/info severity).
 func SetFlash(w http.ResponseWriter, message string) {
 	http.SetCookie(w, &http.Cookie{
 		Name:     "gosilo_flash",
@@ -14,11 +23,16 @@ func SetFlash(w http.ResponseWriter, message string) {
 	})
 }
 
+// SetFlashError sets a flash message cookie with error severity.
+func SetFlashError(w http.ResponseWriter, message string) {
+	SetFlash(w, "error:"+message)
+}
+
 // GetFlash reads and clears the flash message cookie.
-func GetFlash(w http.ResponseWriter, r *http.Request) string {
+func GetFlash(w http.ResponseWriter, r *http.Request) *FlashData {
 	cookie, err := r.Cookie("gosilo_flash")
 	if err != nil {
-		return ""
+		return nil
 	}
 	// Clear it.
 	http.SetCookie(w, &http.Cookie{
@@ -29,5 +43,9 @@ func GetFlash(w http.ResponseWriter, r *http.Request) string {
 		HttpOnly: true,
 		SameSite: http.SameSiteLaxMode,
 	})
-	return cookie.Value
+	val := cookie.Value
+	if strings.HasPrefix(val, "error:") {
+		return &FlashData{Message: strings.TrimPrefix(val, "error:"), IsError: true}
+	}
+	return &FlashData{Message: val}
 }

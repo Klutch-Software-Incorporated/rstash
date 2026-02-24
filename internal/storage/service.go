@@ -375,6 +375,46 @@ func (s *Service) GetFolder(ctx context.Context, userID int64, path string, cond
 	return desc, etag, nil
 }
 
+// CreateFolder creates an empty folder node and propagates ETags.
+// The path must end with "/" and must not be root "/".
+func (s *Service) CreateFolder(ctx context.Context, userID int64, folderPath string) error {
+	if !strings.HasSuffix(folderPath, "/") {
+		return ErrConflict
+	}
+	if folderPath == "/" {
+		return ErrConflict
+	}
+
+	tx, err := s.database.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("begin tx: %w", err)
+	}
+	defer tx.Rollback()
+
+	existing, err := db.GetNode(ctx, tx, userID, folderPath)
+	if err != nil {
+		return err
+	}
+	if existing != nil {
+		return ErrConflict
+	}
+
+	etag := FolderETag(nil)
+	if _, err := db.UpsertNode(ctx, tx, userID, folderPath, true, "", 0, etag); err != nil {
+		return err
+	}
+
+	if err := s.propagateETags(ctx, tx, userID, folderPath); err != nil {
+		return err
+	}
+
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("commit: %w", err)
+	}
+
+	return nil
+}
+
 // propagateETags recomputes folder ETags for all ancestors of path.
 func (s *Service) propagateETags(ctx context.Context, tx *sql.Tx, userID int64, path string) error {
 	ancestors := db.AncestorPaths(path)

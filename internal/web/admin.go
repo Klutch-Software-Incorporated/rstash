@@ -252,7 +252,7 @@ func (h *adminHandler) DeleteUser(w http.ResponseWriter, r *http.Request) {
 
 	currentUser := CurrentUser(r)
 	if id == currentUser.ID {
-		ui.SetFlash(w, "You cannot delete your own account.")
+		ui.SetFlashError(w, "You cannot delete your own account.")
 		http.Redirect(w, r, "/admin", http.StatusSeeOther)
 		return
 	}
@@ -260,7 +260,7 @@ func (h *adminHandler) DeleteUser(w http.ResponseWriter, r *http.Request) {
 	target, _ := h.deps.Auth.GetUser(r.Context(), id)
 	if err := h.deps.Auth.DeleteUser(r.Context(), id); err != nil {
 		slog.Error("failed to delete user", "error", err)
-		ui.SetFlash(w, "Failed to delete user.")
+		ui.SetFlashError(w, "Failed to delete user.")
 		http.Redirect(w, r, "/admin", http.StatusSeeOther)
 		return
 	}
@@ -281,7 +281,7 @@ func (h *adminHandler) CreateInvite(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if h.deps.Config.RegistrationMode == "closed" {
-		ui.SetFlash(w, "Cannot create invite codes while registration is closed.")
+		ui.SetFlashError(w, "Cannot create invite codes while registration is closed.")
 		http.Redirect(w, r, "/admin", http.StatusSeeOther)
 		return
 	}
@@ -290,7 +290,7 @@ func (h *adminHandler) CreateInvite(w http.ResponseWriter, r *http.Request) {
 	inv, err := h.deps.Auth.CreateInvite(r.Context(), user.ID)
 	if err != nil {
 		slog.Error("failed to create invite code", "error", err)
-		ui.SetFlash(w, "Failed to generate invite code.")
+		ui.SetFlashError(w, "Failed to generate invite code.")
 		http.Redirect(w, r, "/admin", http.StatusSeeOther)
 		return
 	}
@@ -318,7 +318,7 @@ func (h *adminHandler) SetUserQuota(w http.ResponseWriter, r *http.Request) {
 	if quotaStr != "" && quotaStr != "0" {
 		parsed, err := config.ParseByteSize(quotaStr)
 		if err != nil {
-			ui.SetFlash(w, fmt.Sprintf("Invalid quota value: %s", quotaStr))
+			ui.SetFlashError(w, fmt.Sprintf("Invalid quota value: %s", quotaStr))
 			http.Redirect(w, r, "/admin", http.StatusSeeOther)
 			return
 		}
@@ -327,7 +327,7 @@ func (h *adminHandler) SetUserQuota(w http.ResponseWriter, r *http.Request) {
 
 	if err := db.UpdateUserQuota(r.Context(), h.deps.DB, id, quotaBytes); err != nil {
 		slog.Error("failed to update user quota", "error", err)
-		ui.SetFlash(w, "Failed to update quota.")
+		ui.SetFlashError(w, "Failed to update quota.")
 		http.Redirect(w, r, "/admin", http.StatusSeeOther)
 		return
 	}
@@ -352,13 +352,13 @@ func (h *adminHandler) CreateUser(w http.ResponseWriter, r *http.Request) {
 	isAdmin := r.FormValue("is_admin") == "on"
 
 	if username == "" || password == "" {
-		ui.SetFlash(w, "Username and password are required.")
+		ui.SetFlashError(w, "Username and password are required.")
 		http.Redirect(w, r, "/admin", http.StatusSeeOther)
 		return
 	}
 
 	if msg := validatePassword(password); msg != "" {
-		ui.SetFlash(w, msg)
+		ui.SetFlashError(w, msg)
 		http.Redirect(w, r, "/admin", http.StatusSeeOther)
 		return
 	}
@@ -366,7 +366,7 @@ func (h *adminHandler) CreateUser(w http.ResponseWriter, r *http.Request) {
 	newUser, err := h.deps.Auth.CreateUser(r.Context(), username, password, isAdmin)
 	if err != nil {
 		slog.Error("failed to create user", "error", err)
-		ui.SetFlash(w, "Failed to create user. Username may already exist.")
+		ui.SetFlashError(w, "Failed to create user. Username may already exist.")
 		http.Redirect(w, r, "/admin", http.StatusSeeOther)
 		return
 	}
@@ -391,14 +391,14 @@ func (h *adminHandler) ToggleAdmin(w http.ResponseWriter, r *http.Request) {
 
 	currentUser := CurrentUser(r)
 	if id == currentUser.ID {
-		ui.SetFlash(w, "You cannot change your own admin status.")
+		ui.SetFlashError(w, "You cannot change your own admin status.")
 		http.Redirect(w, r, "/admin", http.StatusSeeOther)
 		return
 	}
 
 	user, err := h.deps.Auth.GetUser(r.Context(), id)
 	if err != nil || user == nil {
-		ui.SetFlash(w, "User not found.")
+		ui.SetFlashError(w, "User not found.")
 		http.Redirect(w, r, "/admin", http.StatusSeeOther)
 		return
 	}
@@ -406,7 +406,7 @@ func (h *adminHandler) ToggleAdmin(w http.ResponseWriter, r *http.Request) {
 	newAdmin := !user.IsAdmin
 	if err := h.deps.Auth.ToggleAdmin(r.Context(), id, newAdmin); err != nil {
 		slog.Error("failed to toggle admin", "error", err)
-		ui.SetFlash(w, "Failed to toggle admin status.")
+		ui.SetFlashError(w, "Failed to toggle admin status.")
 		http.Redirect(w, r, "/admin", http.StatusSeeOther)
 		return
 	}
@@ -435,14 +435,14 @@ func (h *adminHandler) ToggleDisabled(w http.ResponseWriter, r *http.Request) {
 
 	currentUser := CurrentUser(r)
 	if id == currentUser.ID {
-		ui.SetFlash(w, "You cannot disable your own account.")
+		ui.SetFlashError(w, "You cannot disable your own account.")
 		http.Redirect(w, r, "/admin", http.StatusSeeOther)
 		return
 	}
 
 	user, err := h.deps.Auth.GetUser(r.Context(), id)
 	if err != nil || user == nil {
-		ui.SetFlash(w, "User not found.")
+		ui.SetFlashError(w, "User not found.")
 		http.Redirect(w, r, "/admin", http.StatusSeeOther)
 		return
 	}
@@ -450,7 +450,7 @@ func (h *adminHandler) ToggleDisabled(w http.ResponseWriter, r *http.Request) {
 	newDisabled := !user.Disabled
 	if err := h.deps.Auth.SetDisabled(r.Context(), id, newDisabled); err != nil {
 		slog.Error("failed to toggle disabled", "error", err)
-		ui.SetFlash(w, "Failed to toggle disabled status.")
+		ui.SetFlashError(w, "Failed to toggle disabled status.")
 		http.Redirect(w, r, "/admin", http.StatusSeeOther)
 		return
 	}
@@ -532,7 +532,7 @@ func (h *adminHandler) TerminateSession(w http.ResponseWriter, r *http.Request) 
 	token := r.PathValue("token")
 	if err := h.deps.Auth.TerminateSession(r.Context(), token); err != nil {
 		slog.Error("failed to terminate session", "error", err)
-		ui.SetFlash(w, "Failed to terminate session.")
+		ui.SetFlashError(w, "Failed to terminate session.")
 	} else {
 		h.audit(r, "session.terminated", "session", token[:8]+"...", "")
 		ui.SetFlash(w, "Session terminated.")
@@ -560,7 +560,7 @@ func (h *adminHandler) TerminateAllSessions(w http.ResponseWriter, r *http.Reque
 
 	if err := h.deps.Auth.TerminateAllSessions(r.Context(), id); err != nil {
 		slog.Error("failed to terminate all sessions", "error", err)
-		ui.SetFlash(w, "Failed to terminate sessions.")
+		ui.SetFlashError(w, "Failed to terminate sessions.")
 	} else {
 		h.audit(r, "session.terminated", "user", idStr, "all sessions")
 		ui.SetFlash(w, "All sessions terminated.")
@@ -661,7 +661,7 @@ func (h *adminHandler) DeleteInvite(w http.ResponseWriter, r *http.Request) {
 	code := r.PathValue("code")
 	if err := h.deps.Auth.DeleteInvite(r.Context(), code); err != nil {
 		slog.Error("failed to delete invite code", "error", err)
-		ui.SetFlash(w, "Failed to delete invite code.")
+		ui.SetFlashError(w, "Failed to delete invite code.")
 		http.Redirect(w, r, "/admin", http.StatusSeeOther)
 		return
 	}

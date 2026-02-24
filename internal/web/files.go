@@ -7,6 +7,7 @@ import (
 	"mime"
 	"net/http"
 	"path"
+	"regexp"
 	"sort"
 	"strings"
 
@@ -14,6 +15,8 @@ import (
 	"gosilo/internal/storage"
 	"gosilo/internal/ui"
 )
+
+var moduleNameRe = regexp.MustCompile(`^[a-zA-Z0-9_-]+$`)
 
 type filesHandler struct {
 	deps *UIDeps
@@ -27,6 +30,7 @@ func FilesHandler(deps *UIDeps) *filesHandler {
 type filesContent struct {
 	Username    string
 	CurrentPath string
+	IsRoot      bool
 	Breadcrumbs []breadcrumb
 	Items       []*fileItem
 }
@@ -113,6 +117,7 @@ func (h *filesHandler) browseFolder(w http.ResponseWriter, r *http.Request, user
 	h.deps.Renderer.Render(w, "files", h.deps.pageData(w, r, "Files — "+storagePath, filesContent{
 		Username:    username,
 		CurrentPath: storagePath,
+		IsRoot:      storagePath == "/",
 		Breadcrumbs: breadcrumbs,
 		Items:       items,
 	}))
@@ -157,7 +162,7 @@ func (h *filesHandler) Delete(w http.ResponseWriter, r *http.Request) {
 		count, err := h.deps.Storage.DeleteFolder(r.Context(), user.ID, deletePath)
 		if err != nil {
 			slog.Error("failed to delete folder", "error", err, "path", deletePath)
-			ui.SetFlash(w, "Delete failed: "+err.Error())
+			ui.SetFlashError(w, "Delete failed: "+err.Error())
 		} else {
 			name := strings.TrimSuffix(path.Base(strings.TrimSuffix(deletePath, "/")), "/")
 			ui.SetFlash(w, fmt.Sprintf("Deleted %s/ (%d files)", name, count))
@@ -167,7 +172,7 @@ func (h *filesHandler) Delete(w http.ResponseWriter, r *http.Request) {
 		_, err := h.deps.Storage.DeleteDocument(r.Context(), user.ID, deletePath, storage.Conditions{})
 		if err != nil {
 			slog.Error("failed to delete document", "error", err, "path", deletePath)
-			ui.SetFlash(w, "Delete failed: "+err.Error())
+			ui.SetFlashError(w, "Delete failed: "+err.Error())
 		} else {
 			name := path.Base(deletePath)
 			ui.SetFlash(w, fmt.Sprintf("Deleted %s", name))
@@ -197,7 +202,7 @@ func (h *filesHandler) Upload(w http.ResponseWriter, r *http.Request) {
 	r.Body = http.MaxBytesReader(w, r.Body, maxSize)
 
 	if err := r.ParseMultipartForm(maxSize); err != nil {
-		ui.SetFlash(w, "Upload failed: file too large or invalid form data.")
+		ui.SetFlashError(w, "Upload failed: file too large or invalid form data.")
 		http.Redirect(w, r, "/files/", http.StatusSeeOther)
 		return
 	}
@@ -210,9 +215,15 @@ func (h *filesHandler) Upload(w http.ResponseWriter, r *http.Request) {
 		folder += "/"
 	}
 
+	if folder == "/" {
+		ui.SetFlashError(w, "Cannot upload to root. Please create or select a module first.")
+		http.Redirect(w, r, "/files/", http.StatusSeeOther)
+		return
+	}
+
 	files := r.MultipartForm.File["files"]
 	if len(files) == 0 {
-		ui.SetFlash(w, "No files selected.")
+		ui.SetFlashError(w, "No files selected.")
 		http.Redirect(w, r, "/files"+folder, http.StatusSeeOther)
 		return
 	}
@@ -249,6 +260,37 @@ func (h *filesHandler) Upload(w http.ResponseWriter, r *http.Request) {
 		ui.SetFlash(w, fmt.Sprintf("Uploaded %d of %d file(s). Some failed.", uploaded, len(files)))
 	}
 	http.Redirect(w, r, "/files"+folder, http.StatusSeeOther)
+}
+
+// CreateModule handles POST /files/create-module — create a top-level module folder.
+func (h *filesHandler) CreateModule(w http.ResponseWriter, r *http.Request) {
+	if !RequireAuth(w, r) {
+		return
+	}
+	user := CurrentUser(r)
+
+	name := strings.TrimSpace(r.FormValue("name"))
+	if !moduleNameRe.MatchString(name) {
+		ui.SetFlashError(w, "Invalid module name. Use only letters, numbers, hyphens, and underscores.")
+		http.Redirect(w, r, "/files/", http.StatusSeeOther)
+		return
+	}
+
+	folderPath := "/" + name + "/"
+	err := h.deps.Storage.CreateFolder(r.Context(), user.ID, folderPath)
+	if err != nil {
+		if err == storage.ErrConflict {
+			ui.SetFlashError(w, fmt.Sprintf("Module %q already exists.", name))
+		} else {
+			slog.Error("failed to create module", "error", err, "name", name)
+			ui.SetFlashError(w, "Failed to create module.")
+		}
+		http.Redirect(w, r, "/files/", http.StatusSeeOther)
+		return
+	}
+
+	ui.SetFlash(w, fmt.Sprintf("Created module %s/", name))
+	http.Redirect(w, r, "/files/", http.StatusSeeOther)
 }
 
 type searchContent struct {
