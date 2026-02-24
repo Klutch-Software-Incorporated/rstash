@@ -133,6 +133,50 @@ func DeleteExpiredOAuthTokens(ctx context.Context, q Querier) error {
 	return nil
 }
 
+// CountUserOAuthTokens returns the count of active (non-expired) OAuth tokens
+// for a user.
+func CountUserOAuthTokens(ctx context.Context, q Querier, userID int64) (int64, error) {
+	var count int64
+	err := q.QueryRowContext(ctx,
+		`SELECT COUNT(*) FROM oauth_tokens
+		 WHERE user_id = ? AND (expires_at IS NULL OR expires_at > datetime('now'))`,
+		userID,
+	).Scan(&count)
+	if err != nil {
+		return 0, fmt.Errorf("count user oauth tokens: %w", err)
+	}
+	return count, nil
+}
+
+// GetRecentUserOAuthTokens returns recently created OAuth tokens for a user,
+// ordered by creation time descending.
+func GetRecentUserOAuthTokens(ctx context.Context, q Querier, userID int64, limit int) ([]*model.OAuthToken, error) {
+	rows, err := q.QueryContext(ctx,
+		`SELECT token, user_id, client_id, scopes, created_at, expires_at
+		 FROM oauth_tokens
+		 WHERE user_id = ?
+		 ORDER BY created_at DESC
+		 LIMIT ?`,
+		userID, limit,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("get recent user oauth tokens: %w", err)
+	}
+	defer rows.Close()
+
+	var tokens []*model.OAuthToken
+	for rows.Next() {
+		var t model.OAuthToken
+		var scopeStr string
+		if err := rows.Scan(&t.Token, &t.UserID, &t.ClientID, &scopeStr, &t.CreatedAt, &t.ExpiresAt); err != nil {
+			return nil, fmt.Errorf("scan oauth token: %w", err)
+		}
+		t.Scopes = strings.Fields(scopeStr)
+		tokens = append(tokens, &t)
+	}
+	return tokens, rows.Err()
+}
+
 func oauthRandomHex(n int) (string, error) {
 	b := make([]byte, n)
 	if _, err := rand.Read(b); err != nil {

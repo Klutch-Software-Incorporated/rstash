@@ -90,6 +90,33 @@ func DeleteUserSessions(ctx context.Context, q Querier, userID int64) error {
 	return nil
 }
 
+// GetRecentUserSessions returns recent sessions for a user, ordered by creation
+// time descending.
+func GetRecentUserSessions(ctx context.Context, q Querier, userID int64, limit int) ([]*model.Session, error) {
+	rows, err := q.QueryContext(ctx,
+		`SELECT token, user_id, csrf_token, created_at, expires_at
+		 FROM sessions
+		 WHERE user_id = ?
+		 ORDER BY created_at DESC
+		 LIMIT ?`,
+		userID, limit,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("get recent user sessions: %w", err)
+	}
+	defer rows.Close()
+
+	var sessions []*model.Session
+	for rows.Next() {
+		var s model.Session
+		if err := rows.Scan(&s.Token, &s.UserID, &s.CSRFToken, &s.CreatedAt, &s.ExpiresAt); err != nil {
+			return nil, fmt.Errorf("scan session: %w", err)
+		}
+		sessions = append(sessions, &s)
+	}
+	return sessions, rows.Err()
+}
+
 func randomHex(n int) (string, error) {
 	b := make([]byte, n)
 	if _, err := rand.Read(b); err != nil {

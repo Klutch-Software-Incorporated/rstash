@@ -9,6 +9,7 @@ import (
 	"sort"
 	"strings"
 
+	"gosilo/internal/db"
 	"gosilo/internal/storage"
 	"gosilo/internal/ui"
 )
@@ -82,7 +83,14 @@ func (h *filesHandler) browseFolder(w http.ResponseWriter, r *http.Request, user
 			IsFolder:  isFolder,
 			ETag:      item.ETag,
 		}
-		if !isFolder {
+		if isFolder {
+			subtreeSize, err := db.GetSubtreeSize(r.Context(), h.deps.DB, userID, storagePath+name)
+			if err != nil {
+				slog.Error("failed to get subtree size", "error", err, "path", storagePath+name)
+			} else {
+				fi.Size = humanSize(subtreeSize)
+			}
+		} else {
 			fi.ContentType = item.ContentType
 			if item.ContentLength != nil {
 				fi.Size = humanSize(*item.ContentLength)
@@ -136,7 +144,7 @@ func (h *filesHandler) downloadFile(w http.ResponseWriter, r *http.Request, user
 	io.Copy(w, result.Content)
 }
 
-// Delete handles POST /files/delete.
+// Delete handles POST /files/delete for both files and folders.
 func (h *filesHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	if !RequireAuth(w, r) {
 		return
@@ -153,17 +161,30 @@ func (h *filesHandler) Delete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	_, err := h.deps.Storage.DeleteDocument(r.Context(), user.ID, deletePath, storage.Conditions{})
-	if err != nil {
-		slog.Error("failed to delete document", "error", err, "path", deletePath)
-		SetFlash(w, "Delete failed: "+err.Error())
+	if strings.HasSuffix(deletePath, "/") {
+		// Folder delete (recursive).
+		count, err := h.deps.Storage.DeleteFolder(r.Context(), user.ID, deletePath)
+		if err != nil {
+			slog.Error("failed to delete folder", "error", err, "path", deletePath)
+			SetFlash(w, "Delete failed: "+err.Error())
+		} else {
+			name := strings.TrimSuffix(path.Base(strings.TrimSuffix(deletePath, "/")), "/")
+			SetFlash(w, fmt.Sprintf("Deleted %s/ (%d files)", name, count))
+		}
 	} else {
-		name := path.Base(deletePath)
-		SetFlash(w, fmt.Sprintf("Deleted %s", name))
+		// Single file delete.
+		_, err := h.deps.Storage.DeleteDocument(r.Context(), user.ID, deletePath, storage.Conditions{})
+		if err != nil {
+			slog.Error("failed to delete document", "error", err, "path", deletePath)
+			SetFlash(w, "Delete failed: "+err.Error())
+		} else {
+			name := path.Base(deletePath)
+			SetFlash(w, fmt.Sprintf("Deleted %s", name))
+		}
 	}
 
 	// Redirect to parent folder.
-	parentFolder := path.Dir(deletePath)
+	parentFolder := path.Dir(strings.TrimSuffix(deletePath, "/"))
 	if !strings.HasSuffix(parentFolder, "/") {
 		parentFolder += "/"
 	}

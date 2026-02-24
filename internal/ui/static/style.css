@@ -715,6 +715,55 @@ code {
     font-family: ui-monospace, "Cascadia Code", "Fira Code", Menlo, monospace;
 }
 
+/* ===== Home Dashboard ===== */
+.home-dashboard h1 {
+    margin-bottom: 1.25rem;
+}
+
+.home-dashboard h2 {
+    margin-top: 2rem;
+    margin-bottom: 0.75rem;
+}
+
+.stats-3col {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1rem;
+}
+.stats-3col > div {
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    padding: 1rem;
+}
+.stats-3col dt {
+    font-size: 0.875rem;
+    color: var(--color-text-muted);
+}
+.stats-3col dd {
+    font-size: 1.5rem;
+    font-weight: 600;
+    margin-top: 0.25rem;
+}
+
+.home-server-info {
+    margin-top: 1.5rem;
+}
+
+.home-cta {
+    margin-top: 1.5rem;
+    max-width: 16rem;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.home-register-link {
+    margin-top: 0.75rem;
+    font-size: 0.875rem;
+    color: var(--color-text-muted);
+    text-align: center;
+}
+
 /* ===== File Browser ===== */
 .breadcrumb {
     display: flex;
@@ -739,7 +788,8 @@ code {
 
 /* ===== Responsive ===== */
 @media (max-width: 640px) {
-    .stats {
+    .stats,
+    .stats-3col {
         grid-template-columns: 1fr;
     }
 

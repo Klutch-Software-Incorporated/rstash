@@ -44,5 +44,11 @@
     <footer>
         Gosilo &mdash; remoteStorage server
     </footer>
+    <script>
+    document.querySelectorAll('time[datetime]').forEach(function(el) {
+        var d = new Date(el.getAttribute('datetime') + 'Z');
+        if (!isNaN(d)) el.textContent = d.toLocaleString();
+    });
+    </script>
 </body>
 </html>{{end}}

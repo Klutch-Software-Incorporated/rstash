@@ -22,20 +22,8 @@ func UI(deps *UIDeps) http.Handler {
 	mux := http.NewServeMux()
 
 	// Home page.
-	mux.HandleFunc("GET /", func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/" {
-			http.NotFound(w, r)
-			return
-		}
-		user := CurrentUser(r)
-		deps.Renderer.Render(w, "home", ui.PageData{
-			Title:            "Gosilo",
-			CurrentUser:      userInfo(user),
-			CSRFToken:        CSRFToken(r),
-			Flash:            GetFlash(w, r),
-			RegistrationMode: deps.Config.RegistrationMode,
-		})
-	})
+	homeH := HomeHandler(deps)
+	mux.HandleFunc("GET /", homeH.Show)
 
 	// Setup wizard.
 	setupHandler := SetupHandler(deps)

@@ -1,6 +1,110 @@
 {{define "home"}}
+{{if .Content}}
+{{/* ===== Logged-in: Account Overview ===== */}}
+<div class="home-dashboard">
+    <h1>Account Overview</h1>
+
+    {{with .Content}}
+
+    <dl class="stats stats-3col">
+        <div>
+            <dt>Files</dt>
+            <dd>{{.Stats.FileCount}}</dd>
+        </div>
+        <div>
+            <dt>Storage Used</dt>
+            <dd>{{.Stats.StorageUsed}}</dd>
+        </div>
+        <div>
+            <dt>Connected Apps</dt>
+            <dd>{{.Stats.OAuthApps}}</dd>
+        </div>
+    </dl>
+
+    <h2>Modules</h2>
+    {{if .Modules}}
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th scope="col">Module</th>
+                    <th scope="col">Files</th>
+                    <th scope="col">Size</th>
+                </tr>
+            </thead>
+            <tbody>
+                {{range .Modules}}
+                <tr>
+                    <td><a href="/files/{{.Name}}/"><code>{{.Name}}/</code></a></td>
+                    <td>{{.FileCount}}</td>
+                    <td>{{.Size}}</td>
+                </tr>
+                {{end}}
+            </tbody>
+        </table>
+    </div>
+    {{else}}
+    <p class="empty-state">No files stored yet. Use a <a href="https://remotestorage.io/apps/">remoteStorage app</a> or the <code>rs-upload</code> CLI to get started.</p>
+    {{end}}
+
+    <h2>Recent Activity</h2>
+    {{if .Activity}}
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th scope="col">Event</th>
+                    <th scope="col">Time</th>
+                </tr>
+            </thead>
+            <tbody>
+                {{range .Activity}}
+                <tr>
+                    <td>
+                        {{if eq .Type "file_update"}}<span class="badge badge-available">file</span>
+                        {{else if eq .Type "login"}}<span class="badge badge-admin">login</span>
+                        {{else if eq .Type "oauth_grant"}}<span class="badge badge-used">oauth</span>
+                        {{end}}
+                        {{.Summary}}
+                    </td>
+                    <td><time datetime="{{.Timestamp}}">{{.Timestamp}}</time></td>
+                </tr>
+                {{end}}
+            </tbody>
+        </table>
+    </div>
+    {{else}}
+    <p class="empty-state">No recent activity.</p>
+    {{end}}
+
+    {{end}}
+</div>
+
+{{else}}
+{{/* ===== Logged-out: Server Info ===== */}}
 <div class="hero">
     <h1>Welcome to Gosilo</h1>
     <p>A <a href="https://remotestorage.io">remoteStorage</a> server.</p>
+
+    <div class="home-server-info">
+        <p>
+            Registration:
+            {{if eq .RegistrationMode "open"}}
+                <span class="badge badge-available">Open</span>
+            {{else if eq .RegistrationMode "invite"}}
+                <span class="badge badge-admin">Invite Only</span>
+            {{else}}
+                <span class="badge badge-used">Closed</span>
+            {{end}}
+        </p>
+    </div>
+
+    <div class="home-cta">
+        <a href="/login" class="oauth-btn-login">Log In</a>
+        {{if or (eq .RegistrationMode "open") (eq .RegistrationMode "invite")}}
+            <p class="home-register-link">or <a href="/register">create an account</a></p>
+        {{end}}
+    </div>
 </div>
+{{end}}
 {{end}}

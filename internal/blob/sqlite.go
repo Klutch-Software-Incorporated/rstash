@@ -87,3 +87,16 @@ func (s *SQLiteStore) DeleteWith(ctx context.Context, q db.Querier, userID int64
 func (s *SQLiteStore) Delete(ctx context.Context, userID int64, path string) error {
 	return s.DeleteWith(ctx, s.db, userID, path)
 }
+
+// DeleteTreeWith removes all blobs under a folder path prefix using the provided
+// Querier (supports transactions).
+func (s *SQLiteStore) DeleteTreeWith(ctx context.Context, q db.Querier, userID int64, folderPath string) error {
+	_, err := q.ExecContext(ctx,
+		"DELETE FROM blobs WHERE user_id = ? AND path LIKE ? || '%'",
+		userID, folderPath,
+	)
+	if err != nil {
+		return fmt.Errorf("delete blob tree: %w", err)
+	}
+	return nil
+}
