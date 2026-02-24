@@ -15,6 +15,8 @@ func validConfig() *Config {
 		BlobPath:         "",
 		RegistrationMode: "closed",
 		LogLevel:         "info",
+		RateLimitRate:    10,
+		RateLimitBurst:   20,
 	}
 }
 
@@ -185,6 +187,49 @@ func TestValidate_LogLevel(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), `got "trace"`) {
 		t.Fatalf("error should mention trace, got: %v", err)
+	}
+}
+
+func TestValidate_RateLimitRate_Negative(t *testing.T) {
+	cfg := validConfig()
+	cfg.RateLimitRate = -1
+	err := cfg.Validate()
+	if err == nil {
+		t.Fatal("expected error for negative rate limit")
+	}
+	if !strings.Contains(err.Error(), "GOSILO_RATE_LIMIT") {
+		t.Fatalf("error should mention GOSILO_RATE_LIMIT, got: %v", err)
+	}
+}
+
+func TestValidate_RateLimitRate_ZeroDisables(t *testing.T) {
+	cfg := validConfig()
+	cfg.RateLimitRate = 0
+	cfg.RateLimitBurst = 0 // burst doesn't matter when disabled
+	if err := cfg.Validate(); err != nil {
+		t.Fatalf("zero rate should be valid (disables limiting), got: %v", err)
+	}
+}
+
+func TestValidate_RateLimitBurst_InvalidWhenEnabled(t *testing.T) {
+	cfg := validConfig()
+	cfg.RateLimitRate = 10
+	cfg.RateLimitBurst = 0
+	err := cfg.Validate()
+	if err == nil {
+		t.Fatal("expected error for zero burst with rate > 0")
+	}
+	if !strings.Contains(err.Error(), "GOSILO_RATE_BURST") {
+		t.Fatalf("error should mention GOSILO_RATE_BURST, got: %v", err)
+	}
+}
+
+func TestValidate_RateLimitBurst_ValidWhenEnabled(t *testing.T) {
+	cfg := validConfig()
+	cfg.RateLimitRate = 5
+	cfg.RateLimitBurst = 1
+	if err := cfg.Validate(); err != nil {
+		t.Fatalf("burst=1 with rate>0 should be valid, got: %v", err)
 	}
 }
 

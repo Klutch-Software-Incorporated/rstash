@@ -64,5 +64,15 @@ func (c *Config) Validate() error {
 		errs = append(errs, fmt.Errorf("GOSILO_LOG_LEVEL: must be one of: debug, info, warn, error — got %q", c.LogLevel))
 	}
 
+	// RateLimitRate
+	if c.RateLimitRate < 0 {
+		errs = append(errs, fmt.Errorf("GOSILO_RATE_LIMIT: must be >= 0 — got %v", c.RateLimitRate))
+	}
+
+	// RateLimitBurst (only relevant when rate limiting is enabled)
+	if c.RateLimitRate > 0 && c.RateLimitBurst < 1 {
+		errs = append(errs, fmt.Errorf("GOSILO_RATE_BURST: must be >= 1 when rate limiting is enabled — got %d", c.RateLimitBurst))
+	}
+
 	return errors.Join(errs...)
 }

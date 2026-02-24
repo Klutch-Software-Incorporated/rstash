@@ -52,6 +52,16 @@ func EnvVars() []EnvVar {
 			Description: "Log verbosity level.",
 			ValidValues: []string{"debug", "info", "warn", "error"},
 		},
+		{
+			Name:        "GOSILO_RATE_LIMIT",
+			Default:     "10",
+			Description: "Per-IP rate limit in requests/sec. Set to 0 to disable.",
+		},
+		{
+			Name:        "GOSILO_RATE_BURST",
+			Default:     "20",
+			Description: "Max burst size for per-IP rate limiting.",
+		},
 	}
 }
 

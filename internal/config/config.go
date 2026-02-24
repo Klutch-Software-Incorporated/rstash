@@ -2,6 +2,7 @@ package config
 
 import (
 	"os"
+	"strconv"
 )
 
 // Config holds all application configuration, loaded from environment variables.
@@ -12,7 +13,9 @@ type Config struct {
 	BlobBackend      string // GOSILO_BLOB_BACKEND — blob storage backend type
 	BlobPath         string // GOSILO_BLOB_PATH — path for filesystem blob backend
 	RegistrationMode string // GOSILO_REGISTRATION — "open", "invite", or "closed"
-	LogLevel         string // GOSILO_LOG_LEVEL — "debug", "info", "warn", "error"
+	LogLevel         string  // GOSILO_LOG_LEVEL — "debug", "info", "warn", "error"
+	RateLimitRate    float64 // GOSILO_RATE_LIMIT — requests/sec per IP (0 = disabled)
+	RateLimitBurst   int     // GOSILO_RATE_BURST — max burst size
 }
 
 // Load reads configuration from environment variables, applying defaults where appropriate.
@@ -25,12 +28,32 @@ func Load() *Config {
 		BlobPath:         os.Getenv("GOSILO_BLOB_PATH"),
 		RegistrationMode: envOrDefault("GOSILO_REGISTRATION", "closed"),
 		LogLevel:         envOrDefault("GOSILO_LOG_LEVEL", "info"),
+		RateLimitRate:    envOrDefaultFloat("GOSILO_RATE_LIMIT", 10),
+		RateLimitBurst:   envOrDefaultInt("GOSILO_RATE_BURST", 20),
 	}
 }
 
 func envOrDefault(key, defaultVal string) string {
 	if v := os.Getenv(key); v != "" {
 		return v
+	}
+	return defaultVal
+}
+
+func envOrDefaultFloat(key string, defaultVal float64) float64 {
+	if v := os.Getenv(key); v != "" {
+		if f, err := strconv.ParseFloat(v, 64); err == nil {
+			return f
+		}
+	}
+	return defaultVal
+}
+
+func envOrDefaultInt(key string, defaultVal int) int {
+	if v := os.Getenv(key); v != "" {
+		if i, err := strconv.Atoi(v); err == nil {
+			return i
+		}
 	}
 	return defaultVal
 }

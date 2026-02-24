@@ -180,10 +180,19 @@ func runServe() {
 	)
 	mux.Handle("/", wrapped)
 
+	// Optionally wrap with rate limiting.
+	var handler http.Handler = mux
+	if cfg.RateLimitRate > 0 {
+		limiter := api.NewRateLimiter(cfg.RateLimitRate, cfg.RateLimitBurst)
+		defer limiter.Stop()
+		handler = api.RateLimit(limiter)(mux)
+		slog.Info("rate limiting enabled", "rate", cfg.RateLimitRate, "burst", cfg.RateLimitBurst)
+	}
+
 	// Start server.
 	srv := &http.Server{
 		Addr:    cfg.Addr,
-		Handler: api.RequestLogger(mux),
+		Handler: api.RequestLogger(handler),
 	}
 
 	// Graceful shutdown on SIGINT/SIGTERM.
