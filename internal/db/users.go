@@ -95,6 +95,19 @@ func DeleteUser(ctx context.Context, q Querier, id int64) error {
 	return nil
 }
 
+// UpdateUserPassword hashes a new password with bcrypt and updates the user's row.
+func UpdateUserPassword(ctx context.Context, q Querier, userID int64, newPassword string) error {
+	hash, err := bcrypt.GenerateFromPassword([]byte(newPassword), bcrypt.DefaultCost)
+	if err != nil {
+		return fmt.Errorf("hash password: %w", err)
+	}
+	_, err = q.ExecContext(ctx, "UPDATE users SET password_hash = ? WHERE id = ?", string(hash), userID)
+	if err != nil {
+		return fmt.Errorf("update user password: %w", err)
+	}
+	return nil
+}
+
 // UserCount returns the total number of users.
 func UserCount(ctx context.Context, q Querier) (int64, error) {
 	var count int64

@@ -88,6 +88,33 @@ func GetOAuthToken(ctx context.Context, q Querier, token string) (*model.OAuthTo
 	return &t, nil
 }
 
+// ListOAuthTokensByUserID returns all non-expired tokens for the given user.
+func ListOAuthTokensByUserID(ctx context.Context, q Querier, userID int64) ([]*model.OAuthToken, error) {
+	rows, err := q.QueryContext(ctx,
+		`SELECT token, user_id, client_id, scopes, created_at, expires_at
+		 FROM oauth_tokens
+		 WHERE user_id = ? AND (expires_at IS NULL OR expires_at > datetime('now'))
+		 ORDER BY created_at DESC`,
+		userID,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("list oauth tokens by user: %w", err)
+	}
+	defer rows.Close()
+
+	var tokens []*model.OAuthToken
+	for rows.Next() {
+		var t model.OAuthToken
+		var scopeStr string
+		if err := rows.Scan(&t.Token, &t.UserID, &t.ClientID, &scopeStr, &t.CreatedAt, &t.ExpiresAt); err != nil {
+			return nil, fmt.Errorf("scan oauth token: %w", err)
+		}
+		t.Scopes = strings.Fields(scopeStr)
+		tokens = append(tokens, &t)
+	}
+	return tokens, rows.Err()
+}
+
 // DeleteOAuthToken revokes a token.
 func DeleteOAuthToken(ctx context.Context, q Querier, token string) error {
 	_, err := q.ExecContext(ctx, "DELETE FROM oauth_tokens WHERE token = ?", token)

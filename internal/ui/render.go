@@ -46,6 +46,8 @@ func NewRenderer() *Renderer {
 		"templates/admin/invites.html",
 		"templates/admin/oauth_test.html",
 		"templates/oauth_authorize.html",
+		"templates/settings.html",
+		"templates/change_password.html",
 	)
 	if err != nil {
 		slog.Error("failed to parse templates", "error", err)

@@ -13,6 +13,7 @@
             <div>
                 {{if .CurrentUser}}
                     <span>{{.CurrentUser.Username}}</span>
+                    <a href="/settings">Settings</a>
                     {{if .CurrentUser.IsAdmin}}
                         <a href="/admin">Admin</a>
                     {{end}}

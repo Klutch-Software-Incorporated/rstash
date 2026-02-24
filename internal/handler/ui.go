@@ -51,6 +51,13 @@ func UI(deps *UIDeps) http.Handler {
 	mux.HandleFunc("GET /register", registerHandler.ShowRegister)
 	mux.HandleFunc("POST /register", registerHandler.DoRegister)
 
+	// Account settings.
+	settingsHandler := SettingsHandler(deps)
+	mux.HandleFunc("GET /settings", settingsHandler.ShowSettings)
+	mux.HandleFunc("GET /settings/password", settingsHandler.ShowChangePassword)
+	mux.HandleFunc("POST /settings/password", settingsHandler.ChangePassword)
+	mux.HandleFunc("POST /settings/tokens/{token}/revoke", settingsHandler.RevokeToken)
+
 	// Admin (all routes require auth + admin, enforced inside handler).
 	adminHandler := AdminHandler(deps)
 	mux.HandleFunc("GET /admin", adminHandler.Dashboard)

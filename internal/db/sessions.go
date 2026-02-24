@@ -72,6 +72,15 @@ func DeleteExpiredSessions(ctx context.Context, q Querier) error {
 	return nil
 }
 
+// DeleteUserSessionsExcept removes all sessions for a user except the given token.
+func DeleteUserSessionsExcept(ctx context.Context, q Querier, userID int64, exceptToken string) error {
+	_, err := q.ExecContext(ctx, "DELETE FROM sessions WHERE user_id = ? AND token != ?", userID, exceptToken)
+	if err != nil {
+		return fmt.Errorf("delete user sessions except: %w", err)
+	}
+	return nil
+}
+
 // DeleteUserSessions removes all sessions for a given user.
 func DeleteUserSessions(ctx context.Context, q Querier, userID int64) error {
 	_, err := q.ExecContext(ctx, "DELETE FROM sessions WHERE user_id = ?", userID)
