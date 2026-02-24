@@ -73,10 +73,14 @@
 {{end}}
 
 <h2>Invite Codes</h2>
+{{if eq .RegistrationMode "invite"}}
 <form method="POST" action="/admin/invites" style="margin-bottom:.75rem">
     <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
     <button type="submit" class="btn-primary">Generate Invite Code</button>
 </form>
+{{else if eq .RegistrationMode "closed"}}
+<p class="empty-state">Invite codes are disabled while registration is closed.</p>
+{{end}}
 
 {{if .Invites}}
 <table>

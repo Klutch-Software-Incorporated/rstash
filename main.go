@@ -171,8 +171,8 @@ func runServe() {
 	}
 	mux.Handle("GET /oauth/authorize", oauthWrap(oauthH.ShowAuthorize))
 	mux.Handle("POST /oauth/authorize", oauthWrap(web.RequireCSRF(oauthH.DoAuthorize)))
-	mux.Handle("POST /oauth/token", api.CORS(api.OAuthToken()))
-	mux.Handle("/storage/{user}/{path...}", api.CORS(api.Storage(database, storageSvc)))
+	mux.Handle("POST /oauth/token", api.CORS(api.OAuthToken(database)))
+	mux.Handle("/storage/{user}/{path...}", api.CORS(api.Storage(database, storageSvc, cfg.MaxUploadSize)))
 
 	// Static file server from embedded assets.
 	staticFS, err := fs.Sub(ui.Static, "static")
@@ -202,8 +202,12 @@ func runServe() {
 
 	// Start server.
 	srv := &http.Server{
-		Addr:    cfg.Addr,
-		Handler: api.RequestLogger(handler),
+		Addr:              cfg.Addr,
+		Handler:           api.RequestLogger(api.SecurityHeaders(handler)),
+		ReadHeaderTimeout: 10 * time.Second,
+		ReadTimeout:       30 * time.Second,
+		WriteTimeout:      60 * time.Second,
+		IdleTimeout:       120 * time.Second,
 	}
 
 	// Graceful shutdown on SIGINT/SIGTERM.
@@ -222,6 +226,9 @@ func runServe() {
 				}
 				if err := db.DeleteExpiredOAuthTokens(context.Background(), database); err != nil {
 					slog.Error("failed to delete expired oauth tokens", "error", err)
+				}
+				if err := db.DeleteExpiredAuthorizationCodes(context.Background(), database); err != nil {
+					slog.Error("failed to delete expired authorization codes", "error", err)
 				}
 			case <-ctx.Done():
 				return

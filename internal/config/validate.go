@@ -92,5 +92,10 @@ func (c *Config) Validate() error {
 		errs = append(errs, fmt.Errorf("GOSILO_QUOTA_USER: must be > 0 when GOSILO_QUOTA_MODE=user"))
 	}
 
+	// MaxUploadSize
+	if c.MaxUploadSize <= 0 {
+		errs = append(errs, fmt.Errorf("GOSILO_MAX_UPLOAD: must be > 0"))
+	}
+
 	return errors.Join(errs...)
 }

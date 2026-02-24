@@ -28,15 +28,18 @@ type scopeDisplay struct {
 }
 
 type authorizeContent struct {
-	ClientID     string
-	RedirectURI  string
-	Username     string
-	LoggedIn     bool
-	LoginURL     string
-	Scopes       []string
-	ScopeDisplay []scopeDisplay
-	State        string
-	Error        string
+	ClientID            string
+	RedirectURI         string
+	Username            string
+	LoggedIn            bool
+	LoginURL            string
+	Scopes              []string
+	ScopeDisplay        []scopeDisplay
+	State               string
+	ResponseType        string
+	CodeChallenge       string
+	CodeChallengeMethod string
+	Error               string
 }
 
 func buildScopeDisplay(scopes []string) []scopeDisplay {
@@ -82,8 +85,8 @@ func (h *oauthHandler) ShowAuthorize(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
 
 	responseType := q.Get("response_type")
-	if responseType != "token" {
-		http.Error(w, "unsupported response_type: must be 'token'", http.StatusBadRequest)
+	if responseType != "token" && responseType != "code" {
+		http.Error(w, "unsupported response_type: must be 'token' or 'code'", http.StatusBadRequest)
 		return
 	}
 
@@ -106,6 +109,17 @@ func (h *oauthHandler) ShowAuthorize(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Code flow requires PKCE parameters.
+	var codeChallenge, codeChallengeMethod string
+	if responseType == "code" {
+		codeChallenge = q.Get("code_challenge")
+		codeChallengeMethod = q.Get("code_challenge_method")
+		if codeChallenge == "" || codeChallengeMethod != "S256" {
+			http.Error(w, "code flow requires code_challenge and code_challenge_method=S256", http.StatusBadRequest)
+			return
+		}
+	}
+
 	state := q.Get("state")
 
 	user := CurrentUser(r)
@@ -124,14 +138,17 @@ func (h *oauthHandler) ShowAuthorize(w http.ResponseWriter, r *http.Request) {
 		CurrentUser: userInfo(user),
 		CSRFToken:   CSRFToken(r),
 		Content: &authorizeContent{
-			ClientID:     origin,
-			RedirectURI:  redirectURI,
-			Username:     username,
-			LoggedIn:     loggedIn,
-			LoginURL:     loginURL,
-			Scopes:       scopes,
-			ScopeDisplay: buildScopeDisplay(scopes),
-			State:        state,
+			ClientID:            origin,
+			RedirectURI:         redirectURI,
+			Username:            username,
+			LoggedIn:            loggedIn,
+			LoginURL:            loginURL,
+			Scopes:              scopes,
+			ScopeDisplay:        buildScopeDisplay(scopes),
+			State:               state,
+			ResponseType:        responseType,
+			CodeChallenge:       codeChallenge,
+			CodeChallengeMethod: codeChallengeMethod,
 		},
 	})
 }
@@ -141,6 +158,7 @@ func (h *oauthHandler) DoAuthorize(w http.ResponseWriter, r *http.Request) {
 	redirectURI := r.FormValue("redirect_uri")
 	state := r.FormValue("state")
 	action := r.FormValue("action")
+	responseType := r.FormValue("response_type")
 	scopes := r.Form["scope"]
 
 	if redirectURI == "" {
@@ -148,19 +166,31 @@ func (h *oauthHandler) DoAuthorize(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Build the fragment-based redirect URL.
 	redirectBase, err := url.Parse(redirectURI)
 	if err != nil {
 		http.Error(w, "invalid redirect_uri", http.StatusBadRequest)
 		return
 	}
 
+	isCodeFlow := responseType == "code"
+
 	if action == "deny" {
-		fragment := "error=access_denied"
-		if state != "" {
-			fragment += "&state=" + url.QueryEscape(state)
+		if isCodeFlow {
+			// Code flow: error in query params.
+			q := redirectBase.Query()
+			q.Set("error", "access_denied")
+			if state != "" {
+				q.Set("state", state)
+			}
+			redirectBase.RawQuery = q.Encode()
+		} else {
+			// Implicit flow: error in fragment.
+			fragment := "error=access_denied"
+			if state != "" {
+				fragment += "&state=" + url.QueryEscape(state)
+			}
+			redirectBase.Fragment = fragment
 		}
-		redirectBase.Fragment = fragment
 		http.Redirect(w, r, redirectBase.String(), http.StatusFound)
 		return
 	}
@@ -186,7 +216,7 @@ func (h *oauthHandler) DoAuthorize(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Upsert client and create token.
+	// Upsert client.
 	_, err = db.UpsertOAuthClient(r.Context(), h.deps.DB, origin, redirectURI)
 	if err != nil {
 		slog.Error("upsert oauth client", "error", err)
@@ -194,17 +224,43 @@ func (h *oauthHandler) DoAuthorize(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	token, err := db.CreateOAuthToken(r.Context(), h.deps.DB, user.ID, origin, validScopes)
-	if err != nil {
-		slog.Error("create oauth token", "error", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
-		return
-	}
+	if isCodeFlow {
+		// Authorization code flow: create code and redirect with query params.
+		codeChallenge := r.FormValue("code_challenge")
+		codeChallengeMethod := r.FormValue("code_challenge_method")
+		if codeChallenge == "" || codeChallengeMethod != "S256" {
+			http.Error(w, "code flow requires code_challenge and code_challenge_method=S256", http.StatusBadRequest)
+			return
+		}
 
-	fragment := "access_token=" + url.QueryEscape(token.Token) + "&token_type=bearer"
-	if state != "" {
-		fragment += "&state=" + url.QueryEscape(state)
+		ac, err := db.CreateAuthorizationCode(r.Context(), h.deps.DB, user.ID, origin, redirectURI, scopeStr, codeChallenge, codeChallengeMethod)
+		if err != nil {
+			slog.Error("create authorization code", "error", err)
+			http.Error(w, "internal error", http.StatusInternalServerError)
+			return
+		}
+
+		q := redirectBase.Query()
+		q.Set("code", ac.Code)
+		if state != "" {
+			q.Set("state", state)
+		}
+		redirectBase.RawQuery = q.Encode()
+		http.Redirect(w, r, redirectBase.String(), http.StatusFound)
+	} else {
+		// Implicit flow: create token and redirect with fragment.
+		token, err := db.CreateOAuthToken(r.Context(), h.deps.DB, user.ID, origin, validScopes)
+		if err != nil {
+			slog.Error("create oauth token", "error", err)
+			http.Error(w, "internal error", http.StatusInternalServerError)
+			return
+		}
+
+		fragment := "access_token=" + url.QueryEscape(token.Token) + "&token_type=bearer"
+		if state != "" {
+			fragment += "&state=" + url.QueryEscape(state)
+		}
+		redirectBase.Fragment = fragment
+		http.Redirect(w, r, redirectBase.String(), http.StatusFound)
 	}
-	redirectBase.Fragment = fragment
-	http.Redirect(w, r, redirectBase.String(), http.StatusFound)
 }

@@ -1,10 +1,103 @@
 package api
 
-import "net/http"
+import (
+	"crypto/sha256"
+	"database/sql"
+	"encoding/base64"
+	"encoding/json"
+	"log/slog"
+	"net/http"
+	"strings"
 
-// OAuthToken handles POST /oauth/token (stub for future PKCE support).
-func OAuthToken() http.Handler {
+	"gosilo/internal/db"
+)
+
+// OAuthToken handles POST /oauth/token for the authorization code + PKCE exchange.
+func OAuthToken(database *sql.DB) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		http.Error(w, "oauth token: not yet implemented", http.StatusNotImplemented)
+		if r.Method != http.MethodPost {
+			tokenError(w, "invalid_request", "method must be POST", http.StatusBadRequest)
+			return
+		}
+
+		grantType := r.FormValue("grant_type")
+		if grantType != "authorization_code" {
+			tokenError(w, "unsupported_grant_type", "only authorization_code is supported", http.StatusBadRequest)
+			return
+		}
+
+		code := r.FormValue("code")
+		codeVerifier := r.FormValue("code_verifier")
+		redirectURI := r.FormValue("redirect_uri")
+
+		if code == "" || codeVerifier == "" || redirectURI == "" {
+			tokenError(w, "invalid_request", "code, code_verifier, and redirect_uri are required", http.StatusBadRequest)
+			return
+		}
+
+		// Look up the authorization code.
+		ac, err := db.GetAuthorizationCode(r.Context(), database, code)
+		if err != nil {
+			slog.Error("get authorization code", "error", err)
+			tokenError(w, "server_error", "internal error", http.StatusInternalServerError)
+			return
+		}
+		if ac == nil {
+			tokenError(w, "invalid_grant", "authorization code is invalid, expired, or already used", http.StatusBadRequest)
+			return
+		}
+
+		// Verify redirect_uri matches.
+		if ac.RedirectURI != redirectURI {
+			tokenError(w, "invalid_grant", "redirect_uri does not match", http.StatusBadRequest)
+			return
+		}
+
+		// Verify PKCE: BASE64URL(SHA256(code_verifier)) must equal code_challenge.
+		if !verifyPKCE(codeVerifier, ac.CodeChallenge) {
+			tokenError(w, "invalid_grant", "code_verifier does not match code_challenge", http.StatusBadRequest)
+			return
+		}
+
+		// Mark code as used.
+		if err := db.UseAuthorizationCode(r.Context(), database, code); err != nil {
+			slog.Error("use authorization code", "error", err)
+			tokenError(w, "server_error", "internal error", http.StatusInternalServerError)
+			return
+		}
+
+		// Create the access token.
+		scopes := strings.Fields(ac.Scopes)
+		token, err := db.CreateOAuthToken(r.Context(), database, ac.UserID, ac.ClientID, scopes)
+		if err != nil {
+			slog.Error("create oauth token", "error", err)
+			tokenError(w, "server_error", "internal error", http.StatusInternalServerError)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set("Cache-Control", "no-store")
+		json.NewEncoder(w).Encode(map[string]string{
+			"access_token": token.Token,
+			"token_type":   "bearer",
+		})
+	})
+}
+
+// verifyPKCE checks that BASE64URL(SHA256(verifier)) == challenge.
+func verifyPKCE(verifier, challenge string) bool {
+	h := sha256.Sum256([]byte(verifier))
+	computed := base64.RawURLEncoding.EncodeToString(h[:])
+	return computed == challenge
+}
+
+// tokenError writes an OAuth token error response as JSON.
+func tokenError(w http.ResponseWriter, code, description string, status int) {
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Cache-Control", "no-store")
+	w.WriteHeader(status)
+	json.NewEncoder(w).Encode(map[string]string{
+		"error":             code,
+		"error_description": description,
 	})
 }

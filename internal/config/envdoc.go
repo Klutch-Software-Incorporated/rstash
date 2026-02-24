@@ -78,6 +78,11 @@ func EnvVars() []EnvVar {
 			Description:  "Default per-user storage quota (e.g. 500MB, 1GB). Admin can override per user.",
 			RequiredWhen: "GOSILO_QUOTA_MODE=user",
 		},
+		{
+			Name:        "GOSILO_MAX_UPLOAD",
+			Default:     "50MB",
+			Description: "Maximum upload size per request (e.g. 50MB, 1GB).",
+		},
 	}
 }
 

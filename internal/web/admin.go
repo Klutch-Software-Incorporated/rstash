@@ -201,6 +201,12 @@ func (h *adminHandler) CreateInvite(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if h.deps.Config.RegistrationMode == "closed" {
+		ui.SetFlash(w, "Cannot create invite codes while registration is closed.")
+		http.Redirect(w, r, "/admin", http.StatusSeeOther)
+		return
+	}
+
 	user := CurrentUser(r)
 	inv, err := h.deps.Auth.CreateInvite(r.Context(), user.ID)
 	if err != nil {

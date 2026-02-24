@@ -59,6 +59,19 @@ CREATE TABLE IF NOT EXISTS invite_codes (
     created_at TEXT NOT NULL DEFAULT (datetime('now')),
     used_at TEXT
 );
+
+CREATE TABLE IF NOT EXISTS authorization_codes (
+    code TEXT PRIMARY KEY,
+    user_id INTEGER NOT NULL REFERENCES users(id),
+    client_id TEXT NOT NULL REFERENCES oauth_clients(id),
+    redirect_uri TEXT NOT NULL,
+    scopes TEXT NOT NULL,
+    code_challenge TEXT NOT NULL,
+    code_challenge_method TEXT NOT NULL,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    expires_at TEXT NOT NULL DEFAULT (datetime('now', '+10 minutes')),
+    used INTEGER NOT NULL DEFAULT 0
+);
 `
 
 // Open opens a SQLite database at the given path, enables WAL mode and

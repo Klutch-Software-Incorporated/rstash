@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net/http"
 	"strings"
 
 	"gosilo/api"
@@ -20,6 +21,7 @@ var (
 	ErrPreconditionFailed = errors.New("precondition failed")
 	ErrConflict           = errors.New("conflict")
 	ErrNotModified        = errors.New("not modified")
+	ErrPayloadTooLarge    = errors.New("payload too large")
 )
 
 // Conditions holds parsed If-Match / If-None-Match header values (unquoted).
@@ -74,6 +76,10 @@ func (s *Service) PutDocument(ctx context.Context, userID int64, path string, co
 
 	data, err := io.ReadAll(content)
 	if err != nil {
+		var maxBytesErr *http.MaxBytesError
+		if errors.As(err, &maxBytesErr) {
+			return nil, ErrPayloadTooLarge
+		}
 		return nil, fmt.Errorf("read content: %w", err)
 	}
 

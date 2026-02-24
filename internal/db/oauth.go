@@ -174,3 +174,63 @@ func GetRecentUserOAuthTokens(ctx context.Context, q Querier, userID int64, limi
 	}
 	return tokens, rows.Err()
 }
+
+// CreateAuthorizationCode generates a new authorization code for the OAuth code flow.
+func CreateAuthorizationCode(ctx context.Context, q Querier, userID int64, clientID, redirectURI, scopes, codeChallenge, codeChallengeMethod string) (*model.AuthorizationCode, error) {
+	code, err := RandomHex(32)
+	if err != nil {
+		return nil, fmt.Errorf("generate authorization code: %w", err)
+	}
+
+	var ac model.AuthorizationCode
+	var used int
+	err = q.QueryRowContext(ctx,
+		`INSERT INTO authorization_codes (code, user_id, client_id, redirect_uri, scopes, code_challenge, code_challenge_method)
+		 VALUES (?, ?, ?, ?, ?, ?, ?)
+		 RETURNING code, user_id, client_id, redirect_uri, scopes, code_challenge, code_challenge_method, created_at, expires_at, used`,
+		code, userID, clientID, redirectURI, scopes, codeChallenge, codeChallengeMethod,
+	).Scan(&ac.Code, &ac.UserID, &ac.ClientID, &ac.RedirectURI, &ac.Scopes, &ac.CodeChallenge, &ac.CodeChallengeMethod, &ac.CreatedAt, &ac.ExpiresAt, &used)
+	if err != nil {
+		return nil, fmt.Errorf("create authorization code: %w", err)
+	}
+	ac.Used = used != 0
+	return &ac, nil
+}
+
+// GetAuthorizationCode returns the authorization code record, or nil if not found, expired, or already used.
+func GetAuthorizationCode(ctx context.Context, q Querier, code string) (*model.AuthorizationCode, error) {
+	var ac model.AuthorizationCode
+	var used int
+	err := q.QueryRowContext(ctx,
+		`SELECT code, user_id, client_id, redirect_uri, scopes, code_challenge, code_challenge_method, created_at, expires_at, used
+		 FROM authorization_codes
+		 WHERE code = ? AND used = 0 AND expires_at > datetime('now')`,
+		code,
+	).Scan(&ac.Code, &ac.UserID, &ac.ClientID, &ac.RedirectURI, &ac.Scopes, &ac.CodeChallenge, &ac.CodeChallengeMethod, &ac.CreatedAt, &ac.ExpiresAt, &used)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("get authorization code: %w", err)
+	}
+	ac.Used = used != 0
+	return &ac, nil
+}
+
+// UseAuthorizationCode marks an authorization code as used (single-use enforcement).
+func UseAuthorizationCode(ctx context.Context, q Querier, code string) error {
+	_, err := q.ExecContext(ctx, "UPDATE authorization_codes SET used = 1 WHERE code = ?", code)
+	if err != nil {
+		return fmt.Errorf("use authorization code: %w", err)
+	}
+	return nil
+}
+
+// DeleteExpiredAuthorizationCodes removes expired or used authorization codes.
+func DeleteExpiredAuthorizationCodes(ctx context.Context, q Querier) error {
+	_, err := q.ExecContext(ctx, "DELETE FROM authorization_codes WHERE used = 1 OR expires_at <= datetime('now')")
+	if err != nil {
+		return fmt.Errorf("delete expired authorization codes: %w", err)
+	}
+	return nil
+}

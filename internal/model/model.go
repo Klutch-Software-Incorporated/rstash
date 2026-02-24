@@ -51,3 +51,16 @@ type InviteCode struct {
 	CreatedAt string
 	UsedAt    *string
 }
+
+type AuthorizationCode struct {
+	Code                string
+	UserID              int64
+	ClientID            string
+	RedirectURI         string
+	Scopes              string
+	CodeChallenge       string
+	CodeChallengeMethod string
+	CreatedAt           string
+	ExpiresAt           string
+	Used                bool
+}

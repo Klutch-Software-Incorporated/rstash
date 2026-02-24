@@ -19,12 +19,14 @@ type Config struct {
 	QuotaMode        string  // GOSILO_QUOTA_MODE — "off", "total", "user"
 	QuotaTotal       int64   // GOSILO_QUOTA_TOTAL — bytes (parsed from human-readable)
 	QuotaUser        int64   // GOSILO_QUOTA_USER — bytes (parsed from human-readable)
+	MaxUploadSize    int64   // GOSILO_MAX_UPLOAD — max request body size (parsed from human-readable)
 }
 
 // Load reads configuration from environment variables, applying defaults where appropriate.
 func Load() *Config {
 	quotaTotal, _ := ParseByteSize(envOrDefault("GOSILO_QUOTA_TOTAL", "50GB"))
 	quotaUser, _ := ParseByteSize(os.Getenv("GOSILO_QUOTA_USER"))
+	maxUpload, _ := ParseByteSize(envOrDefault("GOSILO_MAX_UPLOAD", "50MB"))
 
 	return &Config{
 		Addr:             envOrDefault("GOSILO_ADDR", ":8080"),
@@ -32,13 +34,14 @@ func Load() *Config {
 		DatabasePath:     envOrDefault("GOSILO_DB_PATH", "gosilo.db"),
 		BlobBackend:      envOrDefault("GOSILO_BLOB_BACKEND", "sqlite"),
 		BlobPath:         os.Getenv("GOSILO_BLOB_PATH"),
-		RegistrationMode: envOrDefault("GOSILO_REGISTRATION", "closed"),
+		RegistrationMode: envOrDefault("GOSILO_REGISTRATION", "invite"),
 		LogLevel:         envOrDefault("GOSILO_LOG_LEVEL", "info"),
 		RateLimitRate:    envOrDefaultFloat("GOSILO_RATE_LIMIT", 10),
 		RateLimitBurst:   envOrDefaultInt("GOSILO_RATE_BURST", 20),
 		QuotaMode:        envOrDefault("GOSILO_QUOTA_MODE", "total"),
 		QuotaTotal:       quotaTotal,
 		QuotaUser:        quotaUser,
+		MaxUploadSize:    maxUpload,
 	}
 }
 

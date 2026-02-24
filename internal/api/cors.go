@@ -7,7 +7,7 @@ import "net/http"
 func CORS(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Access-Control-Allow-Origin", "*")
-		w.Header().Set("Access-Control-Allow-Methods", "GET, HEAD, PUT, DELETE")
+		w.Header().Set("Access-Control-Allow-Methods", "GET, HEAD, PUT, DELETE, POST")
 		w.Header().Set("Access-Control-Allow-Headers",
 			"Authorization, Content-Length, Content-Type, Origin, X-Requested-With, If-Match, If-None-Match")
 		w.Header().Set("Access-Control-Expose-Headers", "Content-Length, Content-Type, ETag")

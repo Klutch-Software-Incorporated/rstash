@@ -15,7 +15,7 @@ import (
 )
 
 // Storage handles GET/PUT/DELETE/HEAD requests on /storage/{user}/{path...}.
-func Storage(database *sql.DB, svc *storage.Service) http.Handler {
+func Storage(database *sql.DB, svc *storage.Service, maxUploadSize int64) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		username := r.PathValue("user")
 		pathVal := r.PathValue("path")
@@ -99,6 +99,7 @@ func Storage(database *sql.DB, svc *storage.Service) http.Handler {
 				http.Error(w, "cannot PUT a folder", http.StatusBadRequest)
 				return
 			}
+			r.Body = http.MaxBytesReader(w, r.Body, maxUploadSize)
 			handlePutDocument(w, r, svc, user.ID, storagePath, cond)
 		case http.MethodDelete:
 			handleDeleteDocument(w, r, svc, user.ID, storagePath, cond)
@@ -227,6 +228,8 @@ func writeServiceError(w http.ResponseWriter, err error) {
 		http.Error(w, "conflict", http.StatusConflict)
 	case errors.Is(err, storage.ErrNotModified):
 		w.WriteHeader(http.StatusNotModified)
+	case errors.Is(err, storage.ErrPayloadTooLarge):
+		http.Error(w, "payload too large", http.StatusRequestEntityTooLarge)
 	case errors.Is(err, storage.ErrQuotaExceeded):
 		http.Error(w, "quota exceeded", http.StatusRequestEntityTooLarge)
 	default:
