@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+{{define "layout"}}<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="utf-8">
@@ -7,9 +7,40 @@
     <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
+    <header>
+        <nav aria-label="Main navigation">
+            <a href="/">Gosilo</a>
+            <div>
+                {{if .CurrentUser}}
+                    <span>{{.CurrentUser.Username}}</span>
+                    {{if .CurrentUser.IsAdmin}}
+                        <a href="/admin">Admin</a>
+                    {{end}}
+                    <form method="POST" action="/logout">
+                        <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
+                        <button type="submit">Logout</button>
+                    </form>
+                {{else}}
+                    <a href="/login">Login</a>
+                    {{if and .RegistrationMode (not (eq .RegistrationMode "closed"))}}
+                        <a href="/register">Register</a>
+                    {{end}}
+                {{end}}
+            </div>
+        </nav>
+    </header>
+
     <main>
-        <h1>{{.Title}}</h1>
-        <p>{{.Content}}</p>
+        {{if .Flash}}
+            <div role="alert">
+                {{.Flash}}
+            </div>
+        {{end}}
+        {{template "content" .}}
     </main>
+
+    <footer>
+        Gosilo &mdash; remoteStorage server
+    </footer>
 </body>
-</html>
+</html>{{end}}

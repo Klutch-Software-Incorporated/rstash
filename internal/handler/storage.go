@@ -38,6 +38,40 @@ func Storage(database *sql.DB, svc *storage.Service) http.Handler {
 			return
 		}
 
+		isFolder := strings.HasSuffix(storagePath, "/")
+		isPublic := isPublicPath(storagePath)
+		isReadOnly := r.Method == http.MethodGet || r.Method == http.MethodHead
+
+		// Public documents are readable without auth (not folders, per spec).
+		needsAuth := !(isPublic && isReadOnly && !isFolder)
+
+		var tokenUserID int64
+		if needsAuth {
+			bearer := extractBearer(r)
+			if bearer == "" {
+				w.Header().Set("WWW-Authenticate", "Bearer")
+				http.Error(w, "unauthorized", http.StatusUnauthorized)
+				return
+			}
+			oauthToken, err := db.GetOAuthToken(r.Context(), database, bearer)
+			if err != nil {
+				slog.Error("lookup oauth token", "error", err)
+				http.Error(w, "internal error", http.StatusInternalServerError)
+				return
+			}
+			if oauthToken == nil {
+				w.Header().Set("WWW-Authenticate", `Bearer error="invalid_token"`)
+				http.Error(w, "invalid token", http.StatusUnauthorized)
+				return
+			}
+			isWrite := r.Method == http.MethodPut || r.Method == http.MethodDelete
+			if !CheckScope(oauthToken.Scopes, storagePath, isWrite) {
+				http.Error(w, "insufficient scope", http.StatusForbidden)
+				return
+			}
+			tokenUserID = oauthToken.UserID
+		}
+
 		// Look up user by username.
 		user, err := db.GetUserByUsername(r.Context(), database, username)
 		if err != nil {
@@ -50,8 +84,13 @@ func Storage(database *sql.DB, svc *storage.Service) http.Handler {
 			return
 		}
 
+		// Ownership check: token must belong to the path's user.
+		if needsAuth && tokenUserID != user.ID {
+			http.Error(w, "forbidden", http.StatusForbidden)
+			return
+		}
+
 		cond := parseConditions(r)
-		isFolder := strings.HasSuffix(storagePath, "/")
 
 		switch r.Method {
 		case http.MethodGet:
@@ -195,6 +234,18 @@ func handleDeleteDocument(w http.ResponseWriter, r *http.Request, svc *storage.S
 
 	w.Header().Set("ETag", storage.QuoteETag(result.ETag))
 	w.WriteHeader(http.StatusOK)
+}
+
+func extractBearer(r *http.Request) string {
+	auth := r.Header.Get("Authorization")
+	if strings.HasPrefix(auth, "Bearer ") {
+		return auth[7:]
+	}
+	return ""
+}
+
+func isPublicPath(path string) bool {
+	return strings.HasPrefix(path, "/public/")
 }
 
 func writeServiceError(w http.ResponseWriter, err error) {

@@ -25,3 +25,9 @@ tasks:
     desc: Run go vet on all packages
     cmds:
       - go vet ./...
+
+  clean:
+    desc: Remove build artifacts and local database
+    cmds:
+      - rm -f ./build/gosilo.exe
+      - rm -f gosilo.db gosilo.db-wal gosilo.db-shm

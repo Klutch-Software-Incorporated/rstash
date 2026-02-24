@@ -34,3 +34,19 @@ type Node struct {
 	CreatedAt     string
 	UpdatedAt     string
 }
+
+type Session struct {
+	Token     string
+	UserID    int64
+	CSRFToken string
+	CreatedAt string
+	ExpiresAt string
+}
+
+type InviteCode struct {
+	Code      string
+	CreatedBy int64
+	UsedBy    *int64
+	CreatedAt string
+	UsedAt    *string
+}

@@ -1,0 +1,33 @@
+{{define "admin_dashboard"}}
+<div>
+    <h1>Admin Dashboard</h1>
+
+    <nav class="admin-nav" aria-label="Admin navigation">
+        <a href="/admin/users">Users</a>
+        <a href="/admin/invites">Invite Codes</a>
+        <a href="/admin/oauth-test">OAuth Test</a>
+    </nav>
+
+    {{with .Content}}
+    <dl class="stats">
+        <div>
+            <dt>Users</dt>
+            <dd>{{.UserCount}}</dd>
+        </div>
+        <div>
+            <dt>Registration Mode</dt>
+            <dd>{{.RegistrationMode}}</dd>
+            <dd class="hint">{{if eq .RegistrationMode "open"}}Anyone can register.{{else if eq .RegistrationMode "invite"}}Invite code required.{{else}}Registration is disabled.{{end}}</dd>
+        </div>
+        <div>
+            <dt>Base URL</dt>
+            <dd class="mono">{{.BaseURL}}</dd>
+        </div>
+        <div>
+            <dt>Blob Backend</dt>
+            <dd>{{.BlobBackend}}</dd>
+        </div>
+    </dl>
+    {{end}}
+</div>
+{{end}}

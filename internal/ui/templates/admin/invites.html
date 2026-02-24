@@ -1,0 +1,60 @@
+{{define "admin_invites"}}
+<div>
+    <div class="page-header">
+        <h1>Invite Codes</h1>
+        <a href="/admin">&larr; Dashboard</a>
+    </div>
+
+    <p>Invite codes are single-use tokens you can share with people to let them register an account.
+        They are required when the server's registration mode is set to <strong>invite</strong>.
+        {{if eq .RegistrationMode "invite"}}Invite registration is currently <strong>active</strong>.{{else}}Registration mode is currently <strong>{{.RegistrationMode}}</strong>, so invite codes won't be required to register.{{end}}</p>
+
+    <form method="POST" action="/admin/invites">
+        <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
+        <button type="submit" class="btn-primary">Generate Invite Code</button>
+    </form>
+
+    {{with .Content}}
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th scope="col">Code</th>
+                    <th scope="col">Status</th>
+                    <th scope="col">Created</th>
+                    <th scope="col">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {{range .Invites}}
+                <tr>
+                    <td class="mono">{{.Code}}</td>
+                    <td>
+                        {{if .UsedBy}}
+                            <span class="badge badge-used">used</span>
+                        {{else}}
+                            <span class="badge badge-available">available</span>
+                        {{end}}
+                    </td>
+                    <td>{{.CreatedAt}}</td>
+                    <td>
+                        {{if not .UsedBy}}
+                        <form method="POST" action="/admin/invites/{{.Code}}/delete">
+                            <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
+                            <button type="submit" class="btn-danger">Delete</button>
+                        </form>
+                        {{end}}
+                    </td>
+                </tr>
+                {{end}}
+                {{if not .Invites}}
+                <tr>
+                    <td colspan="4" class="empty-state">No invite codes yet.</td>
+                </tr>
+                {{end}}
+            </tbody>
+        </table>
+    </div>
+    {{end}}
+</div>
+{{end}}

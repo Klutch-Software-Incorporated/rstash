@@ -1,39 +1,65 @@
 package handler
 
 import (
-	"html/template"
-	"log/slog"
+	"database/sql"
 	"net/http"
 
+	"gosilo/internal/config"
 	"gosilo/internal/ui"
 )
 
-// UI returns an http.Handler that serves the web UI routes.
-func UI() http.Handler {
-	tmpl, err := template.ParseFS(ui.Templates, "templates/layout.html")
-	if err != nil {
-		slog.Error("failed to parse templates", "error", err)
-		panic("failed to parse templates: " + err.Error())
-	}
+// UIDeps holds the dependencies needed by UI handlers.
+type UIDeps struct {
+	DB       *sql.DB
+	Renderer *ui.Renderer
+	Config   *config.Config
+}
 
+// UI returns an http.Handler that serves the web UI routes.
+func UI(deps *UIDeps) http.Handler {
 	mux := http.NewServeMux()
 
+	// Home page.
 	mux.HandleFunc("GET /", func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/" {
 			http.NotFound(w, r)
 			return
 		}
-		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		tmpl.Execute(w, map[string]string{"Title": "Gosilo", "Content": "Welcome to Gosilo — a remoteStorage server."})
+		user := CurrentUser(r)
+		deps.Renderer.Render(w, "home", ui.PageData{
+			Title:            "Gosilo",
+			CurrentUser:      userInfo(user),
+			CSRFToken:        CSRFToken(r),
+			Flash:            GetFlash(w, r),
+			RegistrationMode: deps.Config.RegistrationMode,
+		})
 	})
 
-	mux.HandleFunc("GET /admin", func(w http.ResponseWriter, r *http.Request) {
-		http.Error(w, "admin: not yet implemented", http.StatusNotImplemented)
-	})
+	// Setup wizard.
+	setupHandler := SetupHandler(deps)
+	mux.HandleFunc("GET /setup", setupHandler.ShowSetup)
+	mux.HandleFunc("POST /setup", setupHandler.DoSetup)
 
-	mux.HandleFunc("GET /setup", func(w http.ResponseWriter, r *http.Request) {
-		http.Error(w, "setup: not yet implemented", http.StatusNotImplemented)
-	})
+	// Auth (login/logout).
+	authHandler := AuthHandler(deps)
+	mux.HandleFunc("GET /login", authHandler.ShowLogin)
+	mux.HandleFunc("POST /login", authHandler.DoLogin)
+	mux.HandleFunc("POST /logout", authHandler.DoLogout)
+
+	// Registration.
+	registerHandler := RegisterHandler(deps)
+	mux.HandleFunc("GET /register", registerHandler.ShowRegister)
+	mux.HandleFunc("POST /register", registerHandler.DoRegister)
+
+	// Admin (all routes require auth + admin, enforced inside handler).
+	adminHandler := AdminHandler(deps)
+	mux.HandleFunc("GET /admin", adminHandler.Dashboard)
+	mux.HandleFunc("GET /admin/users", adminHandler.Users)
+	mux.HandleFunc("POST /admin/users/{id}/delete", adminHandler.DeleteUser)
+	mux.HandleFunc("GET /admin/invites", adminHandler.Invites)
+	mux.HandleFunc("POST /admin/invites", adminHandler.CreateInvite)
+	mux.HandleFunc("POST /admin/invites/{code}/delete", adminHandler.DeleteInvite)
+	mux.HandleFunc("GET /admin/oauth-test", adminHandler.OAuthTest)
 
 	return mux
 }

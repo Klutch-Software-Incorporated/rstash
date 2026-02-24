@@ -2,6 +2,12 @@ build/
 *.iml
 nul
 
+# Go runtime artifacts
+*.db
+*.db-shm
+*.db-wal
+*.exe
+
 # Dependencies
 *node_modules*
 

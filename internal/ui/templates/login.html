@@ -1,0 +1,34 @@
+{{define "login"}}
+<div class="form-page">
+    <h1 class="text-center">Login</h1>
+
+    {{with .Content}}
+        {{if .Error}}
+            <div role="alert" class="alert-error">
+                {{.Error}}
+            </div>
+        {{end}}
+    {{end}}
+
+    <form method="POST" action="/login">
+        <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
+        <input type="hidden" name="redirect" value="{{with .Content}}{{.RedirectTo}}{{end}}">
+        <fieldset>
+            <legend class="sr-only">Login Credentials</legend>
+
+            <div>
+                <label for="username">Username</label>
+                <input type="text" id="username" name="username" required autocomplete="username"
+                    value="{{with .Content}}{{.Username}}{{end}}">
+            </div>
+
+            <div>
+                <label for="password">Password</label>
+                <input type="password" id="password" name="password" required autocomplete="current-password">
+            </div>
+        </fieldset>
+
+        <button type="submit">Login</button>
+    </form>
+</div>
+{{end}}

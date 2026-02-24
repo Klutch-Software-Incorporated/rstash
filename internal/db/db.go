@@ -43,6 +43,22 @@ CREATE TABLE IF NOT EXISTS nodes (
     updated_at TEXT NOT NULL DEFAULT (datetime('now')),
     UNIQUE(user_id, path)
 );
+
+CREATE TABLE IF NOT EXISTS sessions (
+    token TEXT PRIMARY KEY,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    csrf_token TEXT NOT NULL,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    expires_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS invite_codes (
+    code TEXT PRIMARY KEY,
+    created_by INTEGER NOT NULL REFERENCES users(id),
+    used_by INTEGER REFERENCES users(id),
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    used_at TEXT
+);
 `
 
 // Open opens a SQLite database at the given path, enables WAL mode and
