@@ -3,6 +3,7 @@ package web
 import (
 	"fmt"
 	"net/http"
+	"strings"
 
 	"gosilo/internal/ui"
 )
@@ -31,6 +32,23 @@ func (d *UIDeps) pageData(w http.ResponseWriter, r *http.Request, title string, 
 		Flash:            ui.GetFlash(w, r),
 		RegistrationMode: d.Config.RegistrationMode,
 		Content:          content,
+		ActiveNav:        activeNavFromPath(r.URL.Path),
+	}
+}
+
+// activeNavFromPath returns the nav identifier based on the request path.
+func activeNavFromPath(path string) string {
+	switch {
+	case path == "/":
+		return "home"
+	case strings.HasPrefix(path, "/files"):
+		return "files"
+	case strings.HasPrefix(path, "/settings"):
+		return "settings"
+	case strings.HasPrefix(path, "/admin"):
+		return "admin"
+	default:
+		return ""
 	}
 }
 

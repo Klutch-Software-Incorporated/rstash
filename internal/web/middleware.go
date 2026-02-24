@@ -48,6 +48,12 @@ func AuthLoader(authSvc auth.Service) func(http.Handler) http.Handler {
 				return
 			}
 
+			if user.Disabled {
+				auth.ClearSessionCookie(w)
+				next.ServeHTTP(w, r)
+				return
+			}
+
 			ctx := context.WithValue(r.Context(), ctxKeyUser, user)
 			ctx = context.WithValue(ctx, ctxKeySession, sess)
 			next.ServeHTTP(w, r.WithContext(ctx))

@@ -1,0 +1,39 @@
+{{define "files_search"}}
+{{with .Content}}
+
+<h1>Search Files</h1>
+
+<form action="/files/search" method="GET" style="max-width:28rem;margin-bottom:1rem">
+    <div style="display:flex;gap:.5rem">
+        <input type="text" name="q" value="{{.Query}}" placeholder="Search by filename or path..." style="flex:1;margin-bottom:0" autofocus>
+        <button type="submit" class="btn-primary" style="width:auto">Search</button>
+    </div>
+</form>
+
+{{if .Query}}
+{{if .Results}}
+<p>{{len .Results}} result(s) for <strong>{{.Query}}</strong></p>
+<table>
+    <thead>
+        <tr><th>Name</th><th>Path</th><th>Size</th><th>Type</th></tr>
+    </thead>
+    <tbody>
+        {{range .Results}}
+        <tr>
+            <td><a href="{{.BrowseURL}}">{{.Name}}</a></td>
+            <td><code>{{.Path}}</code></td>
+            <td>{{.Size}}</td>
+            <td>{{.ContentType}}</td>
+        </tr>
+        {{end}}
+    </tbody>
+</table>
+{{else}}
+<p class="empty-state">No files matching <strong>{{.Query}}</strong>.</p>
+{{end}}
+{{end}}
+
+<p><a href="/files/">&larr; Back to files</a></p>
+
+{{end}}
+{{end}}

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"mime"
 	"net/http"
 	"path"
 	"sort"
@@ -179,6 +180,169 @@ func (h *filesHandler) Delete(w http.ResponseWriter, r *http.Request) {
 		parentFolder += "/"
 	}
 	http.Redirect(w, r, "/files"+parentFolder, http.StatusSeeOther)
+}
+
+// Upload handles POST /files/upload — multipart file upload.
+func (h *filesHandler) Upload(w http.ResponseWriter, r *http.Request) {
+	if !RequireAuth(w, r) {
+		return
+	}
+	user := CurrentUser(r)
+
+	// Limit request body size.
+	maxSize := h.deps.Config.MaxUploadSize
+	if maxSize <= 0 {
+		maxSize = 50 << 20 // 50MB default
+	}
+	r.Body = http.MaxBytesReader(w, r.Body, maxSize)
+
+	if err := r.ParseMultipartForm(maxSize); err != nil {
+		ui.SetFlash(w, "Upload failed: file too large or invalid form data.")
+		http.Redirect(w, r, "/files/", http.StatusSeeOther)
+		return
+	}
+
+	folder := r.FormValue("folder")
+	if folder == "" {
+		folder = "/"
+	}
+	if !strings.HasSuffix(folder, "/") {
+		folder += "/"
+	}
+
+	files := r.MultipartForm.File["files"]
+	if len(files) == 0 {
+		ui.SetFlash(w, "No files selected.")
+		http.Redirect(w, r, "/files"+folder, http.StatusSeeOther)
+		return
+	}
+
+	uploaded := 0
+	for _, fh := range files {
+		f, err := fh.Open()
+		if err != nil {
+			slog.Error("failed to open uploaded file", "error", err, "filename", fh.Filename)
+			continue
+		}
+
+		contentType := fh.Header.Get("Content-Type")
+		if contentType == "" || contentType == "application/octet-stream" {
+			ext := path.Ext(fh.Filename)
+			if detected := mime.TypeByExtension(ext); detected != "" {
+				contentType = detected
+			}
+		}
+
+		docPath := folder + fh.Filename
+		_, err = h.deps.Storage.PutDocument(r.Context(), user.ID, docPath, f, contentType, storage.Conditions{})
+		f.Close()
+		if err != nil {
+			slog.Error("failed to store uploaded file", "error", err, "path", docPath)
+			continue
+		}
+		uploaded++
+	}
+
+	if uploaded == len(files) {
+		ui.SetFlash(w, fmt.Sprintf("Uploaded %d file(s).", uploaded))
+	} else {
+		ui.SetFlash(w, fmt.Sprintf("Uploaded %d of %d file(s). Some failed.", uploaded, len(files)))
+	}
+	http.Redirect(w, r, "/files"+folder, http.StatusSeeOther)
+}
+
+type searchContent struct {
+	Query   string
+	Results []*searchResultRow
+}
+
+type searchResultRow struct {
+	Name        string
+	Path        string
+	BrowseURL   string
+	Size        string
+	ContentType string
+}
+
+// Search handles GET /files/search — file search.
+func (h *filesHandler) Search(w http.ResponseWriter, r *http.Request) {
+	if !RequireAuth(w, r) {
+		return
+	}
+	user := CurrentUser(r)
+
+	query := r.URL.Query().Get("q")
+	var results []*searchResultRow
+
+	if query != "" {
+		nodes, err := db.SearchUserNodes(r.Context(), h.deps.DB, user.ID, query, 50)
+		if err != nil {
+			slog.Error("failed to search nodes", "error", err)
+		} else {
+			results = make([]*searchResultRow, len(nodes))
+			for i, n := range nodes {
+				results[i] = &searchResultRow{
+					Name:        path.Base(n.Path),
+					Path:        n.Path,
+					BrowseURL:   "/files" + n.Path,
+					Size:        formatBytes(n.ContentLength),
+					ContentType: n.ContentType,
+				}
+			}
+		}
+	}
+
+	h.deps.Renderer.Render(w, "files_search", h.deps.pageData(w, r, "Search Files", searchContent{
+		Query:   query,
+		Results: results,
+	}))
+}
+
+// BulkDelete handles POST /files/bulk-delete — delete multiple files/folders.
+func (h *filesHandler) BulkDelete(w http.ResponseWriter, r *http.Request) {
+	if !RequireAuth(w, r) {
+		return
+	}
+	user := CurrentUser(r)
+
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "Bad Request", http.StatusBadRequest)
+		return
+	}
+
+	paths := r.Form["paths[]"]
+	if len(paths) == 0 {
+		ui.SetFlash(w, "No items selected.")
+		http.Redirect(w, r, "/files/", http.StatusSeeOther)
+		return
+	}
+
+	deleted := 0
+	for _, p := range paths {
+		if strings.HasSuffix(p, "/") {
+			_, err := h.deps.Storage.DeleteFolder(r.Context(), user.ID, p)
+			if err != nil {
+				slog.Error("bulk delete folder failed", "error", err, "path", p)
+				continue
+			}
+		} else {
+			_, err := h.deps.Storage.DeleteDocument(r.Context(), user.ID, p, storage.Conditions{})
+			if err != nil {
+				slog.Error("bulk delete file failed", "error", err, "path", p)
+				continue
+			}
+		}
+		deleted++
+	}
+
+	ui.SetFlash(w, fmt.Sprintf("Deleted %d item(s).", deleted))
+
+	referer := r.Header.Get("Referer")
+	if referer != "" {
+		http.Redirect(w, r, referer, http.StatusSeeOther)
+	} else {
+		http.Redirect(w, r, "/files/", http.StatusSeeOther)
+	}
 }
 
 // buildBreadcrumbs creates navigation breadcrumbs from a storage path.

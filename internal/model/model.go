@@ -6,6 +6,7 @@ type User struct {
 	PasswordHash string
 	IsAdmin      bool
 	StorageQuota int64 // 0 = use server default
+	Disabled     bool
 	CreatedAt    string
 }
 
@@ -50,6 +51,16 @@ type InviteCode struct {
 	UsedBy    *int64
 	CreatedAt string
 	UsedAt    *string
+}
+
+type AuditEntry struct {
+	ID         int64
+	ActorID    int64
+	Action     string
+	TargetType string
+	TargetID   string
+	Details    string
+	CreatedAt  string
 }
 
 type AuthorizationCode struct {

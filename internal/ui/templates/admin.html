@@ -22,7 +22,45 @@
     <dt>Quota</dt>
     <dd>{{.QuotaMode}} &mdash; {{.QuotaLimit}}</dd>
     {{end}}
+    <dt>Active Users (24h)</dt>
+    <dd>{{.ActiveUsers24h}}</dd>
+    <dt>Active Users (7d)</dt>
+    <dd>{{.ActiveUsers7d}}</dd>
 </dl>
+
+{{if .TopUsers}}
+<h2>Top Users by Storage</h2>
+<table>
+    <thead>
+        <tr><th>Username</th><th>Storage Used</th></tr>
+    </thead>
+    <tbody>
+        {{range .TopUsers}}
+        <tr>
+            <td>{{.Username}}</td>
+            <td>{{.StorageUsed}}</td>
+        </tr>
+        {{end}}
+    </tbody>
+</table>
+{{end}}
+
+<h2>Create User</h2>
+<form method="POST" action="/admin/users/create" style="max-width:28rem">
+    <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
+    <div>
+        <label for="new_username">Username</label>
+        <input type="text" id="new_username" name="username" required autocomplete="off">
+    </div>
+    <div>
+        <label for="new_password">Password</label>
+        <input type="password" id="new_password" name="password" required minlength="8" autocomplete="new-password">
+    </div>
+    <div>
+        <label><input type="checkbox" name="is_admin"> Admin</label>
+    </div>
+    <button type="submit" class="btn-primary">Create User</button>
+</form>
 
 <h2>Users</h2>
 {{if .Users}}
@@ -31,7 +69,9 @@
         <tr>
             <th>Username</th>
             <th>Role</th>
+            <th>Status</th>
             <th>Storage</th>
+            <th>Sessions</th>
             <th>Created</th>
             <th>Actions</th>
         </tr>
@@ -41,20 +81,32 @@
         <tr>
             <td>{{.Username}}</td>
             <td>{{if .IsAdmin}}<span class="badge badge-admin">admin</span>{{else}}user{{end}}</td>
+            <td>{{if .Disabled}}<span class="badge badge-disabled">disabled</span>{{else}}<span class="badge badge-active">active</span>{{end}}</td>
             <td>
                 {{.StorageUsed}}
                 {{if $.Content.QuotaMode | eq "user"}}
                 <span style="color:#888;font-size:.75rem">/ {{.StorageQuota}}</span>
                 {{end}}
             </td>
+            <td><a href="/admin/users/{{.ID}}/sessions">{{.SessionCount}}</a></td>
             <td><time datetime="{{.CreatedAt}}">{{.CreatedAt}}</time></td>
             <td>
                 {{if not .IsSelf}}
-                <form method="POST" action="/admin/users/{{.ID}}/delete"
-                    onsubmit="return confirm('Delete user {{.Username}}?')">
-                    <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
-                    <button type="submit" class="btn-danger">Delete</button>
-                </form>
+                <div style="display:flex;gap:.25rem;flex-wrap:wrap;justify-content:flex-end">
+                    <form method="POST" action="/admin/users/{{.ID}}/toggle-admin">
+                        <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
+                        <button type="submit" class="btn-secondary" style="font-size:.75rem;padding:.15rem .4rem">{{if .IsAdmin}}Demote{{else}}Promote{{end}}</button>
+                    </form>
+                    <form method="POST" action="/admin/users/{{.ID}}/toggle-disabled">
+                        <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
+                        <button type="submit" class="btn-secondary" style="font-size:.75rem;padding:.15rem .4rem">{{if .Disabled}}Enable{{else}}Disable{{end}}</button>
+                    </form>
+                    <form method="POST" action="/admin/users/{{.ID}}/delete"
+                        onsubmit="return confirm('Delete user {{.Username}}?')">
+                        <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
+                        <button type="submit" class="btn-danger">Delete</button>
+                    </form>
+                </div>
                 {{end}}
                 {{if $.Content.QuotaMode | eq "user"}}
                 <form method="POST" action="/admin/users/{{.ID}}/quota" class="inline-form">
@@ -189,6 +241,28 @@
     })();
 </script>
 
+{{end}}
+
+<h2>Audit Log</h2>
+{{if .AuditLog}}
+<table>
+    <thead>
+        <tr><th>Actor</th><th>Action</th><th>Target</th><th>Details</th><th>Time</th></tr>
+    </thead>
+    <tbody>
+        {{range .AuditLog}}
+        <tr>
+            <td>{{.ActorUsername}}</td>
+            <td><code>{{.Action}}</code></td>
+            <td>{{.TargetType}}:{{.TargetID}}</td>
+            <td>{{.Details}}</td>
+            <td><time datetime="{{.CreatedAt}}">{{.CreatedAt}}</time></td>
+        </tr>
+        {{end}}
+    </tbody>
+</table>
+{{else}}
+<p class="empty-state">No audit log entries yet.</p>
 {{end}}
 
 {{end}}

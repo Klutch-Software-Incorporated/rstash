@@ -52,6 +52,17 @@ CREATE TABLE IF NOT EXISTS sessions (
     expires_at TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS audit_log (
+    id INTEGER PRIMARY KEY,
+    actor_id INTEGER NOT NULL REFERENCES users(id),
+    action TEXT NOT NULL,
+    target_type TEXT NOT NULL,
+    target_id TEXT NOT NULL,
+    details TEXT,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_audit_log_created ON audit_log(created_at);
+
 CREATE TABLE IF NOT EXISTS invite_codes (
     code TEXT PRIMARY KEY,
     created_by INTEGER NOT NULL REFERENCES users(id),
@@ -113,6 +124,7 @@ func Open(path string) (*sql.DB, error) {
 func runMigrations(database *sql.DB) error {
 	migrations := []string{
 		"ALTER TABLE users ADD COLUMN storage_quota INTEGER NOT NULL DEFAULT 0",
+		"ALTER TABLE users ADD COLUMN disabled INTEGER NOT NULL DEFAULT 0",
 	}
 	for _, m := range migrations {
 		if _, err := database.Exec(m); err != nil {

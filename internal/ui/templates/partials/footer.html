@@ -1,5 +1,8 @@
 {{define "footer"}}
 <footer>
-  <p>Gosilo &mdash; self-hosted <a href="https://remotestorage.io">remoteStorage</a> server</p>
+  <p>
+    Gosilo &mdash; self-hosted <a href="https://remotestorage.io">remoteStorage</a> server
+    <button class="theme-toggle" onclick="(function(){var h=document.documentElement,c=h.getAttribute('data-theme');var n=c==='dark'?'light':'dark';h.setAttribute('data-theme',n);localStorage.setItem('gosilo-theme',n);})();" aria-label="Toggle theme">&#9681;</button>
+  </p>
 </footer>
 {{end}}

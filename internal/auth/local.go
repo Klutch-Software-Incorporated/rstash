@@ -28,6 +28,9 @@ func (s *LocalService) Authenticate(ctx context.Context, username, password stri
 	if user == nil || !db.CheckPassword(user, password) {
 		return nil, ErrInvalidCredentials
 	}
+	if user.Disabled {
+		return nil, ErrAccountDisabled
+	}
 	return user, nil
 }
 
@@ -89,6 +92,32 @@ func (s *LocalService) UpdatePassword(ctx context.Context, userID int64, newPass
 
 func (s *LocalService) UserCount(ctx context.Context) (int64, error) {
 	return db.UserCount(ctx, s.db)
+}
+
+// --- Admin user management ---
+
+func (s *LocalService) ToggleAdmin(ctx context.Context, userID int64, isAdmin bool) error {
+	return db.UpdateUserAdmin(ctx, s.db, userID, isAdmin)
+}
+
+func (s *LocalService) SetDisabled(ctx context.Context, userID int64, disabled bool) error {
+	return db.UpdateUserDisabled(ctx, s.db, userID, disabled)
+}
+
+func (s *LocalService) ListUserSessions(ctx context.Context, userID int64) ([]*model.Session, error) {
+	return db.ListUserSessions(ctx, s.db, userID)
+}
+
+func (s *LocalService) CountUserSessions(ctx context.Context, userID int64) (int64, error) {
+	return db.CountUserSessions(ctx, s.db, userID)
+}
+
+func (s *LocalService) TerminateSession(ctx context.Context, token string) error {
+	return db.DeleteSession(ctx, s.db, token)
+}
+
+func (s *LocalService) TerminateAllSessions(ctx context.Context, userID int64) error {
+	return db.DeleteUserSessions(ctx, s.db, userID)
 }
 
 // --- Invites ---

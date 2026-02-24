@@ -88,6 +88,57 @@ func DeleteUserSessions(ctx context.Context, q Querier, userID int64) error {
 	return nil
 }
 
+// ListUserSessions returns active (non-expired) sessions for a user.
+func ListUserSessions(ctx context.Context, q Querier, userID int64) ([]*model.Session, error) {
+	rows, err := q.QueryContext(ctx,
+		`SELECT token, user_id, csrf_token, created_at, expires_at
+		 FROM sessions
+		 WHERE user_id = ? AND expires_at > datetime('now')
+		 ORDER BY created_at DESC`,
+		userID,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("list user sessions: %w", err)
+	}
+	defer rows.Close()
+
+	var sessions []*model.Session
+	for rows.Next() {
+		var s model.Session
+		if err := rows.Scan(&s.Token, &s.UserID, &s.CSRFToken, &s.CreatedAt, &s.ExpiresAt); err != nil {
+			return nil, fmt.Errorf("scan session: %w", err)
+		}
+		sessions = append(sessions, &s)
+	}
+	return sessions, rows.Err()
+}
+
+// CountUserSessions returns the count of active (non-expired) sessions for a user.
+func CountUserSessions(ctx context.Context, q Querier, userID int64) (int64, error) {
+	var count int64
+	err := q.QueryRowContext(ctx,
+		"SELECT COUNT(*) FROM sessions WHERE user_id = ? AND expires_at > datetime('now')",
+		userID,
+	).Scan(&count)
+	if err != nil {
+		return 0, fmt.Errorf("count user sessions: %w", err)
+	}
+	return count, nil
+}
+
+// ActiveUserCount returns the count of distinct users with sessions created since `since`.
+func ActiveUserCount(ctx context.Context, q Querier, since string) (int64, error) {
+	var count int64
+	err := q.QueryRowContext(ctx,
+		"SELECT COUNT(DISTINCT user_id) FROM sessions WHERE created_at >= ?",
+		since,
+	).Scan(&count)
+	if err != nil {
+		return 0, fmt.Errorf("active user count: %w", err)
+	}
+	return count, nil
+}
+
 // GetRecentUserSessions returns recent sessions for a user, ordered by creation
 // time descending.
 func GetRecentUserSessions(ctx context.Context, q Querier, userID int64, limit int) ([]*model.Session, error) {

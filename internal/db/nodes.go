@@ -229,6 +229,22 @@ func DeleteSubtree(ctx context.Context, q Querier, userID int64, folderPath stri
 	return nil
 }
 
+// SearchUserNodes searches non-folder nodes by path substring match.
+func SearchUserNodes(ctx context.Context, q Querier, userID int64, query string, limit int) ([]*model.Node, error) {
+	rows, err := q.QueryContext(ctx,
+		`SELECT `+nodeColumns+`
+		 FROM nodes
+		 WHERE user_id = ? AND is_folder = 0 AND path LIKE '%' || ? || '%'
+		 ORDER BY updated_at DESC
+		 LIMIT ?`,
+		userID, query, limit,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("search user nodes: %w", err)
+	}
+	return scanNodes(rows)
+}
+
 // AncestorPaths returns all ancestor folder paths from the immediate parent
 // up to and including the root "/".
 // Example: "/foo/bar/baz.txt" → ["/foo/bar/", "/foo/", "/"]

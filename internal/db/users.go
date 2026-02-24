@@ -20,9 +20,9 @@ func CreateUser(ctx context.Context, q Querier, username, password string, isAdm
 	var u model.User
 	err = q.QueryRowContext(ctx,
 		`INSERT INTO users (username, password_hash, is_admin) VALUES (?, ?, ?)
-		 RETURNING id, username, password_hash, is_admin, storage_quota, created_at`,
+		 RETURNING id, username, password_hash, is_admin, storage_quota, disabled, created_at`,
 		username, string(hash), isAdmin,
-	).Scan(&u.ID, &u.Username, &u.PasswordHash, &u.IsAdmin, &u.StorageQuota, &u.CreatedAt)
+	).Scan(&u.ID, &u.Username, &u.PasswordHash, &u.IsAdmin, &u.StorageQuota, &u.Disabled, &u.CreatedAt)
 	if err != nil {
 		return nil, fmt.Errorf("create user: %w", err)
 	}
@@ -33,9 +33,9 @@ func CreateUser(ctx context.Context, q Querier, username, password string, isAdm
 func GetUserByUsername(ctx context.Context, q Querier, username string) (*model.User, error) {
 	var u model.User
 	err := q.QueryRowContext(ctx,
-		"SELECT id, username, password_hash, is_admin, storage_quota, created_at FROM users WHERE username = ?",
+		"SELECT id, username, password_hash, is_admin, storage_quota, disabled, created_at FROM users WHERE username = ?",
 		username,
-	).Scan(&u.ID, &u.Username, &u.PasswordHash, &u.IsAdmin, &u.StorageQuota, &u.CreatedAt)
+	).Scan(&u.ID, &u.Username, &u.PasswordHash, &u.IsAdmin, &u.StorageQuota, &u.Disabled, &u.CreatedAt)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -49,9 +49,9 @@ func GetUserByUsername(ctx context.Context, q Querier, username string) (*model.
 func GetUserByID(ctx context.Context, q Querier, id int64) (*model.User, error) {
 	var u model.User
 	err := q.QueryRowContext(ctx,
-		"SELECT id, username, password_hash, is_admin, storage_quota, created_at FROM users WHERE id = ?",
+		"SELECT id, username, password_hash, is_admin, storage_quota, disabled, created_at FROM users WHERE id = ?",
 		id,
-	).Scan(&u.ID, &u.Username, &u.PasswordHash, &u.IsAdmin, &u.StorageQuota, &u.CreatedAt)
+	).Scan(&u.ID, &u.Username, &u.PasswordHash, &u.IsAdmin, &u.StorageQuota, &u.Disabled, &u.CreatedAt)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -69,7 +69,7 @@ func CheckPassword(user *model.User, password string) bool {
 // ListUsers returns all users ordered by id.
 func ListUsers(ctx context.Context, q Querier) ([]*model.User, error) {
 	rows, err := q.QueryContext(ctx,
-		"SELECT id, username, password_hash, is_admin, storage_quota, created_at FROM users ORDER BY id")
+		"SELECT id, username, password_hash, is_admin, storage_quota, disabled, created_at FROM users ORDER BY id")
 	if err != nil {
 		return nil, fmt.Errorf("list users: %w", err)
 	}
@@ -78,7 +78,7 @@ func ListUsers(ctx context.Context, q Querier) ([]*model.User, error) {
 	var users []*model.User
 	for rows.Next() {
 		var u model.User
-		if err := rows.Scan(&u.ID, &u.Username, &u.PasswordHash, &u.IsAdmin, &u.StorageQuota, &u.CreatedAt); err != nil {
+		if err := rows.Scan(&u.ID, &u.Username, &u.PasswordHash, &u.IsAdmin, &u.StorageQuota, &u.Disabled, &u.CreatedAt); err != nil {
 			return nil, fmt.Errorf("scan user: %w", err)
 		}
 		users = append(users, &u)
@@ -126,6 +126,57 @@ func UpdateUserQuota(ctx context.Context, q Querier, userID int64, quotaBytes in
 		return fmt.Errorf("update user quota: %w", err)
 	}
 	return nil
+}
+
+// UpdateUserAdmin toggles the is_admin flag for a user.
+func UpdateUserAdmin(ctx context.Context, q Querier, userID int64, isAdmin bool) error {
+	_, err := q.ExecContext(ctx, "UPDATE users SET is_admin = ? WHERE id = ?", isAdmin, userID)
+	if err != nil {
+		return fmt.Errorf("update user admin: %w", err)
+	}
+	return nil
+}
+
+// UpdateUserDisabled toggles the disabled flag for a user.
+func UpdateUserDisabled(ctx context.Context, q Querier, userID int64, disabled bool) error {
+	_, err := q.ExecContext(ctx, "UPDATE users SET disabled = ? WHERE id = ?", disabled, userID)
+	if err != nil {
+		return fmt.Errorf("update user disabled: %w", err)
+	}
+	return nil
+}
+
+// TopUserRow holds a user's storage usage for ranking.
+type TopUserRow struct {
+	Username    string
+	StorageUsed int64
+}
+
+// TopUsersByStorage returns the top N users by total storage used.
+func TopUsersByStorage(ctx context.Context, q Querier, limit int) ([]*TopUserRow, error) {
+	rows, err := q.QueryContext(ctx,
+		`SELECT u.username, COALESCE(SUM(n.content_length), 0) AS used
+		 FROM users u
+		 LEFT JOIN nodes n ON n.user_id = u.id AND n.is_folder = 0
+		 GROUP BY u.id
+		 ORDER BY used DESC
+		 LIMIT ?`,
+		limit,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("top users by storage: %w", err)
+	}
+	defer rows.Close()
+
+	var result []*TopUserRow
+	for rows.Next() {
+		var r TopUserRow
+		if err := rows.Scan(&r.Username, &r.StorageUsed); err != nil {
+			return nil, fmt.Errorf("scan top user: %w", err)
+		}
+		result = append(result, &r)
+	}
+	return result, rows.Err()
 }
 
 // GetTotalStorageUsed returns the total content_length across all users' non-folder nodes.

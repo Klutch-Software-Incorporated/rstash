@@ -11,6 +11,7 @@ import (
 var (
 	ErrInvalidCredentials = errors.New("invalid credentials")
 	ErrUserNotFound       = errors.New("user not found")
+	ErrAccountDisabled    = errors.New("account is disabled")
 )
 
 // Service defines the authentication and user management operations
@@ -37,6 +38,14 @@ type Service interface {
 	DeleteUser(ctx context.Context, id int64) error
 	UpdatePassword(ctx context.Context, userID int64, newPassword string) error
 	UserCount(ctx context.Context) (int64, error)
+
+	// Admin user management
+	ToggleAdmin(ctx context.Context, userID int64, isAdmin bool) error
+	SetDisabled(ctx context.Context, userID int64, disabled bool) error
+	ListUserSessions(ctx context.Context, userID int64) ([]*model.Session, error)
+	CountUserSessions(ctx context.Context, userID int64) (int64, error)
+	TerminateSession(ctx context.Context, token string) error
+	TerminateAllSessions(ctx context.Context, userID int64) error
 
 	// Invites
 	CreateInvite(ctx context.Context, createdBy int64) (*model.InviteCode, error)

@@ -26,24 +26,36 @@ func Routes(deps *UIDeps) http.Handler {
 	mux.HandleFunc("GET /register", registerHandler.ShowRegister)
 	mux.HandleFunc("POST /register", registerHandler.DoRegister)
 
-	// Account settings (POST-only actions, pages merged into home dashboard).
+	// Account settings.
 	settingsHandler := SettingsHandler(deps)
+	mux.HandleFunc("GET /settings", settingsHandler.Show)
 	mux.HandleFunc("POST /settings/password", RequireCSRF(settingsHandler.ChangePassword))
 	mux.HandleFunc("POST /settings/tokens/{token}/revoke", RequireCSRF(settingsHandler.RevokeToken))
+	mux.HandleFunc("POST /settings/sessions/{token}/terminate", RequireCSRF(settingsHandler.TerminateOwnSession))
 
 	// File browser.
 	filesHandler := FilesHandler(deps)
 	mux.HandleFunc("GET /files", func(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/files/", http.StatusMovedPermanently)
 	})
+	mux.HandleFunc("GET /files/search", filesHandler.Search)
 	mux.HandleFunc("GET /files/{path...}", filesHandler.Browse)
 	mux.HandleFunc("POST /files/delete", RequireCSRF(filesHandler.Delete))
+	mux.HandleFunc("POST /files/upload", RequireCSRF(filesHandler.Upload))
+	mux.HandleFunc("POST /files/bulk-delete", RequireCSRF(filesHandler.BulkDelete))
 
 	// Admin (single page, all sections combined).
 	adminHandler := AdminHandler(deps)
 	mux.HandleFunc("GET /admin", adminHandler.Show)
+	mux.HandleFunc("POST /admin/users/create", RequireCSRF(adminHandler.CreateUser))
 	mux.HandleFunc("POST /admin/users/{id}/delete", RequireCSRF(adminHandler.DeleteUser))
 	mux.HandleFunc("POST /admin/users/{id}/quota", RequireCSRF(adminHandler.SetUserQuota))
+	mux.HandleFunc("POST /admin/users/{id}/toggle-admin", RequireCSRF(adminHandler.ToggleAdmin))
+	mux.HandleFunc("POST /admin/users/{id}/toggle-disabled", RequireCSRF(adminHandler.ToggleDisabled))
+	mux.HandleFunc("GET /admin/users/{id}/sessions", adminHandler.UserSessions)
+	mux.HandleFunc("GET /admin/users/{id}/activity", adminHandler.UserActivity)
+	mux.HandleFunc("POST /admin/sessions/{token}/terminate", RequireCSRF(adminHandler.TerminateSession))
+	mux.HandleFunc("POST /admin/users/{id}/terminate-all", RequireCSRF(adminHandler.TerminateAllSessions))
 	mux.HandleFunc("POST /admin/invites", RequireCSRF(adminHandler.CreateInvite))
 	mux.HandleFunc("POST /admin/invites/{code}/delete", RequireCSRF(adminHandler.DeleteInvite))
 

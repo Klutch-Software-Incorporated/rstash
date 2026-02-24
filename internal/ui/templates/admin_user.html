@@ -1,0 +1,64 @@
+{{define "admin_user"}}
+{{with .Content}}
+
+<h2><a href="/admin">&larr; Admin</a> / {{.Username}}</h2>
+
+<dl>
+    <dt>User ID</dt>
+    <dd>{{.UserID}}</dd>
+    <dt>Role</dt>
+    <dd>{{if .IsAdmin}}<span class="badge badge-admin">admin</span>{{else}}user{{end}}</dd>
+    <dt>Status</dt>
+    <dd>{{if .Disabled}}<span class="badge badge-disabled">disabled</span>{{else}}<span class="badge badge-active">active</span>{{end}}</dd>
+    <dt>Created</dt>
+    <dd><time datetime="{{.CreatedAt}}">{{.CreatedAt}}</time></dd>
+    <dt>Storage</dt>
+    <dd>{{.StorageUsed}} ({{.FileCount}} files)</dd>
+    <dt>Active Sessions</dt>
+    <dd><a href="/admin/users/{{.UserID}}/sessions">{{.SessionCount}}</a></dd>
+</dl>
+
+<h2>Recent Files</h2>
+{{if .RecentFiles}}
+<table>
+    <thead>
+        <tr><th>Path</th><th>Size</th><th>Type</th><th>Updated</th></tr>
+    </thead>
+    <tbody>
+        {{range .RecentFiles}}
+        <tr>
+            <td><code>{{.Path}}</code></td>
+            <td>{{.Size}}</td>
+            <td>{{.ContentType}}</td>
+            <td><time datetime="{{.UpdatedAt}}">{{.UpdatedAt}}</time></td>
+        </tr>
+        {{end}}
+    </tbody>
+</table>
+{{else}}
+<p class="empty-state">No files.</p>
+{{end}}
+
+<h2>Audit Log</h2>
+{{if .AuditLog}}
+<table>
+    <thead>
+        <tr><th>Actor</th><th>Action</th><th>Details</th><th>Time</th></tr>
+    </thead>
+    <tbody>
+        {{range .AuditLog}}
+        <tr>
+            <td>{{.ActorUsername}}</td>
+            <td><code>{{.Action}}</code></td>
+            <td>{{.Details}}</td>
+            <td><time datetime="{{.CreatedAt}}">{{.CreatedAt}}</time></td>
+        </tr>
+        {{end}}
+    </tbody>
+</table>
+{{else}}
+<p class="empty-state">No audit entries for this user.</p>
+{{end}}
+
+{{end}}
+{{end}}

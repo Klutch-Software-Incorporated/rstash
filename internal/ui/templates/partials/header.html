@@ -1,15 +1,21 @@
 {{define "header"}}
 <header>
-  <h1><a href="/">Gosilo</a></h1>
+  <div class="header-top">
+    <h1><a href="/">Gosilo</a></h1>
+    {{if .CurrentUser}}
+      <button class="nav-toggle" aria-label="Toggle navigation" onclick="document.querySelector('header nav ul').classList.toggle('open')">&#9776;</button>
+    {{end}}
+  </div>
   {{if .CurrentUser}}
     <p>Logged in as <strong>{{.CurrentUser.Username}}</strong></p>
   {{end}}
   <nav aria-label="Main">
     <ul>
       {{if .CurrentUser}}
-        <li><a href="/">Dashboard</a></li>
-        <li><a href="/files/">Files</a></li>
-        {{if .CurrentUser.IsAdmin}}<li><a href="/admin">Admin</a></li>{{end}}
+        <li><a href="/"{{if eq .ActiveNav "home"}} class="nav-active" aria-current="page"{{end}}>Dashboard</a></li>
+        <li><a href="/files/"{{if eq .ActiveNav "files"}} class="nav-active" aria-current="page"{{end}}>Files</a></li>
+        <li><a href="/settings"{{if eq .ActiveNav "settings"}} class="nav-active" aria-current="page"{{end}}>Settings</a></li>
+        {{if .CurrentUser.IsAdmin}}<li><a href="/admin"{{if eq .ActiveNav "admin"}} class="nav-active" aria-current="page"{{end}}>Admin</a></li>{{end}}
         <li><form method="POST" action="/logout">
           <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
           <button type="submit">Log out</button>

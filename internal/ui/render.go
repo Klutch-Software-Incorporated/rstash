@@ -22,6 +22,7 @@ type PageData struct {
 	Flash            string
 	Content          any
 	RegistrationMode string
+	ActiveNav        string
 }
 
 // Renderer parses and renders HTML templates from the embedded filesystem.
@@ -44,8 +45,12 @@ func NewRenderer() *Renderer {
 		"templates/login.html",
 		"templates/register.html",
 		"templates/admin.html",
+		"templates/admin_sessions.html",
+		"templates/admin_user.html",
 		"templates/oauth_authorize.html",
 		"templates/files.html",
+		"templates/files_search.html",
+		"templates/settings.html",
 	)
 	if err != nil {
 		slog.Error("failed to parse templates", "error", err)
