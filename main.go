@@ -2,26 +2,89 @@ package main
 
 import (
 	"context"
+	"fmt"
+	"io"
 	"io/fs"
 	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
+	"text/tabwriter"
 	"time"
 
+	"gosilo/internal/api"
 	"gosilo/internal/auth"
 	"gosilo/internal/blob"
 	"gosilo/internal/config"
 	"gosilo/internal/db"
-	"gosilo/internal/api"
 	"gosilo/internal/storage"
-	"gosilo/internal/web"
 	"gosilo/internal/ui"
+	"gosilo/internal/web"
 )
 
 func main() {
+	cmd := "serve"
+	if len(os.Args) > 1 {
+		cmd = os.Args[1]
+	}
+
+	switch cmd {
+	case "serve":
+		runServe()
+	case "env":
+		fmt.Print(config.GenerateEnvFile())
+	case "version":
+		fmt.Printf("gosilo %s\n", config.Version)
+	case "help", "-h", "--help":
+		printHelp(os.Stdout)
+	default:
+		fmt.Fprintf(os.Stderr, "gosilo: unknown command %q\n\n", cmd)
+		printHelp(os.Stderr)
+		os.Exit(1)
+	}
+}
+
+func printHelp(w io.Writer) {
+	fmt.Fprintf(w, "gosilo %s — remoteStorage server\n\n", config.Version)
+	fmt.Fprintln(w, "Usage: gosilo [command]")
+	fmt.Fprintln(w, "")
+	fmt.Fprintln(w, "Commands:")
+	fmt.Fprintln(w, "  serve    Start the server (default)")
+	fmt.Fprintln(w, "  env      Print a documented .env template")
+	fmt.Fprintln(w, "  version  Print version")
+	fmt.Fprintln(w, "  help     Show this help")
+	fmt.Fprintln(w, "")
+	fmt.Fprintln(w, "Environment variables:")
+	fmt.Fprintln(w, "")
+
+	tw := tabwriter.NewWriter(w, 0, 0, 2, ' ', 0)
+	fmt.Fprintln(tw, "  Variable\tDefault\tDescription")
+	fmt.Fprintln(tw, "  --------\t-------\t-----------")
+	for _, v := range config.EnvVars() {
+		def := v.Default
+		if def == "" {
+			def = "-"
+		}
+		desc := v.Description
+		if len(v.ValidValues) > 0 {
+			desc += " [" + strings.Join(v.ValidValues, ", ") + "]"
+		}
+		fmt.Fprintf(tw, "  %s\t%s\t%s\n", v.Name, def, desc)
+	}
+	tw.Flush()
+	fmt.Fprintln(w, "")
+	fmt.Fprintln(w, "Run 'gosilo env' to generate a documented .env template.")
+}
+
+func runServe() {
 	cfg := config.Load()
+
+	if err := cfg.Validate(); err != nil {
+		fmt.Fprintf(os.Stderr, "configuration error:\n%v\n", err)
+		os.Exit(1)
+	}
 
 	// Configure structured logging.
 	var level slog.Level
@@ -46,7 +109,20 @@ func main() {
 	defer database.Close()
 
 	// Initialize blob storage.
-	blobs, err := blob.NewSQLiteStore(database)
+	var blobs blob.Store
+	switch cfg.BlobBackend {
+	case "fs":
+		if cfg.BlobPath == "" {
+			slog.Error("GOSILO_BLOB_PATH is required when GOSILO_BLOB_BACKEND=fs")
+			os.Exit(1)
+		}
+		blobs, err = blob.NewFSStore(cfg.BlobPath)
+	case "sqlite":
+		blobs, err = blob.NewSQLiteStore(database)
+	default:
+		slog.Error("unknown blob backend", "backend", cfg.BlobBackend)
+		os.Exit(1)
+	}
 	if err != nil {
 		slog.Error("failed to initialize blob store", "error", err)
 		os.Exit(1)

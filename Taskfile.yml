@@ -4,7 +4,10 @@ tasks:
   build:
     desc: Build the gosilo binary
     cmds:
-      - go build -o ./build/gosilo.exe .
+      - go build -ldflags "-X gosilo/internal/config.Version={{.VERSION}}" -o ./build/gosilo.exe .
+    vars:
+      VERSION:
+        sh: fossil info 2>/dev/null | grep "checkout:" | awk '{print substr($NF,1,10)}' || echo "dev"
 
   run:
     desc: Run the server

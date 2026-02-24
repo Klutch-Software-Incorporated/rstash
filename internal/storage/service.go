@@ -57,11 +57,11 @@ type DeleteResult struct {
 // Service orchestrates storage operations (blob + node + ETags) in transactions.
 type Service struct {
 	database *sql.DB
-	blobs    *blob.SQLiteStore
+	blobs    blob.Store
 }
 
 // NewService creates a new storage service.
-func NewService(database *sql.DB, blobs *blob.SQLiteStore) *Service {
+func NewService(database *sql.DB, blobs blob.Store) *Service {
 	return &Service{database: database, blobs: blobs}
 }
 
