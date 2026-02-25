@@ -68,8 +68,6 @@
         Registration:
         {{if eq .RegistrationMode "open"}}
             <span class="badge badge-available">Open</span>
-        {{else if eq .RegistrationMode "invite"}}
-            <span class="badge badge-admin">Invite Only</span>
         {{else}}
             <span class="badge badge-used">Closed</span>
         {{end}}
@@ -77,7 +75,7 @@
 
     <div class="home-cta">
         <a href="/login">Log In</a>
-        {{if or (eq .RegistrationMode "open") (eq .RegistrationMode "invite")}}
+        {{if eq .RegistrationMode "open"}}
             <p class="home-register-link">or <a href="/register">create an account</a></p>
         {{end}}
     </div>

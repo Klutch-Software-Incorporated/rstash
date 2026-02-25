@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 	"strings"
+	"time"
 
 	"gosilo/internal/model"
 )
@@ -42,8 +43,9 @@ func GetOAuthClient(ctx context.Context, q Querier, id string) (*model.OAuthClie
 }
 
 // CreateOAuthToken generates a new OAuth access token for the given user and client.
-// Scopes are stored as a space-separated string. No expiry (revoke-only).
-func CreateOAuthToken(ctx context.Context, q Querier, userID int64, clientID string, scopes []string) (*model.OAuthToken, error) {
+// Scopes are stored as a space-separated string. lifetime sets the token
+// expiry (0 = no expiry, token lives until revoked).
+func CreateOAuthToken(ctx context.Context, q Querier, userID int64, clientID string, scopes []string, lifetime time.Duration) (*model.OAuthToken, error) {
 	token, err := RandomHex(32)
 	if err != nil {
 		return nil, fmt.Errorf("generate oauth token: %w", err)
@@ -51,14 +53,24 @@ func CreateOAuthToken(ctx context.Context, q Querier, userID int64, clientID str
 
 	scopeStr := strings.Join(scopes, " ")
 
+	var query string
+	var args []any
+	if lifetime > 0 {
+		secs := int64(lifetime.Seconds())
+		query = `INSERT INTO oauth_tokens (token, user_id, client_id, scopes, expires_at)
+		 VALUES (?, ?, ?, ?, datetime('now', '+' || ? || ' seconds'))
+		 RETURNING token, user_id, client_id, scopes, created_at, expires_at`
+		args = []any{token, userID, clientID, scopeStr, secs}
+	} else {
+		query = `INSERT INTO oauth_tokens (token, user_id, client_id, scopes)
+		 VALUES (?, ?, ?, ?)
+		 RETURNING token, user_id, client_id, scopes, created_at, expires_at`
+		args = []any{token, userID, clientID, scopeStr}
+	}
+
 	var t model.OAuthToken
 	var scopeOut string
-	err = q.QueryRowContext(ctx,
-		`INSERT INTO oauth_tokens (token, user_id, client_id, scopes)
-		 VALUES (?, ?, ?, ?)
-		 RETURNING token, user_id, client_id, scopes, created_at, expires_at`,
-		token, userID, clientID, scopeStr,
-	).Scan(&t.Token, &t.UserID, &t.ClientID, &scopeOut, &t.CreatedAt, &t.ExpiresAt)
+	err = q.QueryRowContext(ctx, query, args...).Scan(&t.Token, &t.UserID, &t.ClientID, &scopeOut, &t.CreatedAt, &t.ExpiresAt)
 	if err != nil {
 		return nil, fmt.Errorf("create oauth token: %w", err)
 	}

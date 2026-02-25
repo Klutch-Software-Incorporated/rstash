@@ -2,11 +2,13 @@ package web
 
 import (
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"strings"
 
 	"gosilo/internal/auth"
+	"gosilo/internal/db"
 	"gosilo/internal/ui"
 )
 
@@ -51,6 +53,7 @@ func (h *authHandler) DoLogin(w http.ResponseWriter, r *http.Request) {
 	user, err := h.deps.Auth.Authenticate(r.Context(), username, password)
 	if err != nil {
 		if errors.Is(err, auth.ErrInvalidCredentials) {
+			db.Audit(r.Context(), h.deps.DB, db.SystemActorID, "auth.login_failed", "user", username, "invalid credentials")
 			renderErr("Invalid username or password.")
 		} else {
 			slog.Error("failed to authenticate", "error", err)
@@ -66,7 +69,8 @@ func (h *authHandler) DoLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	auth.SetSessionCookie(w, sess.Token)
+	db.Audit(r.Context(), h.deps.DB, user.ID, "auth.login", "user", fmt.Sprintf("%d", user.ID), username)
+	auth.SetSessionCookie(w, sess.Token, h.deps.SecureCookies)
 
 	// Redirect to the originally requested page, or home.
 	redirectTo := r.FormValue("redirect")
@@ -77,6 +81,7 @@ func (h *authHandler) DoLogin(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *authHandler) DoLogout(w http.ResponseWriter, r *http.Request) {
+	user := CurrentUser(r)
 	sess := CurrentSession(r)
 	if sess != nil {
 		if err := h.deps.Auth.DestroySession(r.Context(), sess.Token); err != nil {
@@ -84,6 +89,10 @@ func (h *authHandler) DoLogout(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	auth.ClearSessionCookie(w)
+	if user != nil {
+		db.Audit(r.Context(), h.deps.DB, user.ID, "auth.logout", "user", fmt.Sprintf("%d", user.ID), user.Username)
+	}
+
+	auth.ClearSessionCookie(w, h.deps.SecureCookies)
 	http.Redirect(w, r, "/", http.StatusSeeOther)
 }

@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"gosilo/internal/api"
+	"gosilo/internal/config"
 	"gosilo/internal/db"
 	"gosilo/internal/ui"
 )
@@ -22,19 +23,22 @@ func OAuthHandler(deps *UIDeps) *oauthHandler {
 }
 
 type scopeDisplay struct {
-	Module     string
-	Permission string
-	Raw        string
+	Module      string
+	Permission  string
+	Description string
+	Raw         string
 }
 
 type authorizeContent struct {
 	ClientID            string
+	ClientOrigin        string
 	RedirectURI         string
 	Username            string
 	LoggedIn            bool
 	LoginURL            string
 	Scopes              []string
 	ScopeDisplay        []scopeDisplay
+	HasRootScope        bool
 	State               string
 	ResponseType        string
 	CodeChallenge       string
@@ -42,8 +46,9 @@ type authorizeContent struct {
 	Error               string
 }
 
-func buildScopeDisplay(scopes []string) []scopeDisplay {
+func buildScopeDisplay(scopes []string) ([]scopeDisplay, bool) {
 	out := make([]scopeDisplay, 0, len(scopes))
+	hasRoot := false
 	for _, s := range scopes {
 		parts := strings.SplitN(s, ":", 2)
 		module := parts[0]
@@ -55,8 +60,19 @@ func buildScopeDisplay(scopes []string) []scopeDisplay {
 		display := scopeDisplay{Raw: s}
 		if module == "*" {
 			display.Module = "All modules"
+			if access == "rw" {
+				display.Description = "Full access to all your data"
+				hasRoot = true
+			} else {
+				display.Description = "Read all your data"
+			}
 		} else {
 			display.Module = "/" + module
+			if access == "rw" {
+				display.Description = fmt.Sprintf("Read and write your %s data", module)
+			} else {
+				display.Description = fmt.Sprintf("Read your %s data", module)
+			}
 		}
 		if access == "rw" {
 			display.Permission = "read & write"
@@ -65,7 +81,7 @@ func buildScopeDisplay(scopes []string) []scopeDisplay {
 		}
 		out = append(out, display)
 	}
-	return out
+	return out, hasRoot
 }
 
 // extractOrigin returns the scheme + host of a URL (the effective client ID per RS spec).
@@ -133,18 +149,22 @@ func (h *oauthHandler) ShowAuthorize(w http.ResponseWriter, r *http.Request) {
 	// Build login URL that returns here after authentication.
 	loginURL := "/login?redirect=" + url.QueryEscape("/oauth/authorize?"+r.URL.RawQuery)
 
+	scopeDisplayList, hasRootScope := buildScopeDisplay(scopes)
+
 	h.deps.Renderer.Render(w, "oauth_authorize", ui.PageData{
 		Title:       "Authorize — Gosilo",
 		CurrentUser: userInfo(user),
 		CSRFToken:   CSRFToken(r),
 		Content: &authorizeContent{
 			ClientID:            origin,
+			ClientOrigin:        origin,
 			RedirectURI:         redirectURI,
 			Username:            username,
 			LoggedIn:            loggedIn,
 			LoginURL:            loginURL,
 			Scopes:              scopes,
-			ScopeDisplay:        buildScopeDisplay(scopes),
+			ScopeDisplay:        scopeDisplayList,
+			HasRootScope:        hasRootScope,
 			State:               state,
 			ResponseType:        responseType,
 			CodeChallenge:       codeChallenge,
@@ -240,6 +260,8 @@ func (h *oauthHandler) DoAuthorize(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
+		db.Audit(r.Context(), h.deps.DB, user.ID, "oauth.token_granted", "oauth_client", origin, fmt.Sprintf("code flow, scopes: %s", scopeStr))
+
 		q := redirectBase.Query()
 		q.Set("code", ac.Code)
 		if state != "" {
@@ -249,14 +271,22 @@ func (h *oauthHandler) DoAuthorize(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, redirectBase.String(), http.StatusFound)
 	} else {
 		// Implicit flow: create token and redirect with fragment.
-		token, err := db.CreateOAuthToken(r.Context(), h.deps.DB, user.ID, origin, validScopes)
+		lifetimeStr := h.deps.Settings.Load().TokenLifetime
+		lifetime, _ := config.ParseTokenLifetime(lifetimeStr)
+
+		token, err := db.CreateOAuthToken(r.Context(), h.deps.DB, user.ID, origin, validScopes, lifetime)
 		if err != nil {
 			slog.Error("create oauth token", "error", err)
 			http.Error(w, "internal error", http.StatusInternalServerError)
 			return
 		}
 
+		db.Audit(r.Context(), h.deps.DB, user.ID, "oauth.token_granted", "oauth_client", origin, fmt.Sprintf("implicit flow, scopes: %s", scopeStr))
+
 		fragment := "access_token=" + url.QueryEscape(token.Token) + "&token_type=bearer"
+		if lifetime > 0 {
+			fragment += "&expires_in=" + fmt.Sprintf("%d", int64(lifetime.Seconds()))
+		}
 		if state != "" {
 			fragment += "&state=" + url.QueryEscape(state)
 		}

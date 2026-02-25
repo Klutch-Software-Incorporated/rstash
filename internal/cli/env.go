@@ -9,8 +9,12 @@ import (
 )
 
 var envCmd = &cobra.Command{
-	Use:   "env",
-	Short: "Print a documented .env template",
+	Use:     "env",
+	Short:   "Print a documented .env template",
+	Long:    "Print all available environment variables with descriptions and defaults.",
+	GroupID: "diagnostics",
+	Example: `  gosilo env
+  gosilo env > .env`,
 	Run: func(cmd *cobra.Command, args []string) {
 		fmt.Print(config.GenerateEnvFile())
 	},

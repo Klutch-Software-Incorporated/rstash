@@ -3,9 +3,22 @@ package db
 import (
 	"context"
 	"fmt"
+	"log/slog"
 
 	"gosilo/internal/model"
 )
+
+// SystemActorID is the user ID of the _system sentinel user, used as the
+// actor for CLI operations and system events.
+const SystemActorID int64 = 0
+
+// Audit is a convenience wrapper that logs an audit entry and swallows errors
+// (logging them instead). Use for fire-and-forget audit calls.
+func Audit(ctx context.Context, q Querier, actorID int64, action, targetType, targetID, details string) {
+	if err := InsertAuditEntry(ctx, q, actorID, action, targetType, targetID, details); err != nil {
+		slog.Error("failed to write audit log", "error", err, "action", action)
+	}
+}
 
 // InsertAuditEntry records an audit log entry.
 func InsertAuditEntry(ctx context.Context, q Querier, actorID int64, action, targetType, targetID, details string) error {
@@ -29,10 +42,10 @@ type AuditRow struct {
 // ListAuditEntries returns recent audit entries joined with actor username.
 func ListAuditEntries(ctx context.Context, q Querier, limit, offset int) ([]*AuditRow, error) {
 	rows, err := q.QueryContext(ctx,
-		`SELECT a.id, a.actor_id, u.username, a.action, a.target_type, a.target_id,
+		`SELECT a.id, a.actor_id, COALESCE(u.username, '_system'), a.action, a.target_type, a.target_id,
 		        COALESCE(a.details, ''), a.created_at
 		 FROM audit_log a
-		 JOIN users u ON u.id = a.actor_id
+		 LEFT JOIN users u ON u.id = a.actor_id
 		 ORDER BY a.created_at DESC
 		 LIMIT ? OFFSET ?`,
 		limit, offset,
@@ -57,10 +70,10 @@ func ListAuditEntries(ctx context.Context, q Querier, limit, offset int) ([]*Aud
 // ListAuditEntriesByTarget returns recent audit entries for a specific target.
 func ListAuditEntriesByTarget(ctx context.Context, q Querier, targetType, targetID string, limit int) ([]*AuditRow, error) {
 	rows, err := q.QueryContext(ctx,
-		`SELECT a.id, a.actor_id, u.username, a.action, a.target_type, a.target_id,
+		`SELECT a.id, a.actor_id, COALESCE(u.username, '_system'), a.action, a.target_type, a.target_id,
 		        COALESCE(a.details, ''), a.created_at
 		 FROM audit_log a
-		 JOIN users u ON u.id = a.actor_id
+		 LEFT JOIN users u ON u.id = a.actor_id
 		 WHERE a.target_type = ? AND a.target_id = ?
 		 ORDER BY a.created_at DESC
 		 LIMIT ?`,

@@ -97,9 +97,6 @@ type oauthTestContent struct {
 
 // ShowDashboard handles GET /admin — server stats + top users.
 func (h *adminHandler) ShowDashboard(w http.ResponseWriter, r *http.Request) {
-	if !RequireAuth(w, r) || !RequireAdmin(w, r) {
-		return
-	}
 
 	ctx := r.Context()
 
@@ -157,9 +154,6 @@ func (h *adminHandler) ShowDashboard(w http.ResponseWriter, r *http.Request) {
 
 // ShowUsers handles GET /admin/users — user list with actions.
 func (h *adminHandler) ShowUsers(w http.ResponseWriter, r *http.Request) {
-	if !RequireAuth(w, r) || !RequireAdmin(w, r) {
-		return
-	}
 
 	ctx := r.Context()
 	currentUser := CurrentUser(r)
@@ -212,9 +206,6 @@ func (h *adminHandler) ShowUsers(w http.ResponseWriter, r *http.Request) {
 
 // ShowSettings handles GET /admin/settings — runtime settings form.
 func (h *adminHandler) ShowSettings(w http.ResponseWriter, r *http.Request) {
-	if !RequireAuth(w, r) || !RequireAdmin(w, r) {
-		return
-	}
 
 	ctx := r.Context()
 	snap := h.deps.Settings.Load()
@@ -239,6 +230,7 @@ func (h *adminHandler) ShowSettings(w http.ResponseWriter, r *http.Request) {
 		{"quota_total", "Total quota", "Maximum storage across all users (e.g. 50GB)", config.FormatByteSize(snap.QuotaTotal)},
 		{"quota_user", "Per-user quota", "Default storage limit per user (e.g. 1GB)", config.FormatByteSize(snap.QuotaUser)},
 		{"max_upload_size", "Max upload size", "Maximum file size for a single upload (e.g. 50MB)", config.FormatByteSize(snap.MaxUploadSize)},
+		{"token_lifetime", "Token lifetime", "OAuth token expiry duration (e.g. 30d, 720h, 0 = no expiry)", snap.TokenLifetime},
 	}
 
 	var settings []*adminSettingRow
@@ -259,9 +251,6 @@ func (h *adminHandler) ShowSettings(w http.ResponseWriter, r *http.Request) {
 
 // ShowAudit handles GET /admin/audit — audit log.
 func (h *adminHandler) ShowAudit(w http.ResponseWriter, r *http.Request) {
-	if !RequireAuth(w, r) || !RequireAdmin(w, r) {
-		return
-	}
 
 	auditEntries, err := db.ListAuditEntries(r.Context(), h.deps.DB, 25, 0)
 	if err != nil {
@@ -286,9 +275,6 @@ func (h *adminHandler) ShowAudit(w http.ResponseWriter, r *http.Request) {
 
 // ShowOAuthTest handles GET /admin/oauth-test — OAuth implicit flow test tool.
 func (h *adminHandler) ShowOAuthTest(w http.ResponseWriter, r *http.Request) {
-	if !RequireAuth(w, r) || !RequireAdmin(w, r) {
-		return
-	}
 
 	currentUser := CurrentUser(r)
 	callbackURL := h.deps.Config.BaseURL + "/admin/oauth-test"
@@ -310,9 +296,6 @@ func (h *adminHandler) ShowOAuthTest(w http.ResponseWriter, r *http.Request) {
 // --- POST handlers (redirects updated to sub-pages) ---
 
 func (h *adminHandler) DeleteUser(w http.ResponseWriter, r *http.Request) {
-	if !RequireAuth(w, r) || !RequireAdmin(w, r) {
-		return
-	}
 
 	idStr := r.PathValue("id")
 	id, err := strconv.ParseInt(idStr, 10, 64)
@@ -347,9 +330,6 @@ func (h *adminHandler) DeleteUser(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *adminHandler) SetUserQuota(w http.ResponseWriter, r *http.Request) {
-	if !RequireAuth(w, r) || !RequireAdmin(w, r) {
-		return
-	}
 
 	idStr := r.PathValue("id")
 	id, err := strconv.ParseInt(idStr, 10, 64)
@@ -388,9 +368,6 @@ func (h *adminHandler) SetUserQuota(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *adminHandler) CreateUser(w http.ResponseWriter, r *http.Request) {
-	if !RequireAuth(w, r) || !RequireAdmin(w, r) {
-		return
-	}
 
 	username := r.FormValue("username")
 	password := r.FormValue("password")
@@ -423,9 +400,6 @@ func (h *adminHandler) CreateUser(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *adminHandler) ToggleAdmin(w http.ResponseWriter, r *http.Request) {
-	if !RequireAuth(w, r) || !RequireAdmin(w, r) {
-		return
-	}
 
 	idStr := r.PathValue("id")
 	id, err := strconv.ParseInt(idStr, 10, 64)
@@ -467,9 +441,6 @@ func (h *adminHandler) ToggleAdmin(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *adminHandler) ToggleDisabled(w http.ResponseWriter, r *http.Request) {
-	if !RequireAuth(w, r) || !RequireAdmin(w, r) {
-		return
-	}
 
 	idStr := r.PathValue("id")
 	id, err := strconv.ParseInt(idStr, 10, 64)
@@ -527,9 +498,6 @@ type adminSessionRow struct {
 }
 
 func (h *adminHandler) UserSessions(w http.ResponseWriter, r *http.Request) {
-	if !RequireAuth(w, r) || !RequireAdmin(w, r) {
-		return
-	}
 
 	idStr := r.PathValue("id")
 	id, err := strconv.ParseInt(idStr, 10, 64)
@@ -570,9 +538,6 @@ func (h *adminHandler) UserSessions(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *adminHandler) TerminateSession(w http.ResponseWriter, r *http.Request) {
-	if !RequireAuth(w, r) || !RequireAdmin(w, r) {
-		return
-	}
 
 	token := r.PathValue("token")
 	if err := h.deps.Auth.TerminateSession(r.Context(), token); err != nil {
@@ -592,9 +557,6 @@ func (h *adminHandler) TerminateSession(w http.ResponseWriter, r *http.Request) 
 }
 
 func (h *adminHandler) TerminateAllSessions(w http.ResponseWriter, r *http.Request) {
-	if !RequireAuth(w, r) || !RequireAdmin(w, r) {
-		return
-	}
 
 	idStr := r.PathValue("id")
 	id, err := strconv.ParseInt(idStr, 10, 64)
@@ -635,9 +597,6 @@ type recentFileRow struct {
 }
 
 func (h *adminHandler) UserActivity(w http.ResponseWriter, r *http.Request) {
-	if !RequireAuth(w, r) || !RequireAdmin(w, r) {
-		return
-	}
 
 	idStr := r.PathValue("id")
 	id, err := strconv.ParseInt(idStr, 10, 64)
@@ -703,14 +662,11 @@ var settingFormKeys = []string{
 	"registration_mode", "log_level",
 	"rate_limit_rate", "rate_limit_burst",
 	"quota_mode", "quota_total", "quota_user",
-	"max_upload_size",
+	"max_upload_size", "token_lifetime",
 }
 
 // UpdateSettings handles POST /admin/settings — update runtime settings.
 func (h *adminHandler) UpdateSettings(w http.ResponseWriter, r *http.Request) {
-	if !RequireAuth(w, r) || !RequireAdmin(w, r) {
-		return
-	}
 
 	ctx := r.Context()
 	changed := 0
@@ -741,6 +697,8 @@ func (h *adminHandler) UpdateSettings(w http.ResponseWriter, r *http.Request) {
 			current = config.FormatByteSize(snap.QuotaUser)
 		case "max_upload_size":
 			current = config.FormatByteSize(snap.MaxUploadSize)
+		case "token_lifetime":
+			current = snap.TokenLifetime
 		}
 		if newVal == current {
 			continue
@@ -766,9 +724,6 @@ func (h *adminHandler) UpdateSettings(w http.ResponseWriter, r *http.Request) {
 
 // ResetSetting handles POST /admin/settings/{key}/reset — revert to env default.
 func (h *adminHandler) ResetSetting(w http.ResponseWriter, r *http.Request) {
-	if !RequireAuth(w, r) || !RequireAdmin(w, r) {
-		return
-	}
 
 	key := r.PathValue("key")
 	if err := h.deps.Settings.Delete(r.Context(), key); err != nil {

@@ -23,6 +23,7 @@ type Snapshot struct {
 	QuotaTotal       int64
 	QuotaUser        int64
 	MaxUploadSize    int64
+	TokenLifetime    string // duration string: "30d", "24h", "0" (no expiry)
 }
 
 // Settings provides runtime-configurable settings backed by SQLite.
@@ -137,6 +138,7 @@ func (s *Settings) buildSnapshot(overrides map[string]string) *Snapshot {
 		QuotaTotal:       s.defaults.QuotaTotal,
 		QuotaUser:        s.defaults.QuotaUser,
 		MaxUploadSize:    s.defaults.MaxUploadSize,
+		TokenLifetime:    s.defaults.TokenLifetime,
 	}
 
 	if overrides == nil {
@@ -176,6 +178,9 @@ func (s *Settings) buildSnapshot(overrides map[string]string) *Snapshot {
 		if n, err := config.ParseByteSize(v); err == nil {
 			snap.MaxUploadSize = n
 		}
+	}
+	if v, ok := overrides["token_lifetime"]; ok {
+		snap.TokenLifetime = v
 	}
 
 	return snap
@@ -249,6 +254,13 @@ func validateSetting(key, value string) error {
 		}
 		if n <= 0 {
 			return fmt.Errorf("max_upload_size must be > 0")
+		}
+		return nil
+
+	case "token_lifetime":
+		_, err := config.ParseTokenLifetime(value)
+		if err != nil {
+			return fmt.Errorf("token_lifetime: %w", err)
 		}
 		return nil
 

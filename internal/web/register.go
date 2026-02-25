@@ -1,11 +1,13 @@
 package web
 
 import (
+	"fmt"
 	"log/slog"
 	"net/http"
 	"strings"
 
 	"gosilo/internal/auth"
+	"gosilo/internal/db"
 	"gosilo/internal/ui"
 )
 
@@ -90,7 +92,8 @@ func (h *registerHandler) DoRegister(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	auth.SetSessionCookie(w, sess.Token)
+	db.Audit(r.Context(), h.deps.DB, user.ID, "user.registered", "user", fmt.Sprintf("%d", user.ID), username)
+	auth.SetSessionCookie(w, sess.Token, h.deps.SecureCookies)
 	ui.SetFlash(w, "Account created successfully.")
 	http.Redirect(w, r, "/", http.StatusSeeOther)
 }

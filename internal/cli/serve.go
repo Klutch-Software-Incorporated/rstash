@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -27,9 +28,14 @@ import (
 var webModeFlag string
 
 var serveCmd = &cobra.Command{
-	Use:   "serve",
-	Short: "Start the server",
-	RunE:  runServe,
+	Use:     "serve",
+	Short:   "Start the server",
+	Long:    "Start the HTTP server with storage API, OAuth, and optional web UI.",
+	GroupID: "server",
+	Example: `  gosilo serve
+  gosilo serve --web=oauth
+  GOSILO_ADDR=:9090 gosilo serve`,
+	RunE: runServe,
 }
 
 func init() {
@@ -113,14 +119,17 @@ func runServe(cmd *cobra.Command, args []string) error {
 	// Initialize template renderer.
 	renderer := ui.NewRenderer()
 
+	secureCookies := strings.HasPrefix(cfg.BaseURL, "https://") || (cfg.TLSCert != "" && cfg.TLSKey != "")
+
 	// UI dependencies (shared by UI handlers and OAuth).
 	uiDeps := &web.UIDeps{
-		Auth:     localAuth,
-		DB:       database,
-		Renderer: renderer,
-		Config:   cfg,
-		Storage:  storageSvc,
-		Settings: runtimeSettings,
+		Auth:          localAuth,
+		DB:            database,
+		Renderer:      renderer,
+		Config:        cfg,
+		Storage:       storageSvc,
+		Settings:      runtimeSettings,
+		SecureCookies: secureCookies,
 	}
 
 	// Build routes.
@@ -128,7 +137,9 @@ func runServe(cmd *cobra.Command, args []string) error {
 
 	// Always registered: WebFinger, OAuth token, storage API.
 	mux.Handle("/.well-known/webfinger", api.CORS(api.WebFinger(cfg)))
-	mux.Handle("POST /oauth/token", api.CORS(api.OAuthToken(database)))
+	mux.Handle("POST /oauth/token", api.CORS(api.OAuthToken(database, func() string {
+		return runtimeSettings.Load().TokenLifetime
+	})))
 	mux.Handle("/storage/{user}/{path...}", api.CORS(api.Storage(database, storageSvc, func() int64 {
 		return runtimeSettings.Load().MaxUploadSize
 	})))
@@ -145,7 +156,7 @@ func runServe(cmd *cobra.Command, args []string) error {
 		// OAuth authorize routes (need auth loader + setup guard for session cookie support).
 		oauthH := web.OAuthHandler(uiDeps)
 		oauthWrap := func(h http.HandlerFunc) http.Handler {
-			return web.AuthLoader(localAuth)(
+			return web.AuthLoader(localAuth, secureCookies)(
 				web.SetupGuard(localAuth)(http.HandlerFunc(h)),
 			)
 		}
@@ -161,7 +172,7 @@ func runServe(cmd *cobra.Command, args []string) error {
 		}
 
 		// Wrap UI handler with auth loader and setup guard.
-		wrapped := web.AuthLoader(localAuth)(
+		wrapped := web.AuthLoader(localAuth, secureCookies)(
 			web.SetupGuard(localAuth)(uiHandler),
 		)
 		mux.Handle("/", wrapped)
@@ -181,7 +192,9 @@ func runServe(cmd *cobra.Command, args []string) error {
 	// Start server.
 	srv := &http.Server{
 		Addr:              cfg.Addr,
-		Handler:           api.RequestLogger(api.SecurityHeaders(handler)),
+		Handler:           api.RequestLogger(api.SecurityHeaders(api.SecurityHeadersConfig{
+			HTTPS: strings.HasPrefix(cfg.BaseURL, "https://"),
+		})(handler)),
 		ReadHeaderTimeout: 10 * time.Second,
 		ReadTimeout:       30 * time.Second,
 		WriteTimeout:      60 * time.Second,
@@ -215,10 +228,18 @@ func runServe(cmd *cobra.Command, args []string) error {
 	}()
 
 	go func() {
-		slog.Info("server starting", "addr", cfg.Addr, "base_url", cfg.BaseURL, "web_mode", cfg.WebMode)
-		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			slog.Error("server error", "error", err)
-			os.Exit(1)
+		if cfg.TLSCert != "" && cfg.TLSKey != "" {
+			slog.Info("server starting (TLS)", "addr", cfg.Addr, "base_url", cfg.BaseURL, "web_mode", cfg.WebMode)
+			if err := srv.ListenAndServeTLS(cfg.TLSCert, cfg.TLSKey); err != nil && err != http.ErrServerClosed {
+				slog.Error("server error", "error", err)
+				os.Exit(1)
+			}
+		} else {
+			slog.Info("server starting", "addr", cfg.Addr, "base_url", cfg.BaseURL, "web_mode", cfg.WebMode)
+			if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+				slog.Error("server error", "error", err)
+				os.Exit(1)
+			}
 		}
 	}()
 

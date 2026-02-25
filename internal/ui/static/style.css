@@ -214,6 +214,13 @@ button.oauth-btn-deny:hover{background:var(--danger-bg)}
 .oauth-login-prompt{text-align:center;font-size:.8rem;color:var(--fg-faint);margin-bottom:.5rem}
 .oauth-btn-login{display:block;width:100%;padding:.6rem 1rem;background:var(--accent);color:#fff;border:none;border-radius:3px;font:inherit;font-size:.9rem;font-weight:600;cursor:pointer;text-align:center;text-decoration:none}
 .oauth-btn-login:hover{background:var(--accent-hover);color:#fff;text-decoration:none}
+.oauth-request-label{font-size:.7rem;color:var(--fg-faint);text-transform:uppercase;letter-spacing:.05em;margin-bottom:.25rem}
+.oauth-warning{padding:.75rem 1rem;background:#fff3cd;border-left:4px solid #ffc107;font-size:.85rem;color:#664d03}
+.oauth-scope-raw{display:block;font-size:.7rem;color:var(--fg-faint);font-weight:400;font-family:ui-monospace,"Cascadia Code",Menlo,monospace}
+.oauth-buttons{display:flex;gap:.5rem;flex-direction:row}
+button.oauth-btn-deny{flex:1;margin-top:0;background:var(--surface-alt);border:1px solid var(--border);color:var(--fg-muted)}
+button.oauth-btn-deny:hover{background:var(--danger-bg);border-color:var(--danger);color:var(--danger)}
+button.oauth-btn-allow{flex:2}
 .oauth-redirect-note{font-size:.7rem;color:var(--fg-faint);text-align:center;margin-top:.5rem;word-break:break-all}
 .oauth-trust-note{text-align:center;font-size:.7rem;color:var(--fg-faint);margin-top:.75rem}
 

@@ -2,6 +2,8 @@ package cli
 
 import (
 	"context"
+	"database/sql"
+	"encoding/json"
 	"fmt"
 	"os"
 	"text/tabwriter"
@@ -14,35 +16,45 @@ import (
 )
 
 var configCmd = &cobra.Command{
-	Use:   "config",
-	Short: "Manage runtime settings",
+	Use:     "config",
+	Short:   "Manage runtime settings",
+	Long:    "View and modify runtime settings. DB overrides take precedence over environment variables.",
+	GroupID: "settings",
 }
 
 var configListCmd = &cobra.Command{
 	Use:   "list",
 	Short: "List all settings with source",
-	RunE:  runConfigList,
+	Example: `  gosilo config list
+  gosilo config list --json`,
+	RunE: runConfigList,
 }
 
 var configGetCmd = &cobra.Command{
 	Use:   "get <key>",
 	Short: "Get the resolved value for a setting",
-	Args:  cobra.ExactArgs(1),
-	RunE:  runConfigGet,
+	Example: `  gosilo config get registration_mode
+  gosilo config get quota_user --json`,
+	Args: cobra.ExactArgs(1),
+	RunE: runConfigGet,
 }
 
 var configSetCmd = &cobra.Command{
 	Use:   "set <key> <value>",
 	Short: "Set a runtime setting override",
-	Args:  cobra.ExactArgs(2),
-	RunE:  runConfigSet,
+	Example: `  gosilo config set registration_mode open
+  gosilo config set quota_user 100MB
+  gosilo config set token_lifetime 7d`,
+	Args: cobra.ExactArgs(2),
+	RunE: runConfigSet,
 }
 
 var configResetCmd = &cobra.Command{
 	Use:   "reset <key>",
 	Short: "Remove a setting override (revert to env default)",
-	Args:  cobra.ExactArgs(1),
-	RunE:  runConfigReset,
+	Example: `  gosilo config reset registration_mode`,
+	Args:    cobra.ExactArgs(1),
+	RunE:    runConfigReset,
 }
 
 func init() {
@@ -50,22 +62,22 @@ func init() {
 	rootCmd.AddCommand(configCmd)
 }
 
-func openSettings() (*settings.Settings, func(), error) {
+func openSettings() (*settings.Settings, *sql.DB, func(), error) {
 	dsn := resolvedDBDSN("sqlite:gosilo.db")
 	database, err := db.Open(dsn)
 	if err != nil {
-		return nil, nil, fmt.Errorf("open database: %w", err)
+		return nil, nil, nil, &SystemError{fmt.Errorf("open database: %w", err)}
 	}
 	cfg := config.Load()
 	if dbFlag != "" {
 		cfg.DatabaseDSN = dbFlag
 	}
 	s := settings.New(database, cfg)
-	return s, func() { database.Close() }, nil
+	return s, database, func() { database.Close() }, nil
 }
 
 func runConfigList(cmd *cobra.Command, args []string) error {
-	s, cleanup, err := openSettings()
+	s, _, cleanup, err := openSettings()
 	if err != nil {
 		return err
 	}
@@ -90,6 +102,7 @@ func runConfigList(cmd *cobra.Command, args []string) error {
 		{"quota_total", config.FormatByteSize(snap.QuotaTotal), ""},
 		{"quota_user", config.FormatByteSize(snap.QuotaUser), ""},
 		{"max_upload_size", config.FormatByteSize(snap.MaxUploadSize), ""},
+		{"token_lifetime", snap.TokenLifetime, ""},
 	}
 	for i := range rows {
 		if _, ok := overrides[rows[i].key]; ok {
@@ -97,6 +110,19 @@ func runConfigList(cmd *cobra.Command, args []string) error {
 		} else {
 			rows[i].source = "env"
 		}
+	}
+
+	if jsonFlag {
+		type settingJSON struct {
+			Key    string `json:"key"`
+			Value  string `json:"value"`
+			Source string `json:"source"`
+		}
+		out := make([]settingJSON, len(rows))
+		for i, r := range rows {
+			out[i] = settingJSON{r.key, r.value, r.source}
+		}
+		return json.NewEncoder(os.Stdout).Encode(out)
 	}
 
 	tw := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
@@ -111,7 +137,7 @@ func runConfigList(cmd *cobra.Command, args []string) error {
 func runConfigGet(cmd *cobra.Command, args []string) error {
 	key := args[0]
 
-	s, cleanup, err := openSettings()
+	s, _, cleanup, err := openSettings()
 	if err != nil {
 		return err
 	}
@@ -137,8 +163,14 @@ func runConfigGet(cmd *cobra.Command, args []string) error {
 		val = config.FormatByteSize(snap.QuotaUser)
 	case "max_upload_size":
 		val = config.FormatByteSize(snap.MaxUploadSize)
+	case "token_lifetime":
+		val = snap.TokenLifetime
 	default:
 		return fmt.Errorf("unknown setting: %q", key)
+	}
+
+	if jsonFlag {
+		return json.NewEncoder(os.Stdout).Encode(map[string]string{"key": key, "value": val})
 	}
 
 	fmt.Println(val)
@@ -148,16 +180,18 @@ func runConfigGet(cmd *cobra.Command, args []string) error {
 func runConfigSet(cmd *cobra.Command, args []string) error {
 	key, value := args[0], args[1]
 
-	s, cleanup, err := openSettings()
+	s, database, cleanup, err := openSettings()
 	if err != nil {
 		return err
 	}
 	defer cleanup()
 
-	if err := s.Set(context.Background(), key, value); err != nil {
+	ctx := context.Background()
+	if err := s.Set(ctx, key, value); err != nil {
 		return fmt.Errorf("set %s: %w", key, err)
 	}
 
+	db.Audit(ctx, database, db.SystemActorID, "settings.updated", "setting", key, value)
 	fmt.Fprintf(os.Stderr, "Set %s = %s\n", key, value)
 	return nil
 }
@@ -165,16 +199,18 @@ func runConfigSet(cmd *cobra.Command, args []string) error {
 func runConfigReset(cmd *cobra.Command, args []string) error {
 	key := args[0]
 
-	s, cleanup, err := openSettings()
+	s, database, cleanup, err := openSettings()
 	if err != nil {
 		return err
 	}
 	defer cleanup()
 
-	if err := s.Delete(context.Background(), key); err != nil {
+	ctx := context.Background()
+	if err := s.Delete(ctx, key); err != nil {
 		return fmt.Errorf("reset %s: %w", key, err)
 	}
 
+	db.Audit(ctx, database, db.SystemActorID, "settings.reset", "setting", key, "reverted to default")
 	fmt.Fprintf(os.Stderr, "Reset %s to default.\n", key)
 	return nil
 }

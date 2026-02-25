@@ -14,6 +14,11 @@ import (
 	"gosilo/internal/storage"
 )
 
+// storageAudit logs a storage operation to the audit log.
+func storageAudit(r *http.Request, database *sql.DB, userID int64, action, path string) {
+	db.Audit(r.Context(), database, userID, action, "storage", path, "")
+}
+
 // Storage handles GET/PUT/DELETE/HEAD requests on /storage/{user}/{path...}.
 func Storage(database *sql.DB, svc *storage.Service, maxUploadSize func() int64) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -101,8 +106,10 @@ func Storage(database *sql.DB, svc *storage.Service, maxUploadSize func() int64)
 			}
 			r.Body = http.MaxBytesReader(w, r.Body, maxUploadSize())
 			handlePutDocument(w, r, svc, user.ID, storagePath, cond)
+			storageAudit(r, database, user.ID, "storage.put", storagePath)
 		case http.MethodDelete:
 			handleDeleteDocument(w, r, svc, user.ID, storagePath, cond)
+			storageAudit(r, database, user.ID, "storage.delete", storagePath)
 		default:
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		}

@@ -47,7 +47,7 @@ func setupTestServer(t *testing.T, regMode string) (*httptest.Server, *web.UIDep
 	}
 
 	uiHandler := web.Routes(deps)
-	wrapped := web.AuthLoader(localAuth)(
+	wrapped := web.AuthLoader(localAuth, false)(
 		web.SetupGuard(localAuth)(uiHandler),
 	)
 
@@ -231,6 +231,31 @@ func TestRegistrationClosed(t *testing.T) {
 	resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("expected 200, got %d", resp.StatusCode)
+	}
+}
+
+func TestRegistrationClosedPostReturns403(t *testing.T) {
+	ts, deps := setupTestServer(t, "closed")
+
+	_, _ = db.CreateUser(context.Background(), deps.DB, "closedpostuser", "password123", false)
+
+	client := &http.Client{CheckRedirect: func(req *http.Request, via []*http.Request) error {
+		return http.ErrUseLastResponse
+	}}
+
+	form := url.Values{
+		"username":         {"newuser"},
+		"password":         {"newpassword123"},
+		"password_confirm": {"newpassword123"},
+	}
+	resp, err := client.Post(ts.URL+"/register", "application/x-www-form-urlencoded", strings.NewReader(form.Encode()))
+	if err != nil {
+		t.Fatalf("post /register: %v", err)
+	}
+	resp.Body.Close()
+
+	if resp.StatusCode != http.StatusForbidden {
+		t.Fatalf("expected 403 for closed registration POST, got %d", resp.StatusCode)
 	}
 }
 

@@ -22,6 +22,9 @@ type Config struct {
 	QuotaUser        int64   // GOSILO_QUOTA_USER — bytes (parsed from human-readable)
 	MaxUploadSize    int64   // GOSILO_MAX_UPLOAD — max request body size (parsed from human-readable)
 	WebMode          string  // GOSILO_WEB_MODE — "full", "oauth", or "off"
+	TokenLifetime    string  // GOSILO_TOKEN_LIFETIME — OAuth token lifetime: "30d", "24h", "0" (no expiry)
+	TLSCert          string  // GOSILO_TLS_CERT — path to TLS certificate file
+	TLSKey           string  // GOSILO_TLS_KEY — path to TLS private key file
 }
 
 // ParseDSN splits a DSN string into its scheme and path components.
@@ -54,6 +57,9 @@ func Load() *Config {
 		QuotaUser:        quotaUser,
 		MaxUploadSize:    maxUpload,
 		WebMode:          envOrDefault("GOSILO_WEB_MODE", "full"),
+		TokenLifetime:    envOrDefault("GOSILO_TOKEN_LIFETIME", "30d"),
+		TLSCert:          os.Getenv("GOSILO_TLS_CERT"),
+		TLSKey:           os.Getenv("GOSILO_TLS_KEY"),
 	}
 }
 

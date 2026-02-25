@@ -9,12 +9,20 @@
 
         <div class="oauth-consent-card">
             <div class="oauth-consent-header">
+                <p class="oauth-request-label">Authorization request from</p>
+                <p class="oauth-origin">{{.ClientOrigin}}</p>
                 <p>
-                    <span class="oauth-origin">{{.ClientID}}</span>
-                    is requesting access to
-                    {{if .LoggedIn}}your storage{{else}}a Gosilo account{{end}}
+                    This application is requesting access to
+                    {{if .LoggedIn}}your storage{{else}}a Gosilo account{{end}}.
                 </p>
             </div>
+
+            {{if .HasRootScope}}
+                <div class="oauth-warning">
+                    This application is requesting <strong>full access</strong> to all
+                    your data. Only authorize if you fully trust this application.
+                </div>
+            {{end}}
 
             <div class="oauth-consent-perms">
                 {{if .LoggedIn}}
@@ -30,14 +38,17 @@
                 <table class="oauth-scope-table">
                     <thead>
                         <tr>
-                            <th>Storage path</th>
+                            <th>Permission</th>
                             <th>Access</th>
                         </tr>
                     </thead>
                     <tbody>
                         {{range .ScopeDisplay}}
                             <tr>
-                                <td class="oauth-scope-module">{{.Module}}</td>
+                                <td class="oauth-scope-module">
+                                    {{.Description}}
+                                    <span class="oauth-scope-raw">({{.Module}} &mdash; {{.Permission}})</span>
+                                </td>
                                 <td><span class="oauth-scope-access">{{.Permission}}</span></td>
                             </tr>
                         {{end}}
@@ -60,12 +71,14 @@
                         {{range .Scopes}}
                             <input type="hidden" name="scope" value="{{.}}">
                         {{end}}
-                        <button type="submit" name="action" value="approve" class="oauth-btn-allow">
-                            Allow access
-                        </button>
-                        <button type="submit" name="action" value="deny" class="oauth-btn-deny">
-                            Deny
-                        </button>
+                        <div class="oauth-buttons">
+                            <button type="submit" name="action" value="deny" class="oauth-btn-deny">
+                                Deny
+                            </button>
+                            <button type="submit" name="action" value="approve" class="oauth-btn-allow">
+                                Allow access
+                            </button>
+                        </div>
                     </form>
                 {{else}}
                     <p class="oauth-login-prompt">Log in to your account to allow or deny this request.</p>

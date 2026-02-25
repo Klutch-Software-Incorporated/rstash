@@ -13,20 +13,26 @@ import (
 )
 
 var auditCmd = &cobra.Command{
-	Use:   "audit",
-	Short: "View audit log",
+	Use:     "audit",
+	Short:   "View audit log",
+	Long:    "Browse and export the audit log of all administrative and storage events.",
+	GroupID: "audit",
 }
 
 var auditTailCmd = &cobra.Command{
 	Use:   "tail",
 	Short: "Show recent audit log entries",
-	RunE:  runAuditTail,
+	Example: `  gosilo audit tail
+  gosilo audit tail -n 50
+  gosilo audit tail --json`,
+	RunE: runAuditTail,
 }
 
 var auditExportCmd = &cobra.Command{
-	Use:   "export",
-	Short: "Export audit log as JSON lines",
-	RunE:  runAuditExport,
+	Use:     "export",
+	Short:   "Export audit log as JSON lines",
+	Example: `  gosilo audit export > audit.jsonl`,
+	RunE:    runAuditExport,
 }
 
 var (
@@ -46,7 +52,7 @@ func runAuditTail(cmd *cobra.Command, args []string) error {
 	dsn := resolvedDBDSN("sqlite:gosilo.db")
 	database, err := db.Open(dsn)
 	if err != nil {
-		return fmt.Errorf("open database: %w", err)
+		return &SystemError{fmt.Errorf("open database: %w", err)}
 	}
 	defer database.Close()
 
@@ -56,8 +62,28 @@ func runAuditTail(cmd *cobra.Command, args []string) error {
 	}
 
 	if len(entries) == 0 {
+		if jsonFlag {
+			fmt.Println("[]")
+			return nil
+		}
 		fmt.Fprintln(os.Stderr, "No audit entries.")
 		return nil
+	}
+
+	if jsonFlag {
+		type auditJSON struct {
+			Time       string `json:"time"`
+			Actor      string `json:"actor"`
+			Action     string `json:"action"`
+			TargetType string `json:"target_type"`
+			TargetID   string `json:"target_id"`
+			Details    string `json:"details,omitempty"`
+		}
+		out := make([]auditJSON, len(entries))
+		for i, e := range entries {
+			out[i] = auditJSON{e.CreatedAt, e.ActorUsername, e.Action, e.TargetType, e.TargetID, e.Details}
+		}
+		return json.NewEncoder(os.Stdout).Encode(out)
 	}
 
 	tw := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
@@ -74,7 +100,7 @@ func runAuditExport(cmd *cobra.Command, args []string) error {
 	dsn := resolvedDBDSN("sqlite:gosilo.db")
 	database, err := db.Open(dsn)
 	if err != nil {
-		return fmt.Errorf("open database: %w", err)
+		return &SystemError{fmt.Errorf("open database: %w", err)}
 	}
 	defer database.Close()
 

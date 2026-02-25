@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"time"
 )
 
 // ParseByteSize parses a human-readable byte size string into bytes.
@@ -56,6 +57,37 @@ func ParseByteSize(s string) (int64, error) {
 		return 0, fmt.Errorf("negative size: %q", s)
 	}
 	return n, nil
+}
+
+// ParseTokenLifetime parses a token lifetime string into a time.Duration.
+// Supported formats: Go duration strings (e.g. "720h", "30m"), plus a "d" day
+// suffix for convenience (e.g. "30d" = 30*24h). "0" means no expiry.
+// Returns 0 for no expiry.
+func ParseTokenLifetime(s string) (time.Duration, error) {
+	s = strings.TrimSpace(s)
+	if s == "" || s == "0" {
+		return 0, nil
+	}
+
+	// Custom "d" suffix: convert days to hours and delegate to time.ParseDuration.
+	lower := strings.ToLower(s)
+	if strings.HasSuffix(lower, "d") {
+		numStr := strings.TrimSpace(s[:len(s)-1])
+		n, err := strconv.ParseInt(numStr, 10, 64)
+		if err != nil || n < 0 {
+			return 0, fmt.Errorf("invalid token lifetime: %q", s)
+		}
+		return time.Duration(n) * 24 * time.Hour, nil
+	}
+
+	d, err := time.ParseDuration(s)
+	if err != nil {
+		return 0, fmt.Errorf("invalid token lifetime: %q", s)
+	}
+	if d < 0 {
+		return 0, fmt.Errorf("negative token lifetime: %q", s)
+	}
+	return d, nil
 }
 
 // FormatByteSize returns a human-readable string for a byte count.

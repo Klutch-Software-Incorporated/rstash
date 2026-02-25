@@ -23,7 +23,6 @@
         {{if eq .Key "registration_mode"}}
         <select name="registration_mode">
             <option value="open" {{if eq .Value "open"}}selected{{end}}>open</option>
-            <option value="invite" {{if eq .Value "invite"}}selected{{end}}>invite</option>
             <option value="closed" {{if eq .Value "closed"}}selected{{end}}>closed</option>
         </select>
         {{else if eq .Key "log_level"}}

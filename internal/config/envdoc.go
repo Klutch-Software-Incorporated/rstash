@@ -83,6 +83,19 @@ func EnvVars() []EnvVar {
 			Description: "Web UI mode. full=all routes, oauth=login+OAuth only, off=API only.",
 			ValidValues: []string{"full", "oauth", "off"},
 		},
+		{
+			Name:        "GOSILO_TOKEN_LIFETIME",
+			Default:     "30d",
+			Description: "OAuth token lifetime. Examples: 30d, 24h, 0 (no expiry).",
+		},
+		{
+			Name:        "GOSILO_TLS_CERT",
+			Description: "Path to TLS certificate file. Both GOSILO_TLS_CERT and GOSILO_TLS_KEY must be set to enable TLS.",
+		},
+		{
+			Name:        "GOSILO_TLS_KEY",
+			Description: "Path to TLS private key file. Both GOSILO_TLS_CERT and GOSILO_TLS_KEY must be set to enable TLS.",
+		},
 	}
 }
 

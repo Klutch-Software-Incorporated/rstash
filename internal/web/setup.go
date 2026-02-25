@@ -1,11 +1,13 @@
 package web
 
 import (
+	"fmt"
 	"log/slog"
 	"net/http"
 	"strings"
 
 	"gosilo/internal/auth"
+	"gosilo/internal/db"
 	"gosilo/internal/ui"
 )
 
@@ -94,7 +96,8 @@ func (h *setupHandler) DoSetup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	auth.SetSessionCookie(w, sess.Token)
+	db.Audit(r.Context(), h.deps.DB, user.ID, "setup.completed", "user", fmt.Sprintf("%d", user.ID), username)
+	auth.SetSessionCookie(w, sess.Token, h.deps.SecureCookies)
 	ui.SetFlash(w, "Welcome to Gosilo! Your admin account has been created.")
 	http.Redirect(w, r, "/admin", http.StatusSeeOther)
 }

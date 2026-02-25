@@ -123,6 +123,14 @@ func Open(dsn string) (*sql.DB, error) {
 		return nil, fmt.Errorf("run column migrations: %w", err)
 	}
 
+	// Ensure the _system sentinel user exists (for CLI/system audit entries).
+	if _, err := db.Exec(
+		`INSERT OR IGNORE INTO users (id, username, password_hash, is_admin, disabled)
+		 VALUES (0, '_system', '', 0, 1)`); err != nil {
+		db.Close()
+		return nil, fmt.Errorf("create _system user: %w", err)
+	}
+
 	return db, nil
 }
 

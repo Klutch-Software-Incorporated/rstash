@@ -66,10 +66,10 @@ func CheckPassword(user *model.User, password string) bool {
 	return bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(password)) == nil
 }
 
-// ListUsers returns all users ordered by id.
+// ListUsers returns all users ordered by id, excluding the _system sentinel.
 func ListUsers(ctx context.Context, q Querier) ([]*model.User, error) {
 	rows, err := q.QueryContext(ctx,
-		"SELECT id, username, password_hash, is_admin, storage_quota, disabled, created_at FROM users ORDER BY id")
+		"SELECT id, username, password_hash, is_admin, storage_quota, disabled, created_at FROM users WHERE id > 0 ORDER BY id")
 	if err != nil {
 		return nil, fmt.Errorf("list users: %w", err)
 	}
@@ -108,10 +108,10 @@ func UpdateUserPassword(ctx context.Context, q Querier, userID int64, newPasswor
 	return nil
 }
 
-// UserCount returns the total number of users.
+// UserCount returns the total number of users, excluding the _system sentinel.
 func UserCount(ctx context.Context, q Querier) (int64, error) {
 	var count int64
-	err := q.QueryRowContext(ctx, "SELECT COUNT(*) FROM users").Scan(&count)
+	err := q.QueryRowContext(ctx, "SELECT COUNT(*) FROM users WHERE id > 0").Scan(&count)
 	if err != nil {
 		return 0, fmt.Errorf("count users: %w", err)
 	}
@@ -158,6 +158,7 @@ func TopUsersByStorage(ctx context.Context, q Querier, limit int) ([]*TopUserRow
 		`SELECT u.username, COALESCE(SUM(n.content_length), 0) AS used
 		 FROM users u
 		 LEFT JOIN nodes n ON n.user_id = u.id AND n.is_folder = 0
+		 WHERE u.id > 0
 		 GROUP BY u.id
 		 ORDER BY used DESC
 		 LIMIT ?`,

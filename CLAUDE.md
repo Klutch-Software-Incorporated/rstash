@@ -21,37 +21,53 @@ Source control is managed via Fossil, not git.
 
 ## Configuration
 
-All configuration is via environment variables:
+All configuration is via environment variables (see `gosilo env` for a documented template):
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| GOSILO_ADDR | :8080 | Listen address |
+| GOSILO_ADDR | :8080 | Listen address (host:port) |
 | GOSILO_BASE_URL | http://localhost:8080 | Public URL of the server |
-| GOSILO_DB_PATH | gosilo.db | SQLite database path |
-| GOSILO_BLOB_BACKEND | sqlite | Blob storage backend (sqlite, fs, s3) |
-| GOSILO_BLOB_PATH | | Path for filesystem blob backend |
-| GOSILO_REGISTRATION | closed | Registration mode: open, invite, closed |
+| GOSILO_DB | sqlite:gosilo.db | Metadata database DSN (sqlite:path) |
+| GOSILO_BLOB | sqlite:gosilo-blobs.db | Blob store DSN (sqlite:path, fs:/path) |
+| GOSILO_REGISTRATION | closed | Registration mode: open, closed |
 | GOSILO_LOG_LEVEL | info | Log level: debug, info, warn, error |
+| GOSILO_RATE_LIMIT | 10 | Per-IP rate limit (req/sec, 0=disabled) |
+| GOSILO_RATE_BURST | 20 | Rate limit burst size |
+| GOSILO_QUOTA_MODE | total | Quota mode: off, total, user |
+| GOSILO_QUOTA_TOTAL | 50GB | Global storage limit |
+| GOSILO_QUOTA_USER | | Per-user storage quota |
+| GOSILO_MAX_UPLOAD | 50MB | Max upload size per request |
+| GOSILO_WEB_MODE | full | Web UI mode: full, oauth, off |
+| GOSILO_TOKEN_LIFETIME | 30d | OAuth token lifetime (30d, 24h, 0=no expiry) |
+| GOSILO_TLS_CERT | | TLS certificate file path |
+| GOSILO_TLS_KEY | | TLS private key file path |
 
 ## Architecture
 
-- `main.go` — entry point: loads config, opens DB, wires handlers, starts HTTP server
-- `internal/config/` — env var configuration loading
-- `internal/db/` — SQLite database initialization and migrations
-- `internal/model/` — domain types (User, OAuthClient, OAuthToken, Node)
-- `internal/blob/` — pluggable blob storage interface and backends (SQLite, filesystem, S3)
-- `internal/api/` — remoteStorage protocol handlers (storage API, WebFinger, OAuth token), CORS, scope checking, request logging
-- `internal/web/` — web UI handlers (login, setup, registration, admin, file browser, OAuth authorize), session middleware, CSRF
-- `internal/ui/` — embedded templates and static assets (go:embed)
+- `main.go` — entry point, delegates to CLI
+- `internal/cli/` — cobra-based CLI: serve, init, user, config, audit, doctor, env commands
+- `internal/config/` — env var configuration loading, validation, DSN parsing, byte-size/token-lifetime parsing
+- `internal/settings/` — runtime settings (DB overrides merged with env defaults, atomic snapshot)
+- `internal/db/` — SQLite database initialization, migrations, and data access (users, sessions, oauth, audit, nodes, settings)
+- `internal/model/` — domain types (User, OAuthClient, OAuthToken, Node, Session, AuditEntry, AuthorizationCode)
+- `internal/auth/` — authentication service interface and local (password-based) implementation, session/cookie management
+- `internal/blob/` — pluggable blob storage interface and backends (SQLite, filesystem)
+- `internal/storage/` — storage service (PutDocument, GetDocument, DeleteDocument, GetFolder), ETag generation, quota checking
+- `internal/api/` — remoteStorage protocol handlers (storage API, WebFinger, OAuth token), CORS, scope checking, request logging, rate limiting, security headers
+- `internal/web/` — web UI handlers (login, setup, registration, admin, file browser, OAuth authorize, settings), session middleware, CSRF, AdminGuard
+- `internal/ui/` — embedded templates and static assets (go:embed), template renderer, flash messages
 
 ## Key Conventions
 
 - Standard library net/http for routing (Go 1.22 enhanced patterns)
+- cobra for CLI (command groups, help examples, --json/--db global flags, consistent exit codes)
 - modernc.org/sqlite (pure Go, no CGO)
 - log/slog for structured logging
-- Interfaces for pluggable backends (blob.Store)
-- Server-rendered Go HTML templates for web UI
+- Interfaces for pluggable backends (blob.Store, auth.Service)
+- Server-rendered Go HTML templates for web UI (custom CSS, no build tooling)
 - All assets embedded via go:embed for single-binary deployment
+- Audit logging for all state-changing operations (admin, CLI, storage, auth, OAuth)
+- Runtime settings: DB overrides take precedence over env defaults, atomic snapshot swap
 
 ## remoteStorage Protocol
 

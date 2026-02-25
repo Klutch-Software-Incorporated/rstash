@@ -106,5 +106,10 @@ func (c *Config) Validate() error {
 		errs = append(errs, fmt.Errorf("GOSILO_WEB_MODE: must be one of: full, oauth, off — got %q", c.WebMode))
 	}
 
+	// TLS: both or neither must be set.
+	if (c.TLSCert != "") != (c.TLSKey != "") {
+		errs = append(errs, fmt.Errorf("GOSILO_TLS_CERT and GOSILO_TLS_KEY must both be set or both be empty"))
+	}
+
 	return errors.Join(errs...)
 }

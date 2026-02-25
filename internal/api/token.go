@@ -9,11 +9,13 @@ import (
 	"net/http"
 	"strings"
 
+	"gosilo/internal/config"
 	"gosilo/internal/db"
 )
 
 // OAuthToken handles POST /oauth/token for the authorization code + PKCE exchange.
-func OAuthToken(database *sql.DB) http.Handler {
+// tokenLifetimeFunc returns the current token_lifetime setting string.
+func OAuthToken(database *sql.DB, tokenLifetimeFunc func() string) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
 			tokenError(w, "invalid_request", "method must be POST", http.StatusBadRequest)
@@ -66,9 +68,13 @@ func OAuthToken(database *sql.DB) http.Handler {
 			return
 		}
 
+		// Parse token lifetime setting.
+		lifetimeStr := tokenLifetimeFunc()
+		lifetime, _ := config.ParseTokenLifetime(lifetimeStr)
+
 		// Create the access token.
 		scopes := strings.Fields(ac.Scopes)
-		token, err := db.CreateOAuthToken(r.Context(), database, ac.UserID, ac.ClientID, scopes)
+		token, err := db.CreateOAuthToken(r.Context(), database, ac.UserID, ac.ClientID, scopes, lifetime)
 		if err != nil {
 			slog.Error("create oauth token", "error", err)
 			tokenError(w, "server_error", "internal error", http.StatusInternalServerError)
@@ -77,10 +83,14 @@ func OAuthToken(database *sql.DB) http.Handler {
 
 		w.Header().Set("Content-Type", "application/json")
 		w.Header().Set("Cache-Control", "no-store")
-		json.NewEncoder(w).Encode(map[string]string{
+		resp := map[string]any{
 			"access_token": token.Token,
 			"token_type":   "bearer",
-		})
+		}
+		if lifetime > 0 {
+			resp["expires_in"] = int64(lifetime.Seconds())
+		}
+		json.NewEncoder(w).Encode(resp)
 	})
 }
 

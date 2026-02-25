@@ -20,7 +20,7 @@ const (
 
 // AuthLoader returns middleware that reads the session cookie and loads
 // the user into the request context.
-func AuthLoader(authSvc auth.Service) func(http.Handler) http.Handler {
+func AuthLoader(authSvc auth.Service, secureCookies bool) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			cookie, err := r.Cookie("gosilo_session")
@@ -37,7 +37,7 @@ func AuthLoader(authSvc auth.Service) func(http.Handler) http.Handler {
 			}
 			if sess == nil {
 				// Expired or invalid — clear cookie.
-				auth.ClearSessionCookie(w)
+				auth.ClearSessionCookie(w, secureCookies)
 				next.ServeHTTP(w, r)
 				return
 			}
@@ -49,7 +49,7 @@ func AuthLoader(authSvc auth.Service) func(http.Handler) http.Handler {
 			}
 
 			if user.Disabled {
-				auth.ClearSessionCookie(w)
+				auth.ClearSessionCookie(w, secureCookies)
 				next.ServeHTTP(w, r)
 				return
 			}
@@ -95,6 +95,23 @@ func ValidateCSRF(r *http.Request) bool {
 func RequireCSRF(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if !ValidateCSRF(r) {
+			http.Error(w, "Forbidden", http.StatusForbidden)
+			return
+		}
+		next(w, r)
+	}
+}
+
+// AdminGuard wraps an http.HandlerFunc to require authentication and admin status.
+// Use this to wrap all admin route handlers instead of manual checks in each handler.
+func AdminGuard(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		user := CurrentUser(r)
+		if user == nil {
+			http.Redirect(w, r, "/login", http.StatusSeeOther)
+			return
+		}
+		if !user.IsAdmin {
 			http.Error(w, "Forbidden", http.StatusForbidden)
 			return
 		}
