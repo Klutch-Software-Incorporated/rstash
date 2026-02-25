@@ -74,6 +74,8 @@ type userRow struct {
 	IsAdmin      bool
 	Disabled     bool
 	CreatedAt    string
+	LastLoginAt  string
+	LastLoginIP  string
 	IsSelf       bool
 	StorageUsed  string
 	StorageQuota string // human-readable, empty if no quota
@@ -184,6 +186,12 @@ func (h *adminHandler) ShowUsers(w http.ResponseWriter, r *http.Request) {
 			Disabled:  u.Disabled,
 			CreatedAt: u.CreatedAt,
 			IsSelf:    u.ID == currentUser.ID,
+		}
+		if u.LastLoginAt != nil {
+			row.LastLoginAt = *u.LastLoginAt
+		}
+		if u.LastLoginIP != nil {
+			row.LastLoginIP = *u.LastLoginIP
 		}
 		sessCount, err := h.deps.Auth.CountUserSessions(ctx, u.ID)
 		if err != nil {
@@ -611,6 +619,8 @@ type adminUserContent struct {
 	IsAdmin      bool
 	Disabled     bool
 	CreatedAt    string
+	LastLoginAt  string
+	LastLoginIP  string
 	StorageUsed  string
 	FileCount    int64
 	SessionCount int64
@@ -677,6 +687,12 @@ func (h *adminHandler) UserActivity(w http.ResponseWriter, r *http.Request) {
 		SessionCount: sessCount,
 		RecentFiles:  fileRows,
 		AuditLog:     aRows,
+	}
+	if user.LastLoginAt != nil {
+		content.LastLoginAt = *user.LastLoginAt
+	}
+	if user.LastLoginIP != nil {
+		content.LastLoginIP = *user.LastLoginIP
 	}
 	if stats != nil {
 		content.StorageUsed = formatBytes(stats.TotalBytes)

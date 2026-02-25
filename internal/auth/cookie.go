@@ -5,11 +5,14 @@ import (
 	"time"
 )
 
+// SessionCookieName is the name of the session cookie.
+const SessionCookieName = "gosilo_session"
+
 // SetSessionCookie sets the session cookie. When secure is true, the Secure
 // flag is set (should be true when serving over HTTPS).
 func SetSessionCookie(w http.ResponseWriter, token string, secure bool) {
 	http.SetCookie(w, &http.Cookie{
-		Name:     "gosilo_session",
+		Name:     SessionCookieName,
 		Value:    token,
 		Path:     "/",
 		MaxAge:   7 * 24 * int(time.Hour/time.Second),
@@ -22,7 +25,7 @@ func SetSessionCookie(w http.ResponseWriter, token string, secure bool) {
 // ClearSessionCookie removes the session cookie.
 func ClearSessionCookie(w http.ResponseWriter, secure bool) {
 	http.SetCookie(w, &http.Cookie{
-		Name:     "gosilo_session",
+		Name:     SessionCookieName,
 		Value:    "",
 		Path:     "/",
 		MaxAge:   -1,

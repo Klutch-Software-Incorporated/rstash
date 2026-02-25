@@ -30,6 +30,7 @@
             <th>Storage</th>
             <th>Sessions</th>
             <th>Created</th>
+            <th>Last Login</th>
             <th>Actions</th>
         </tr>
     </thead>
@@ -47,6 +48,7 @@
             </td>
             <td data-label="Sessions"><a href="/admin/users/{{.ID}}/sessions">{{.SessionCount}}</a></td>
             <td data-label="Created"><time datetime="{{.CreatedAt}}">{{.CreatedAt}}</time></td>
+            <td data-label="Last Login">{{if .LastLoginAt}}<time datetime="{{.LastLoginAt}}">{{.LastLoginAt}}</time>{{if .LastLoginIP}} <span style="color:#888;font-size:.75rem">({{.LastLoginIP}})</span>{{end}}{{else}}Never{{end}}</td>
             <td data-label="Actions">
                 {{if not .IsSelf}}
                 <div style="display:flex;gap:.25rem;flex-wrap:wrap;justify-content:flex-end">

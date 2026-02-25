@@ -24,7 +24,9 @@ type Snapshot struct {
 	QuotaTotal       int64
 	QuotaUser        int64
 	MaxUploadSize    int64
-	TokenLifetime    string // duration string: "30d", "24h", "0" (no expiry)
+	TokenLifetime        string // duration string: "30d", "24h", "0" (no expiry)
+	RefreshTokens        string // "enabled" or "disabled"
+	RefreshTokenLifetime string // duration string: "90d", "0" (no expiry)
 }
 
 // Settings provides runtime-configurable settings backed by SQLite.
@@ -140,22 +142,26 @@ func (snap *Snapshot) ValueMap() map[string]string {
 		"quota_total":       config.FormatByteSize(snap.QuotaTotal),
 		"quota_user":        config.FormatByteSize(snap.QuotaUser),
 		"max_upload_size":   config.FormatByteSize(snap.MaxUploadSize),
-		"token_lifetime":    snap.TokenLifetime,
+		"token_lifetime":         snap.TokenLifetime,
+		"refresh_tokens":         snap.RefreshTokens,
+		"refresh_token_lifetime": snap.RefreshTokenLifetime,
 	}
 }
 
 // buildSnapshot merges DB overrides on top of env defaults.
 func (s *Settings) buildSnapshot(overrides map[string]string) *Snapshot {
 	snap := &Snapshot{
-		RegistrationMode: s.defaults.RegistrationMode,
-		LogLevel:         s.defaults.LogLevel,
-		RateLimitRate:    s.defaults.RateLimitRate,
-		RateLimitBurst:   s.defaults.RateLimitBurst,
-		QuotaMode:        s.defaults.QuotaMode,
-		QuotaTotal:       s.defaults.QuotaTotal,
-		QuotaUser:        s.defaults.QuotaUser,
-		MaxUploadSize:    s.defaults.MaxUploadSize,
-		TokenLifetime:    s.defaults.TokenLifetime,
+		RegistrationMode:     s.defaults.RegistrationMode,
+		LogLevel:             s.defaults.LogLevel,
+		RateLimitRate:        s.defaults.RateLimitRate,
+		RateLimitBurst:       s.defaults.RateLimitBurst,
+		QuotaMode:            s.defaults.QuotaMode,
+		QuotaTotal:           s.defaults.QuotaTotal,
+		QuotaUser:            s.defaults.QuotaUser,
+		MaxUploadSize:        s.defaults.MaxUploadSize,
+		TokenLifetime:        s.defaults.TokenLifetime,
+		RefreshTokens:        s.defaults.RefreshTokens,
+		RefreshTokenLifetime: s.defaults.RefreshTokenLifetime,
 	}
 
 	if overrides == nil {
@@ -198,6 +204,12 @@ func (s *Settings) buildSnapshot(overrides map[string]string) *Snapshot {
 	}
 	if v, ok := overrides["token_lifetime"]; ok {
 		snap.TokenLifetime = v
+	}
+	if v, ok := overrides["refresh_tokens"]; ok {
+		snap.RefreshTokens = v
+	}
+	if v, ok := overrides["refresh_token_lifetime"]; ok {
+		snap.RefreshTokenLifetime = v
 	}
 
 	return snap

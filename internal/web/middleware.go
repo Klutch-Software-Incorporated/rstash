@@ -23,7 +23,7 @@ const (
 func AuthLoader(authSvc auth.Service, secureCookies bool) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			cookie, err := r.Cookie("gosilo_session")
+			cookie, err := r.Cookie(auth.SessionCookieName)
 			if err != nil {
 				next.ServeHTTP(w, r)
 				return

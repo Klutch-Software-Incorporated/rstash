@@ -126,6 +126,18 @@ func CountUserSessions(ctx context.Context, q Querier, userID int64) (int64, err
 	return count, nil
 }
 
+// CountActiveSessions returns the count of all non-expired sessions.
+func CountActiveSessions(ctx context.Context, q Querier) (int64, error) {
+	var count int64
+	err := q.QueryRowContext(ctx,
+		"SELECT COUNT(*) FROM sessions WHERE expires_at > datetime('now')",
+	).Scan(&count)
+	if err != nil {
+		return 0, fmt.Errorf("count active sessions: %w", err)
+	}
+	return count, nil
+}
+
 // ActiveUserCount returns the count of distinct users with sessions created since `since`.
 func ActiveUserCount(ctx context.Context, q Querier, since string) (int64, error) {
 	var count int64

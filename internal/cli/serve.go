@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"strings"
 	"syscall"
 	"time"
@@ -18,11 +19,13 @@ import (
 	"gosilo/internal/cmdinfo"
 	"gosilo/internal/config"
 	"gosilo/internal/db"
+	"gosilo/internal/metrics"
 	"gosilo/internal/settings"
 	"gosilo/internal/storage"
 	"gosilo/internal/ui"
 	"gosilo/internal/web"
 
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/spf13/cobra"
 )
 
@@ -137,11 +140,17 @@ func runServe(cmd *cobra.Command, args []string) error {
 	// Build routes.
 	mux := http.NewServeMux()
 
-	// Always registered: WebFinger, OAuth token, storage API.
+	// Always registered: WebFinger, OAuth token, storage API, metrics.
+	mux.Handle("GET /metrics", api.MetricsAuth(database, localAuth, secureCookies, promhttp.Handler()))
 	mux.Handle("/.well-known/webfinger", api.CORS(api.WebFinger(cfg)))
-	mux.Handle("POST /oauth/token", api.CORS(api.OAuthToken(database, func() string {
-		return runtimeSettings.Load().TokenLifetime
-	})))
+	mux.Handle("POST /oauth/token", api.CORS(api.OAuthToken(database,
+		func() string { return runtimeSettings.Load().TokenLifetime },
+		func() (bool, string) {
+			snap := runtimeSettings.Load()
+			return snap.RefreshTokens == "enabled", snap.RefreshTokenLifetime
+		},
+	)))
+	mux.Handle("POST /oauth/revoke", api.CORS(api.OAuthRevoke(database)))
 	mux.Handle("/storage/{user}/{path...}", api.CORS(api.Storage(database, storageSvc, func() int64 {
 		return runtimeSettings.Load().MaxUploadSize
 	})))
@@ -186,7 +195,7 @@ func runServe(cmd *cobra.Command, args []string) error {
 	runtimeSettings.OnChange(func(s *settings.Snapshot) {
 		limiter.UpdateConfig(s.RateLimitRate, s.RateLimitBurst)
 	})
-	var handler http.Handler = api.RateLimit(limiter)(mux)
+	var handler http.Handler = api.MetricsMiddleware(api.RateLimit(limiter)(mux))
 	if snap.RateLimitRate > 0 {
 		slog.Info("rate limiting enabled", "rate", snap.RateLimitRate, "burst", snap.RateLimitBurst)
 	}
@@ -223,6 +232,54 @@ func runServe(cmd *cobra.Command, args []string) error {
 				if err := db.DeleteExpiredAuthorizationCodes(context.Background(), database); err != nil {
 					slog.Error("failed to delete expired authorization codes", "error", err)
 				}
+				if err := db.DeleteExpiredRefreshTokens(context.Background(), database); err != nil {
+					slog.Error("failed to delete expired refresh tokens", "error", err)
+				}
+			case <-ctx.Done():
+				return
+			}
+		}
+	}()
+
+	// Metrics gauge updater goroutine.
+	go func() {
+		// Derive the disk path for available space checks.
+		var diskPath string
+		switch blobScheme {
+		case "fs":
+			diskPath = blobPath
+		case "sqlite":
+			diskPath = filepath.Dir(blobPath)
+		}
+
+		update := func() {
+			bgCtx := context.Background()
+			if total, err := db.GetTotalStorageUsed(bgCtx, database); err == nil {
+				metrics.StorageUsedBytes.Set(float64(total))
+			}
+			if diskPath != "" {
+				if avail, err := metrics.DiskAvailableBytes(diskPath); err == nil {
+					metrics.StorageAvailableBytes.Set(float64(avail))
+				}
+			}
+			if count, err := db.UserCount(bgCtx, database); err == nil {
+				metrics.UsersTotal.Set(float64(count))
+			}
+			if count, err := db.CountActiveSessions(bgCtx, database); err == nil {
+				metrics.ActiveSessions.Set(float64(count))
+			}
+			if count, err := db.CountActiveOAuthTokens(bgCtx, database); err == nil {
+				metrics.ActiveTokens.Set(float64(count))
+			}
+		}
+
+		update() // initial population
+		ticker := time.NewTicker(30 * time.Second)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ticker.C:
+				update()
 			case <-ctx.Done():
 				return
 			}

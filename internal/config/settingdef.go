@@ -232,6 +232,27 @@ func SettingDefs() []SettingDef {
 			InputType:       InputDuration,
 			RuntimeEditable: true,
 		},
+		{
+			Key:             "refresh_tokens",
+			Group:           "OAuth",
+			Label:           "Refresh tokens",
+			Description:     "Whether to issue refresh tokens alongside access tokens.",
+			Help:            "When enabled, the token endpoint issues a refresh_token alongside each access_token. Clients can exchange a refresh token for a new access token without requiring the user to re-authorize. Refresh tokens are rotated on each use (the old token is invalidated). Changes apply only to newly issued tokens.",
+			Default:         "enabled",
+			ValidValues:     []string{"enabled", "disabled"},
+			InputType:       InputSelect,
+			RuntimeEditable: true,
+		},
+		{
+			Key:             "refresh_token_lifetime",
+			Group:           "OAuth",
+			Label:           "Refresh token lifetime",
+			Description:     "How long refresh tokens remain valid (e.g. 90d, 2160h, 0 = no expiry).",
+			Help:            "How long OAuth refresh tokens remain valid after issuance. Accepts Go duration strings and the convenience \"d\" suffix for days (e.g. \"90d\" = 90 days). Set to \"0\" for refresh tokens that never expire. Changes apply only to newly issued tokens.",
+			Default:         "90d",
+			InputType:       InputDuration,
+			RuntimeEditable: true,
+		},
 	}
 }
 

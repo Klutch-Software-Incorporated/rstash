@@ -82,6 +82,18 @@ CREATE TABLE IF NOT EXISTS settings (
     value TEXT NOT NULL,
     updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
+
+CREATE TABLE IF NOT EXISTS refresh_tokens (
+    token TEXT PRIMARY KEY,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    client_id TEXT NOT NULL,
+    scopes TEXT NOT NULL,
+    access_token TEXT NOT NULL,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    expires_at TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_refresh_tokens_access ON refresh_tokens(access_token);
+CREATE INDEX IF NOT EXISTS idx_refresh_tokens_user ON refresh_tokens(user_id);
 `
 
 // Open opens a SQLite database at the given DSN, enables WAL mode and
@@ -139,6 +151,8 @@ func runMigrations(database *sql.DB) error {
 	migrations := []string{
 		"ALTER TABLE users ADD COLUMN storage_quota INTEGER NOT NULL DEFAULT 0",
 		"ALTER TABLE users ADD COLUMN disabled INTEGER NOT NULL DEFAULT 0",
+		"ALTER TABLE users ADD COLUMN last_login_at TEXT",
+		"ALTER TABLE users ADD COLUMN last_login_ip TEXT",
 	}
 	for _, m := range migrations {
 		if _, err := database.Exec(m); err != nil {

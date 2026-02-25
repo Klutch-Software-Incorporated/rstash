@@ -247,6 +247,7 @@ func (h *settingsHandler) RevokeToken(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/settings", http.StatusSeeOther)
 		return
 	}
+	_ = db.DeleteRefreshTokenByAccessToken(r.Context(), h.deps.DB, token)
 
 	ui.SetFlash(w, "Token revoked.")
 	http.Redirect(w, r, "/settings", http.StatusSeeOther)

@@ -22,9 +22,11 @@ type Config struct {
 	QuotaUser        int64   // GOSILO_QUOTA_USER — bytes (parsed from human-readable)
 	MaxUploadSize    int64   // GOSILO_MAX_UPLOAD — max request body size (parsed from human-readable)
 	WebMode          string  // GOSILO_WEB_MODE — "full", "oauth", or "off"
-	TokenLifetime    string  // GOSILO_TOKEN_LIFETIME — OAuth token lifetime: "30d", "24h", "0" (no expiry)
-	TLSCert          string  // GOSILO_TLS_CERT — path to TLS certificate file
-	TLSKey           string  // GOSILO_TLS_KEY — path to TLS private key file
+	TokenLifetime        string  // GOSILO_TOKEN_LIFETIME — OAuth token lifetime: "30d", "24h", "0" (no expiry)
+	RefreshTokens        string  // "enabled" or "disabled"
+	RefreshTokenLifetime string  // refresh token lifetime: "90d", "0" (no expiry)
+	TLSCert              string  // GOSILO_TLS_CERT — path to TLS certificate file
+	TLSKey               string  // GOSILO_TLS_KEY — path to TLS private key file
 }
 
 // ParseDSN splits a DSN string into its scheme and path components.
@@ -64,7 +66,9 @@ func Load() *Config {
 		QuotaTotal:       quotaTotal,
 		QuotaUser:        0,
 		MaxUploadSize:    maxUpload,
-		TokenLifetime:    "30d",
+		TokenLifetime:        "30d",
+		RefreshTokens:        "enabled",
+		RefreshTokenLifetime: "90d",
 	}
 }
 
@@ -111,8 +115,10 @@ func (c *Config) ValueMap() map[string]string {
 		"quota_user":        FormatByteSize(c.QuotaUser),
 		"max_upload_size":   FormatByteSize(c.MaxUploadSize),
 		"web_mode":          c.WebMode,
-		"token_lifetime":    c.TokenLifetime,
-		"tls_cert":          c.TLSCert,
-		"tls_key":           c.TLSKey,
+		"token_lifetime":         c.TokenLifetime,
+		"refresh_tokens":         c.RefreshTokens,
+		"refresh_token_lifetime": c.RefreshTokenLifetime,
+		"tls_cert":               c.TLSCert,
+		"tls_key":                c.TLSKey,
 	}
 }

@@ -8,6 +8,8 @@ type User struct {
 	StorageQuota int64 // 0 = use server default
 	Disabled     bool
 	CreatedAt    string
+	LastLoginAt  *string // NULL until first login
+	LastLoginIP  *string // NULL until first login
 }
 
 type OAuthClient struct {
@@ -53,6 +55,16 @@ type AuditEntry struct {
 	TargetID   string
 	Details    string
 	CreatedAt  string
+}
+
+type RefreshToken struct {
+	Token       string
+	UserID      int64
+	ClientID    string
+	Scopes      []string
+	AccessToken string
+	CreatedAt   string
+	ExpiresAt   *string
 }
 
 type AuthorizationCode struct {

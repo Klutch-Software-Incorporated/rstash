@@ -2,6 +2,7 @@ package web
 
 import (
 	"fmt"
+	"net"
 	"net/http"
 	"strings"
 
@@ -57,6 +58,24 @@ func (d *UIDeps) adminPageData(w http.ResponseWriter, r *http.Request, title str
 	pd := d.pageData(w, r, title, content)
 	pd.ActiveAdminNav = nav
 	return pd
+}
+
+// ClientIP extracts the client IP address from the request.
+// It checks X-Forwarded-For (first entry), X-Real-IP, then RemoteAddr.
+func ClientIP(r *http.Request) string {
+	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
+		if ip := strings.TrimSpace(strings.SplitN(xff, ",", 2)[0]); ip != "" {
+			return ip
+		}
+	}
+	if rip := r.Header.Get("X-Real-IP"); rip != "" {
+		return strings.TrimSpace(rip)
+	}
+	host, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err != nil {
+		return r.RemoteAddr
+	}
+	return host
 }
 
 // validatePassword checks that a password meets minimum requirements.

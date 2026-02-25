@@ -69,6 +69,10 @@ func (h *authHandler) DoLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if err := db.UpdateUserLastLogin(r.Context(), h.deps.DB, user.ID, ClientIP(r)); err != nil {
+		slog.Error("failed to update last login", "error", err)
+	}
+
 	db.Audit(r.Context(), h.deps.DB, user.ID, "auth.login", "user", fmt.Sprintf("%d", user.ID), username)
 	auth.SetSessionCookie(w, sess.Token, h.deps.SecureCookies)
 

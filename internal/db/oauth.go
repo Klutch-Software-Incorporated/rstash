@@ -98,6 +98,26 @@ func GetOAuthToken(ctx context.Context, q Querier, token string) (*model.OAuthTo
 	return &t, nil
 }
 
+// GetOAuthTokenUnfiltered returns the token record without checking expiry (for revocation).
+func GetOAuthTokenUnfiltered(ctx context.Context, q Querier, token string) (*model.OAuthToken, error) {
+	var t model.OAuthToken
+	var scopeStr string
+	err := q.QueryRowContext(ctx,
+		`SELECT token, user_id, client_id, scopes, created_at, expires_at
+		 FROM oauth_tokens
+		 WHERE token = ?`,
+		token,
+	).Scan(&t.Token, &t.UserID, &t.ClientID, &scopeStr, &t.CreatedAt, &t.ExpiresAt)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("get oauth token unfiltered: %w", err)
+	}
+	t.Scopes = strings.Fields(scopeStr)
+	return &t, nil
+}
+
 // ListOAuthTokensByUserID returns all non-expired tokens for the given user.
 func ListOAuthTokensByUserID(ctx context.Context, q Querier, userID int64) ([]*model.OAuthToken, error) {
 	rows, err := q.QueryContext(ctx,
@@ -154,6 +174,18 @@ func CountUserOAuthTokens(ctx context.Context, q Querier, userID int64) (int64, 
 	).Scan(&count)
 	if err != nil {
 		return 0, fmt.Errorf("count user oauth tokens: %w", err)
+	}
+	return count, nil
+}
+
+// CountActiveOAuthTokens returns the count of all non-expired OAuth tokens.
+func CountActiveOAuthTokens(ctx context.Context, q Querier) (int64, error) {
+	var count int64
+	err := q.QueryRowContext(ctx,
+		"SELECT COUNT(*) FROM oauth_tokens WHERE expires_at IS NULL OR expires_at > datetime('now')",
+	).Scan(&count)
+	if err != nil {
+		return 0, fmt.Errorf("count active oauth tokens: %w", err)
 	}
 	return count, nil
 }
