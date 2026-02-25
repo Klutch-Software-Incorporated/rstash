@@ -42,6 +42,12 @@ type adminUsersContent struct {
 }
 
 type adminSettingsContent struct {
+	Groups  []adminSettingGroup  // runtime-editable, grouped
+	EnvOnly []*adminSettingRow   // env-only (read-only)
+}
+
+type adminSettingGroup struct {
+	Title    string
 	Settings []*adminSettingRow
 }
 
@@ -50,11 +56,16 @@ type adminAuditContent struct {
 }
 
 type adminSettingRow struct {
-	Key         string
-	Label       string
-	Description string
-	Value       string
-	IsOverride  bool // true if set in DB (not env default)
+	Key             string
+	Label           string
+	Description     string
+	Value           string
+	IsOverride      bool   // true if set in DB (not env default)
+	RuntimeEditable bool   // can be changed at runtime via DB
+	InputType       string // "text", "number", "select", "bytesize", "duration"
+	ValidValues     []string
+	NumberMin       string
+	NumberStep      string
 }
 
 type userRow struct {
@@ -204,7 +215,7 @@ func (h *adminHandler) ShowUsers(w http.ResponseWriter, r *http.Request) {
 	h.deps.Renderer.Render(w, "admin_users", h.deps.adminPageData(w, r, "Users — Admin", "users", content))
 }
 
-// ShowSettings handles GET /admin/settings — runtime settings form.
+// ShowSettings handles GET /admin/settings — settings grid.
 func (h *adminHandler) ShowSettings(w http.ResponseWriter, r *http.Request) {
 
 	ctx := r.Context()
@@ -216,36 +227,54 @@ func (h *adminHandler) ShowSettings(w http.ResponseWriter, r *http.Request) {
 		overrides = map[string]string{}
 	}
 
-	settingDefs := []struct {
-		key   string
-		label string
-		desc  string
-		value string
-	}{
-		{"registration_mode", "Registration mode", "Who can create new accounts", snap.RegistrationMode},
-		{"log_level", "Log level", "Minimum severity for log output", snap.LogLevel},
-		{"rate_limit_rate", "Rate limit", "Max requests per second per IP (0 = unlimited)", fmt.Sprintf("%g", snap.RateLimitRate)},
-		{"rate_limit_burst", "Rate limit burst", "Max burst of requests allowed before throttling", fmt.Sprintf("%d", snap.RateLimitBurst)},
-		{"quota_mode", "Quota mode", "How storage quotas are enforced", snap.QuotaMode},
-		{"quota_total", "Total quota", "Maximum storage across all users (e.g. 50GB)", config.FormatByteSize(snap.QuotaTotal)},
-		{"quota_user", "Per-user quota", "Default storage limit per user (e.g. 1GB)", config.FormatByteSize(snap.QuotaUser)},
-		{"max_upload_size", "Max upload size", "Maximum file size for a single upload (e.g. 50MB)", config.FormatByteSize(snap.MaxUploadSize)},
-		{"token_lifetime", "Token lifetime", "OAuth token expiry duration (e.g. 30d, 720h, 0 = no expiry)", snap.TokenLifetime},
+	// Merge runtime values (from snapshot) with env-only values (from config).
+	runtimeValues := snap.ValueMap()
+	envValues := h.deps.Config.ValueMap()
+
+	// Build grouped runtime settings + flat env-only list.
+	groupMap := make(map[string]*adminSettingGroup)
+	var groupOrder []string
+	var envOnly []*adminSettingRow
+
+	for _, def := range config.SettingDefs() {
+		value := envValues[def.Key]
+		if v, ok := runtimeValues[def.Key]; ok {
+			value = v
+		}
+		_, isOverride := overrides[def.Key]
+		row := &adminSettingRow{
+			Key:             def.Key,
+			Label:           def.Label,
+			Description:     def.Description,
+			Value:           value,
+			IsOverride:      isOverride,
+			RuntimeEditable: def.RuntimeEditable,
+			InputType:       string(def.InputType),
+			ValidValues:     def.ValidValues,
+			NumberMin:       def.NumberMin,
+			NumberStep:      def.NumberStep,
+		}
+
+		if !def.RuntimeEditable {
+			envOnly = append(envOnly, row)
+			continue
+		}
+
+		g, ok := groupMap[def.Group]
+		if !ok {
+			g = &adminSettingGroup{Title: def.Group}
+			groupMap[def.Group] = g
+			groupOrder = append(groupOrder, def.Group)
+		}
+		g.Settings = append(g.Settings, row)
 	}
 
-	var settings []*adminSettingRow
-	for _, sd := range settingDefs {
-		_, isOverride := overrides[sd.key]
-		settings = append(settings, &adminSettingRow{
-			Key:         sd.key,
-			Label:       sd.label,
-			Description: sd.desc,
-			Value:       sd.value,
-			IsOverride:  isOverride,
-		})
+	var groups []adminSettingGroup
+	for _, name := range groupOrder {
+		groups = append(groups, *groupMap[name])
 	}
 
-	content := &adminSettingsContent{Settings: settings}
+	content := &adminSettingsContent{Groups: groups, EnvOnly: envOnly}
 	h.deps.Renderer.Render(w, "admin_settings", h.deps.adminPageData(w, r, "Settings — Admin", "settings", content))
 }
 
@@ -657,60 +686,31 @@ func (h *adminHandler) UserActivity(w http.ResponseWriter, r *http.Request) {
 	h.deps.Renderer.Render(w, "admin_user", h.deps.adminPageData(w, r, fmt.Sprintf("User — %s", user.Username), "users", content))
 }
 
-// settingFormKeys are the settings editable in the admin form.
-var settingFormKeys = []string{
-	"registration_mode", "log_level",
-	"rate_limit_rate", "rate_limit_burst",
-	"quota_mode", "quota_total", "quota_user",
-	"max_upload_size", "token_lifetime",
-}
-
 // UpdateSettings handles POST /admin/settings — update runtime settings.
 func (h *adminHandler) UpdateSettings(w http.ResponseWriter, r *http.Request) {
 
 	ctx := r.Context()
 	changed := 0
 	snap := h.deps.Settings.Load()
+	currentValues := snap.ValueMap()
 
-	for _, key := range settingFormKeys {
-		newVal := r.FormValue(key)
+	for _, def := range config.RuntimeSettingDefs() {
+		newVal := r.FormValue(def.Key)
 		if newVal == "" {
 			continue
 		}
 
-		// Compare with current value to avoid no-op writes.
-		var current string
-		switch key {
-		case "registration_mode":
-			current = snap.RegistrationMode
-		case "log_level":
-			current = snap.LogLevel
-		case "rate_limit_rate":
-			current = fmt.Sprintf("%g", snap.RateLimitRate)
-		case "rate_limit_burst":
-			current = fmt.Sprintf("%d", snap.RateLimitBurst)
-		case "quota_mode":
-			current = snap.QuotaMode
-		case "quota_total":
-			current = config.FormatByteSize(snap.QuotaTotal)
-		case "quota_user":
-			current = config.FormatByteSize(snap.QuotaUser)
-		case "max_upload_size":
-			current = config.FormatByteSize(snap.MaxUploadSize)
-		case "token_lifetime":
-			current = snap.TokenLifetime
-		}
-		if newVal == current {
+		if newVal == currentValues[def.Key] {
 			continue
 		}
 
-		if err := h.deps.Settings.Set(ctx, key, newVal); err != nil {
-			slog.Error("failed to update setting", "key", key, "error", err)
-			ui.SetFlashError(w, fmt.Sprintf("Invalid value for %s: %v", key, err))
+		if err := h.deps.Settings.Set(ctx, def.Key, newVal); err != nil {
+			slog.Error("failed to update setting", "key", def.Key, "error", err)
+			ui.SetFlashError(w, fmt.Sprintf("Invalid value for %s: %v", def.Key, err))
 			http.Redirect(w, r, "/admin/settings", http.StatusSeeOther)
 			return
 		}
-		h.audit(r, "settings.updated", "setting", key, newVal)
+		h.audit(r, "settings.updated", "setting", def.Key, newVal)
 		changed++
 	}
 
@@ -737,6 +737,61 @@ func (h *adminHandler) ResetSetting(w http.ResponseWriter, r *http.Request) {
 
 	ui.SetFlash(w, fmt.Sprintf("Reset %s to default.", key))
 	http.Redirect(w, r, "/admin/settings", http.StatusSeeOther)
+}
+
+// --- Setting detail page ---
+
+type adminSettingDetailContent struct {
+	Def         config.SettingDef
+	Value       string
+	Source      string // "db", "env", or "default"
+	IsOverride  bool
+}
+
+// ShowSettingDetail handles GET /admin/settings/{key} — setting documentation page.
+func (h *adminHandler) ShowSettingDetail(w http.ResponseWriter, r *http.Request) {
+
+	key := r.PathValue("key")
+	def := config.SettingDefByKey(key)
+	if def == nil {
+		http.NotFound(w, r)
+		return
+	}
+
+	ctx := r.Context()
+
+	// Determine current value and source.
+	snap := h.deps.Settings.Load()
+	runtimeValues := snap.ValueMap()
+	envValues := h.deps.Config.ValueMap()
+
+	value := envValues[def.Key]
+	source := "default"
+	if v, ok := runtimeValues[def.Key]; ok {
+		value = v
+		source = "env"
+	}
+
+	overrides, err := h.deps.Settings.Overrides(ctx)
+	if err != nil {
+		slog.Error("failed to load setting overrides", "error", err)
+		overrides = map[string]string{}
+	}
+
+	isOverride := false
+	if _, ok := overrides[def.Key]; ok {
+		source = "db"
+		isOverride = true
+	}
+
+	content := &adminSettingDetailContent{
+		Def:        *def,
+		Value:      value,
+		Source:     source,
+		IsOverride: isOverride,
+	}
+
+	h.deps.Renderer.Render(w, "admin_setting_detail", h.deps.adminPageData(w, r, def.Label+" — Settings", "settings", content))
 }
 
 // audit is a helper to log admin actions to the audit trail.

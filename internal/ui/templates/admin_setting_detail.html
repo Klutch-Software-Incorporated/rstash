@@ -1,0 +1,64 @@
+{{define "admin_setting_detail"}}
+{{template "admin_nav" $}}
+{{with .Content}}
+
+<p style="margin-bottom:.5rem"><a href="/admin/settings">&larr; Back to settings</a></p>
+<h2>{{.Def.Label}}</h2>
+
+<table style="margin-bottom:1.5rem;border-collapse:collapse">
+    <tr>
+        <td style="padding:.25rem 1rem .25rem 0;font-weight:600;vertical-align:top;white-space:nowrap">Key</td>
+        <td style="padding:.25rem 0"><code>{{.Def.Key}}</code></td>
+    </tr>
+    {{if .Def.EnvVar}}
+    <tr>
+        <td style="padding:.25rem 1rem .25rem 0;font-weight:600;vertical-align:top;white-space:nowrap">Environment variable</td>
+        <td style="padding:.25rem 0"><code>{{.Def.EnvVar}}</code></td>
+    </tr>
+    {{end}}
+    <tr>
+        <td style="padding:.25rem 1rem .25rem 0;font-weight:600;vertical-align:top;white-space:nowrap">Current value</td>
+        <td style="padding:.25rem 0">
+            <code>{{.Value}}</code>
+            <span style="font-size:.75rem;color:#888;margin-left:.5rem">(source: {{.Source}})</span>
+        </td>
+    </tr>
+    {{if .Def.Default}}
+    <tr>
+        <td style="padding:.25rem 1rem .25rem 0;font-weight:600;vertical-align:top;white-space:nowrap">Default</td>
+        <td style="padding:.25rem 0"><code>{{.Def.Default}}</code></td>
+    </tr>
+    {{end}}
+    {{if .Def.ValidValues}}
+    <tr>
+        <td style="padding:.25rem 1rem .25rem 0;font-weight:600;vertical-align:top;white-space:nowrap">Valid values</td>
+        <td style="padding:.25rem 0">
+            {{range $i, $v := .Def.ValidValues}}{{if $i}}, {{end}}<code>{{$v}}</code>{{end}}
+        </td>
+    </tr>
+    {{end}}
+    <tr>
+        <td style="padding:.25rem 1rem .25rem 0;font-weight:600;vertical-align:top;white-space:nowrap">Runtime editable</td>
+        <td style="padding:.25rem 0">{{if .Def.RuntimeEditable}}Yes{{else}}No (requires restart){{end}}</td>
+    </tr>
+</table>
+
+{{if .Def.Help}}
+<h3>Documentation</h3>
+{{range split .Def.Help "\n\n"}}
+<p>{{.}}</p>
+{{end}}
+{{end}}
+
+{{if .IsOverride}}
+<div style="margin-top:1.5rem;padding:.75rem;background:#f0f0ff;border-radius:6px">
+    <p style="margin:0 0 .5rem;font-size:.85rem">This setting has a database override. Reset to revert to the environment/default value.</p>
+    <form method="POST" action="/admin/settings/{{.Def.Key}}/reset" style="display:inline">
+        <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
+        <button type="submit" class="btn-secondary" style="font-size:.85rem">Reset to default</button>
+    </form>
+</div>
+{{end}}
+
+{{end}}
+{{end}}

@@ -2,53 +2,64 @@
 {{template "admin_nav" $}}
 {{with .Content}}
 
-<h2>Runtime Settings</h2>
-<p style="color:#888;font-size:.85rem;margin-bottom:.75rem">
+<h2>Settings</h2>
+<p style="color:var(--fg-faint);font-size:.85rem;margin-bottom:1rem">
     Changes take effect immediately without a server restart.
 </p>
-<form method="POST" action="/admin/settings" style="max-width:32rem">
+
+<form method="POST" action="/admin/settings">
     <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
-    {{range .Settings}}
-    <div style="margin-bottom:1rem">
-        <div style="display:flex;align-items:baseline;gap:.5rem">
-            <label style="font-weight:600">{{.Label}}</label>
-            {{if .IsOverride}}
-            <form method="POST" action="/admin/settings/{{.Key}}/reset" style="display:inline;margin:0">
-                <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
-                <button type="submit" style="background:none;border:none;color:#6366f1;font-size:.75rem;cursor:pointer;padding:0;text-decoration:underline">reset to default</button>
-            </form>
+
+    <div class="settings-grid">
+        {{range .Groups}}
+        <div class="settings-card">
+            <h3>{{.Title}}</h3>
+            {{range .Settings}}
+            <div class="setting-row">
+                <div style="display:flex;align-items:baseline;gap:.5rem;margin-bottom:.15rem">
+                    <label><a href="/admin/settings/{{.Key}}" style="color:inherit;text-decoration:none;border-bottom:1px dotted var(--fg-faint)">{{.Label}}</a></label>
+                    {{if .IsOverride}}
+                    <form method="POST" action="/admin/settings/{{.Key}}/reset" style="display:inline;margin:0">
+                        <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
+                        <button type="submit" style="background:none;border:none;color:var(--accent);font-size:.7rem;cursor:pointer;padding:0;text-decoration:underline">reset</button>
+                    </form>
+                    {{end}}
+                </div>
+                <p class="setting-desc">{{.Description}}</p>
+                {{if eq .InputType "select"}}
+                <select name="{{.Key}}">
+                    {{$val := .Value}}
+                    {{range .ValidValues}}
+                    <option value="{{.}}" {{if eq . $val}}selected{{end}}>{{.}}</option>
+                    {{end}}
+                </select>
+                {{else if eq .InputType "number"}}
+                <input type="number" name="{{.Key}}" value="{{.Value}}" {{if .NumberMin}}min="{{.NumberMin}}"{{end}} {{if .NumberStep}}step="{{.NumberStep}}"{{end}}>
+                {{else}}
+                <input type="text" name="{{.Key}}" value="{{.Value}}">
+                {{end}}
+            </div>
             {{end}}
         </div>
-        <p style="color:#888;font-size:.8rem;margin:0 0 .25rem">{{.Description}}</p>
-        {{if eq .Key "registration_mode"}}
-        <select name="registration_mode">
-            <option value="open" {{if eq .Value "open"}}selected{{end}}>open</option>
-            <option value="closed" {{if eq .Value "closed"}}selected{{end}}>closed</option>
-        </select>
-        {{else if eq .Key "log_level"}}
-        <select name="log_level">
-            <option value="debug" {{if eq .Value "debug"}}selected{{end}}>debug</option>
-            <option value="info" {{if eq .Value "info"}}selected{{end}}>info</option>
-            <option value="warn" {{if eq .Value "warn"}}selected{{end}}>warn</option>
-            <option value="error" {{if eq .Value "error"}}selected{{end}}>error</option>
-        </select>
-        {{else if eq .Key "quota_mode"}}
-        <select name="quota_mode">
-            <option value="off" {{if eq .Value "off"}}selected{{end}}>off</option>
-            <option value="total" {{if eq .Value "total"}}selected{{end}}>total</option>
-            <option value="user" {{if eq .Value "user"}}selected{{end}}>user</option>
-        </select>
-        {{else if eq .Key "rate_limit_rate"}}
-        <input type="number" name="rate_limit_rate" value="{{.Value}}" step="0.1" min="0" style="width:8rem">
-        {{else if eq .Key "rate_limit_burst"}}
-        <input type="number" name="rate_limit_burst" value="{{.Value}}" min="0" style="width:8rem">
-        {{else}}
-        <input type="text" name="{{.Key}}" value="{{.Value}}" style="width:10rem">
         {{end}}
     </div>
-    {{end}}
+
     <button type="submit" class="btn-primary">Save Settings</button>
 </form>
+
+{{if .EnvOnly}}
+<details class="env-settings" style="margin-top:1.5rem">
+    <summary>Server Configuration (env only, read-only)</summary>
+    <dl class="env-settings-list">
+        {{range .EnvOnly}}
+        <div>
+            <dt><a href="/admin/settings/{{.Key}}" style="color:inherit">{{.Label}}</a></dt>
+            <dd><code>{{if .Value}}{{.Value}}{{else}}<em style="color:var(--fg-faint)">not set</em>{{end}}</code></dd>
+        </div>
+        {{end}}
+    </dl>
+</details>
+{{end}}
 
 {{end}}
 {{end}}

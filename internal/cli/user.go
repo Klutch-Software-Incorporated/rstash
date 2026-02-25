@@ -24,6 +24,11 @@ var userCmd = &cobra.Command{
 var userAddCmd = &cobra.Command{
 	Use:   "add <username>",
 	Short: "Create a new user",
+	Long: `Create a new user account with the given username.
+
+You will be prompted for a password interactively unless --password is provided.
+Passwords must be at least 8 characters. Use --admin to grant the new user
+administrator privileges immediately. The operation is recorded in the audit log.`,
 	Example: `  gosilo user add alice
   gosilo user add alice --admin --password "s3cure-p4ss"`,
 	Args: cobra.ExactArgs(1),
@@ -33,6 +38,9 @@ var userAddCmd = &cobra.Command{
 var userListCmd = &cobra.Command{
 	Use:   "list",
 	Short: "List all users",
+	Long: `List all user accounts in a table showing ID, username, admin status, disabled
+status, and creation date. Use --json to get the output as a JSON array for
+scripting and integration with other tools.`,
 	Example: `  gosilo user list
   gosilo user list --json`,
 	RunE: runUserList,
@@ -41,6 +49,10 @@ var userListCmd = &cobra.Command{
 var userPasswdCmd = &cobra.Command{
 	Use:   "passwd <username>",
 	Short: "Change a user's password",
+	Long: `Change the password for an existing user. You will be prompted for the new
+password interactively unless --password is provided. Passwords must be at
+least 8 characters. Existing sessions are not terminated — use "user disable"
+and "user disable --enable" to force re-authentication.`,
 	Example: `  gosilo user passwd alice
   gosilo user passwd alice --password "new-p4ssword"`,
 	Args: cobra.ExactArgs(1),
@@ -48,8 +60,11 @@ var userPasswdCmd = &cobra.Command{
 }
 
 var userPromoteCmd = &cobra.Command{
-	Use:     "promote <username>",
-	Short:   "Promote user to admin",
+	Use:   "promote <username>",
+	Short: "Promote user to admin",
+	Long: `Grant administrator privileges to a user. Admins can access the admin panel,
+manage other users, change server settings, and view the audit log. This
+operation is recorded in the audit log.`,
 	Example: `  gosilo user promote alice`,
 	Args:    cobra.ExactArgs(1),
 	RunE:    runUserPromote,
@@ -58,6 +73,10 @@ var userPromoteCmd = &cobra.Command{
 var userDisableCmd = &cobra.Command{
 	Use:   "disable <username>",
 	Short: "Disable a user account",
+	Long: `Disable a user account, preventing login and API access. All active sessions
+are immediately terminated. The user's stored data is preserved. Use --enable
+to re-enable a previously disabled account. The operation is recorded in the
+audit log.`,
 	Example: `  gosilo user disable alice
   gosilo user disable alice --enable`,
 	Args: cobra.ExactArgs(1),
@@ -65,8 +84,12 @@ var userDisableCmd = &cobra.Command{
 }
 
 var userDeleteCmd = &cobra.Command{
-	Use:     "delete <username>",
-	Short:   "Delete a user",
+	Use:   "delete <username>",
+	Short: "Delete a user",
+	Long: `Permanently delete a user account. This removes the user record, all sessions,
+and OAuth tokens. Stored files (blobs and node metadata) are NOT deleted and
+must be cleaned up separately. A confirmation prompt is shown unless --force
+is provided. The operation is recorded in the audit log.`,
 	Example: `  gosilo user delete alice --force`,
 	Args:    cobra.ExactArgs(1),
 	RunE:    runUserDelete,

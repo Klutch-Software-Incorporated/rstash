@@ -11,92 +11,23 @@ type EnvVar struct {
 	RequiredWhen string   // Condition under which this variable is required (empty = optional).
 }
 
-// EnvVars returns metadata for every configuration environment variable.
+// EnvVars returns metadata for every configuration environment variable,
+// derived from the canonical SettingDefs registry.
 func EnvVars() []EnvVar {
-	return []EnvVar{
-		{
-			Name:        "GOSILO_ADDR",
-			Default:     ":8080",
-			Description: "Listen address (host:port). Host may be empty to listen on all interfaces.",
-		},
-		{
-			Name:        "GOSILO_BASE_URL",
-			Default:     "http://localhost:8080",
-			Description: "Public URL of the server. Used for WebFinger and OAuth redirects.",
-		},
-		{
-			Name:        "GOSILO_DB",
-			Default:     "sqlite:gosilo.db",
-			Description: "Metadata database DSN. Only SQLite is supported (sqlite:path or sqlite::memory:).",
-		},
-		{
-			Name:        "GOSILO_BLOB",
-			Default:     "sqlite:gosilo-blobs.db",
-			Description: "Blob store DSN. Supported schemes: sqlite:path, fs:/path/to/dir.",
-		},
-		{
-			Name:        "GOSILO_REGISTRATION",
-			Default:     "closed",
-			Description: "User registration mode.",
-			ValidValues: []string{"open", "closed"},
-		},
-		{
-			Name:        "GOSILO_LOG_LEVEL",
-			Default:     "info",
-			Description: "Log verbosity level.",
-			ValidValues: []string{"debug", "info", "warn", "error"},
-		},
-		{
-			Name:        "GOSILO_RATE_LIMIT",
-			Default:     "10",
-			Description: "Per-IP rate limit in requests/sec. Set to 0 to disable.",
-		},
-		{
-			Name:        "GOSILO_RATE_BURST",
-			Default:     "20",
-			Description: "Max burst size for per-IP rate limiting.",
-		},
-		{
-			Name:        "GOSILO_QUOTA_MODE",
-			Default:     "off",
-			Description: "Storage quota enforcement mode.",
-			ValidValues: []string{"off", "total", "user"},
-		},
-		{
-			Name:         "GOSILO_QUOTA_TOTAL",
-			Description:  "Global storage limit across all users (e.g. 10GB, 500MB).",
-			RequiredWhen: "GOSILO_QUOTA_MODE=total",
-		},
-		{
-			Name:         "GOSILO_QUOTA_USER",
-			Description:  "Default per-user storage quota (e.g. 500MB, 1GB). Admin can override per user.",
-			RequiredWhen: "GOSILO_QUOTA_MODE=user",
-		},
-		{
-			Name:        "GOSILO_MAX_UPLOAD",
-			Default:     "50MB",
-			Description: "Maximum upload size per request (e.g. 50MB, 1GB).",
-		},
-		{
-			Name:        "GOSILO_WEB_MODE",
-			Default:     "full",
-			Description: "Web UI mode. full=all routes, oauth=login+OAuth only, off=API only.",
-			ValidValues: []string{"full", "oauth", "off"},
-		},
-		{
-			Name:        "GOSILO_TOKEN_LIFETIME",
-			Default:     "30d",
-			Description: "OAuth token lifetime. Examples: 30d, 24h, 0 (no expiry).",
-		},
-		{
-			Name:        "GOSILO_TLS_CERT",
-			Description: "Path to TLS certificate file. Both GOSILO_TLS_CERT and GOSILO_TLS_KEY must be set to enable TLS.",
-		},
-		{
-			Name:        "GOSILO_TLS_KEY",
-			Description: "Path to TLS private key file. Both GOSILO_TLS_CERT and GOSILO_TLS_KEY must be set to enable TLS.",
-		},
+	var out []EnvVar
+	for _, d := range SettingDefs() {
+		if d.EnvVar == "" {
+			continue
+		}
+		out = append(out, EnvVar{
+			Name:         d.EnvVar,
+			Default:      d.Default,
+			Description:  d.Description,
+			ValidValues:  d.ValidValues,
+			RequiredWhen: d.RequiredWhen,
+		})
 	}
+	return out
 }
 
 // GenerateEnvFile returns a commented .env template suitable for writing to a file.

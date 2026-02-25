@@ -15,6 +15,7 @@ import (
 	"gosilo/internal/api"
 	"gosilo/internal/auth"
 	"gosilo/internal/blob"
+	"gosilo/internal/cmdinfo"
 	"gosilo/internal/config"
 	"gosilo/internal/db"
 	"gosilo/internal/settings"
@@ -130,6 +131,7 @@ func runServe(cmd *cobra.Command, args []string) error {
 		Storage:       storageSvc,
 		Settings:      runtimeSettings,
 		SecureCookies: secureCookies,
+		CommandIndex:  cmdinfo.WalkCommands(rootCmd),
 	}
 
 	// Build routes.

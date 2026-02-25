@@ -22,6 +22,10 @@ var auditCmd = &cobra.Command{
 var auditTailCmd = &cobra.Command{
 	Use:   "tail",
 	Short: "Show recent audit log entries",
+	Long: `Show the most recent audit log entries in a formatted table. Each entry includes
+the timestamp, actor (user or "system"), action, target, and details. Use -n to
+control how many entries are shown (default 25). Use --json for machine-readable
+JSON array output.`,
 	Example: `  gosilo audit tail
   gosilo audit tail -n 50
   gosilo audit tail --json`,
@@ -29,8 +33,11 @@ var auditTailCmd = &cobra.Command{
 }
 
 var auditExportCmd = &cobra.Command{
-	Use:     "export",
-	Short:   "Export audit log as JSON lines",
+	Use:   "export",
+	Short: "Export audit log as JSON lines",
+	Long: `Export the entire audit log as JSON Lines (one JSON object per line). Each line
+contains all fields for a single audit entry. This format is ideal for piping
+to files, log aggregators, or processing with tools like jq.`,
 	Example: `  gosilo audit export > audit.jsonl`,
 	RunE:    runAuditExport,
 }

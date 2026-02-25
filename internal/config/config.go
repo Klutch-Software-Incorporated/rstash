@@ -37,29 +37,34 @@ func ParseDSN(dsn string) (scheme, path string, err error) {
 	return dsn[:i], dsn[i+1:], nil
 }
 
-// Load reads configuration from environment variables, applying defaults where appropriate.
+// Load reads configuration from environment variables (for boot-critical
+// settings) and hardcoded defaults (for runtime-editable settings that
+// have no env var). Runtime-editable settings are managed via the CLI
+// or admin UI and stored in the database.
 func Load() *Config {
-	quotaTotal, _ := ParseByteSize(envOrDefault("GOSILO_QUOTA_TOTAL", "50GB"))
-	quotaUser, _ := ParseByteSize(os.Getenv("GOSILO_QUOTA_USER"))
-	maxUpload, _ := ParseByteSize(envOrDefault("GOSILO_MAX_UPLOAD", "50MB"))
+	quotaTotal, _ := ParseByteSize("50GB")
+	maxUpload, _ := ParseByteSize("50MB")
 
 	return &Config{
-		Addr:             envOrDefault("GOSILO_ADDR", ":8080"),
-		BaseURL:          envOrDefault("GOSILO_BASE_URL", "http://localhost:8080"),
-		DatabaseDSN:      envOrDefault("GOSILO_DB", "sqlite:gosilo.db"),
-		BlobDSN:          envOrDefault("GOSILO_BLOB", "sqlite:gosilo-blobs.db"),
-		RegistrationMode: envOrDefault("GOSILO_REGISTRATION", "closed"),
-		LogLevel:         envOrDefault("GOSILO_LOG_LEVEL", "info"),
-		RateLimitRate:    envOrDefaultFloat("GOSILO_RATE_LIMIT", 10),
-		RateLimitBurst:   envOrDefaultInt("GOSILO_RATE_BURST", 20),
-		QuotaMode:        envOrDefault("GOSILO_QUOTA_MODE", "total"),
+		// Boot-critical: read from env vars.
+		Addr:        envOrDefault(EnvAddr, ":8080"),
+		BaseURL:     envOrDefault(EnvBaseURL, "http://localhost:8080"),
+		DatabaseDSN: envOrDefault(EnvDB, "sqlite:gosilo.db"),
+		BlobDSN:     envOrDefault(EnvBlob, "sqlite:gosilo-blobs.db"),
+		WebMode:     envOrDefault(EnvWebMode, "full"),
+		LogLevel:    envOrDefault(EnvLogLevel, "info"),
+		TLSCert:     os.Getenv(EnvTLSCert),
+		TLSKey:      os.Getenv(EnvTLSKey),
+
+		// Runtime-editable: sane defaults, changed via CLI/admin UI.
+		RegistrationMode: "closed",
+		RateLimitRate:    10,
+		RateLimitBurst:   20,
+		QuotaMode:        "total",
 		QuotaTotal:       quotaTotal,
-		QuotaUser:        quotaUser,
+		QuotaUser:        0,
 		MaxUploadSize:    maxUpload,
-		WebMode:          envOrDefault("GOSILO_WEB_MODE", "full"),
-		TokenLifetime:    envOrDefault("GOSILO_TOKEN_LIFETIME", "30d"),
-		TLSCert:          os.Getenv("GOSILO_TLS_CERT"),
-		TLSKey:           os.Getenv("GOSILO_TLS_KEY"),
+		TokenLifetime:    "30d",
 	}
 }
 
@@ -86,4 +91,28 @@ func envOrDefaultInt(key string, defaultVal int) int {
 		}
 	}
 	return defaultVal
+}
+
+// ValueMap returns all env-sourced setting values as a key→display-string map,
+// keyed by the SettingDef.Key. This is used by the admin UI and CLI to display
+// current values for env-only (non-runtime-editable) settings.
+func (c *Config) ValueMap() map[string]string {
+	return map[string]string{
+		"addr":              c.Addr,
+		"base_url":          c.BaseURL,
+		"database_dsn":      c.DatabaseDSN,
+		"blob_dsn":          c.BlobDSN,
+		"registration_mode": c.RegistrationMode,
+		"log_level":         c.LogLevel,
+		"rate_limit_rate":   fmt.Sprintf("%g", c.RateLimitRate),
+		"rate_limit_burst":  fmt.Sprintf("%d", c.RateLimitBurst),
+		"quota_mode":        c.QuotaMode,
+		"quota_total":       FormatByteSize(c.QuotaTotal),
+		"quota_user":        FormatByteSize(c.QuotaUser),
+		"max_upload_size":   FormatByteSize(c.MaxUploadSize),
+		"web_mode":          c.WebMode,
+		"token_lifetime":    c.TokenLifetime,
+		"tls_cert":          c.TLSCert,
+		"tls_key":           c.TLSKey,
+	}
 }

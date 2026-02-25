@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"strconv"
+	"strings"
 	"sync"
 	"sync/atomic"
 
@@ -127,6 +128,22 @@ func (s *Settings) Overrides(ctx context.Context) (map[string]string, error) {
 	return db.ListSettings(ctx, s.db)
 }
 
+// ValueMap returns the current runtime-editable setting values as a
+// key→display-string map, keyed by SettingDef.Key.
+func (snap *Snapshot) ValueMap() map[string]string {
+	return map[string]string{
+		"registration_mode": snap.RegistrationMode,
+		"log_level":         snap.LogLevel,
+		"rate_limit_rate":   fmt.Sprintf("%g", snap.RateLimitRate),
+		"rate_limit_burst":  fmt.Sprintf("%d", snap.RateLimitBurst),
+		"quota_mode":        snap.QuotaMode,
+		"quota_total":       config.FormatByteSize(snap.QuotaTotal),
+		"quota_user":        config.FormatByteSize(snap.QuotaUser),
+		"max_upload_size":   config.FormatByteSize(snap.MaxUploadSize),
+		"token_lifetime":    snap.TokenLifetime,
+	}
+}
+
 // buildSnapshot merges DB overrides on top of env defaults.
 func (s *Settings) buildSnapshot(overrides map[string]string) *Snapshot {
 	snap := &Snapshot{
@@ -186,85 +203,58 @@ func (s *Settings) buildSnapshot(overrides map[string]string) *Snapshot {
 	return snap
 }
 
-// validateSetting checks that a key is known and its value is valid.
+// validateSetting checks that a key is known, runtime-editable, and its value is valid.
+// Validation rules are derived from the SettingDefs registry.
 func validateSetting(key, value string) error {
-	switch key {
-	case "registration_mode":
-		switch value {
-		case "open", "closed":
-			return nil
-		default:
-			return fmt.Errorf("registration_mode must be one of: open, closed — got %q", value)
-		}
+	def := config.SettingDefByKey(key)
+	if def == nil {
+		return fmt.Errorf("unknown setting: %q", key)
+	}
+	if !def.RuntimeEditable {
+		return fmt.Errorf("setting %q cannot be changed at runtime", key)
+	}
 
-	case "log_level":
-		switch value {
-		case "debug", "info", "warn", "error":
-			return nil
-		default:
-			return fmt.Errorf("log_level must be one of: debug, info, warn, error — got %q", value)
+	switch def.InputType {
+	case config.InputSelect:
+		for _, v := range def.ValidValues {
+			if value == v {
+				return nil
+			}
 		}
+		return fmt.Errorf("%s must be one of: %s — got %q", key, strings.Join(def.ValidValues, ", "), value)
 
-	case "rate_limit_rate":
-		f, err := strconv.ParseFloat(value, 64)
-		if err != nil || f < 0 {
-			return fmt.Errorf("rate_limit_rate must be a non-negative number — got %q", value)
+	case config.InputNumber:
+		if def.NumberStep != "" && strings.Contains(def.NumberStep, ".") {
+			f, err := strconv.ParseFloat(value, 64)
+			if err != nil || f < 0 {
+				return fmt.Errorf("%s must be a non-negative number — got %q", key, value)
+			}
+		} else {
+			i, err := strconv.Atoi(value)
+			if err != nil || i < 0 {
+				return fmt.Errorf("%s must be a non-negative integer — got %q", key, value)
+			}
 		}
 		return nil
 
-	case "rate_limit_burst":
-		i, err := strconv.Atoi(value)
-		if err != nil || i < 0 {
-			return fmt.Errorf("rate_limit_burst must be a non-negative integer — got %q", value)
-		}
-		return nil
-
-	case "quota_mode":
-		switch value {
-		case "off", "total", "user":
-			return nil
-		default:
-			return fmt.Errorf("quota_mode must be one of: off, total, user — got %q", value)
-		}
-
-	case "quota_total":
+	case config.InputByteSize:
 		n, err := config.ParseByteSize(value)
 		if err != nil {
-			return fmt.Errorf("quota_total: %w", err)
+			return fmt.Errorf("%s: %w", key, err)
 		}
 		if n <= 0 {
-			return fmt.Errorf("quota_total must be > 0")
+			return fmt.Errorf("%s must be > 0", key)
 		}
 		return nil
 
-	case "quota_user":
-		n, err := config.ParseByteSize(value)
-		if err != nil {
-			return fmt.Errorf("quota_user: %w", err)
-		}
-		if n <= 0 {
-			return fmt.Errorf("quota_user must be > 0")
-		}
-		return nil
-
-	case "max_upload_size":
-		n, err := config.ParseByteSize(value)
-		if err != nil {
-			return fmt.Errorf("max_upload_size: %w", err)
-		}
-		if n <= 0 {
-			return fmt.Errorf("max_upload_size must be > 0")
-		}
-		return nil
-
-	case "token_lifetime":
+	case config.InputDuration:
 		_, err := config.ParseTokenLifetime(value)
 		if err != nil {
-			return fmt.Errorf("token_lifetime: %w", err)
+			return fmt.Errorf("%s: %w", key, err)
 		}
 		return nil
 
 	default:
-		return fmt.Errorf("unknown setting: %q", key)
+		return nil
 	}
 }

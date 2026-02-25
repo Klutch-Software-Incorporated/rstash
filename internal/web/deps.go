@@ -4,6 +4,7 @@ import (
 	"database/sql"
 
 	"gosilo/internal/auth"
+	"gosilo/internal/cmdinfo"
 	"gosilo/internal/config"
 	"gosilo/internal/settings"
 	"gosilo/internal/storage"
@@ -19,4 +20,5 @@ type UIDeps struct {
 	Storage       *storage.Service
 	Settings      *settings.Settings
 	SecureCookies bool // true when base URL scheme is https
+	CommandIndex  []cmdinfo.CommandInfo // cobra command tree for /admin/help pages
 }

@@ -64,10 +64,15 @@ func resolvedDBDSN(fallback string) string {
 	if dbFlag != "" {
 		return dbFlag
 	}
-	if v := os.Getenv("GOSILO_DB"); v != "" {
+	if v := os.Getenv(config.EnvDB); v != "" {
 		return v
 	}
 	return fallback
+}
+
+// RootCommand returns the root cobra command for introspection.
+func RootCommand() *cobra.Command {
+	return rootCmd
 }
 
 // Execute runs the root command.

@@ -137,26 +137,6 @@ func TestValidate_BlobDSN(t *testing.T) {
 	}
 }
 
-func TestValidate_RegistrationMode(t *testing.T) {
-	for _, mode := range []string{"open", "closed"} {
-		cfg := validConfig()
-		cfg.RegistrationMode = mode
-		if err := cfg.Validate(); err != nil {
-			t.Errorf("registration mode %q should be valid, got: %v", mode, err)
-		}
-	}
-
-	cfg := validConfig()
-	cfg.RegistrationMode = "whatever"
-	err := cfg.Validate()
-	if err == nil {
-		t.Fatal("expected error for invalid registration mode")
-	}
-	if !strings.Contains(err.Error(), `got "whatever"`) {
-		t.Fatalf("error should mention invalid value, got: %v", err)
-	}
-}
-
 func TestValidate_LogLevel(t *testing.T) {
 	for _, level := range []string{"debug", "info", "warn", "error"} {
 		cfg := validConfig()
@@ -177,130 +157,64 @@ func TestValidate_LogLevel(t *testing.T) {
 	}
 }
 
-func TestValidate_RateLimitRate_Negative(t *testing.T) {
+func TestValidate_WebMode(t *testing.T) {
+	for _, mode := range []string{"full", "oauth", "off"} {
+		cfg := validConfig()
+		cfg.WebMode = mode
+		if err := cfg.Validate(); err != nil {
+			t.Errorf("web mode %q should be valid, got: %v", mode, err)
+		}
+	}
+
 	cfg := validConfig()
-	cfg.RateLimitRate = -1
+	cfg.WebMode = "invalid"
 	err := cfg.Validate()
 	if err == nil {
-		t.Fatal("expected error for negative rate limit")
+		t.Fatal("expected error for invalid web mode")
 	}
-	if !strings.Contains(err.Error(), "GOSILO_RATE_LIMIT") {
-		t.Fatalf("error should mention GOSILO_RATE_LIMIT, got: %v", err)
+	if !strings.Contains(err.Error(), "GOSILO_WEB_MODE") {
+		t.Fatalf("error should mention GOSILO_WEB_MODE, got: %v", err)
 	}
 }
 
-func TestValidate_RateLimitRate_ZeroDisables(t *testing.T) {
+func TestValidate_TLS(t *testing.T) {
+	// Both set — valid.
 	cfg := validConfig()
-	cfg.RateLimitRate = 0
-	cfg.RateLimitBurst = 0 // burst doesn't matter when disabled
+	cfg.TLSCert = "/tmp/cert.pem"
+	cfg.TLSKey = "/tmp/key.pem"
 	if err := cfg.Validate(); err != nil {
-		t.Fatalf("zero rate should be valid (disables limiting), got: %v", err)
+		t.Fatalf("both TLS fields set should be valid, got: %v", err)
 	}
-}
 
-func TestValidate_RateLimitBurst_InvalidWhenEnabled(t *testing.T) {
-	cfg := validConfig()
-	cfg.RateLimitRate = 10
-	cfg.RateLimitBurst = 0
+	// Only cert — invalid.
+	cfg = validConfig()
+	cfg.TLSCert = "/tmp/cert.pem"
 	err := cfg.Validate()
 	if err == nil {
-		t.Fatal("expected error for zero burst with rate > 0")
+		t.Fatal("expected error when only TLS cert is set")
 	}
-	if !strings.Contains(err.Error(), "GOSILO_RATE_BURST") {
-		t.Fatalf("error should mention GOSILO_RATE_BURST, got: %v", err)
-	}
-}
-
-func TestValidate_RateLimitBurst_ValidWhenEnabled(t *testing.T) {
-	cfg := validConfig()
-	cfg.RateLimitRate = 5
-	cfg.RateLimitBurst = 1
-	if err := cfg.Validate(); err != nil {
-		t.Fatalf("burst=1 with rate>0 should be valid, got: %v", err)
+	if !strings.Contains(err.Error(), "GOSILO_TLS_CERT") {
+		t.Fatalf("error should mention TLS, got: %v", err)
 	}
 }
 
 func TestValidate_MultipleErrors(t *testing.T) {
 	cfg := &Config{
-		Addr:             "bad",
-		BaseURL:          "ftp://x.com",
-		DatabaseDSN:      "postgres:host=localhost",
-		BlobDSN:          "s3:mybucket",
-		RegistrationMode: "maybe",
-		LogLevel:         "trace",
-		QuotaMode:        "off",
-		WebMode:          "full",
+		Addr:        "bad",
+		BaseURL:     "ftp://x.com",
+		DatabaseDSN: "postgres:host=localhost",
+		BlobDSN:     "s3:mybucket",
+		LogLevel:    "trace",
+		WebMode:     "full",
 	}
 	err := cfg.Validate()
 	if err == nil {
 		t.Fatal("expected multiple errors")
 	}
 	msg := err.Error()
-	for _, want := range []string{"GOSILO_ADDR", "GOSILO_BASE_URL", "GOSILO_DB", "GOSILO_BLOB", "GOSILO_REGISTRATION", "GOSILO_LOG_LEVEL"} {
+	for _, want := range []string{"GOSILO_ADDR", "GOSILO_BASE_URL", "GOSILO_DB", "GOSILO_BLOB", "GOSILO_LOG_LEVEL"} {
 		if !strings.Contains(msg, want) {
 			t.Errorf("expected error to contain %q, got: %v", want, msg)
 		}
-	}
-}
-
-func TestValidate_QuotaMode(t *testing.T) {
-	for _, mode := range []string{"off", "total", "user"} {
-		cfg := validConfig()
-		cfg.QuotaMode = mode
-		if mode == "total" {
-			cfg.QuotaTotal = 1024
-		}
-		if mode == "user" {
-			cfg.QuotaUser = 1024
-		}
-		if err := cfg.Validate(); err != nil {
-			t.Errorf("quota mode %q should be valid, got: %v", mode, err)
-		}
-	}
-
-	cfg := validConfig()
-	cfg.QuotaMode = "invalid"
-	err := cfg.Validate()
-	if err == nil {
-		t.Fatal("expected error for invalid quota mode")
-	}
-	if !strings.Contains(err.Error(), "GOSILO_QUOTA_MODE") {
-		t.Fatalf("error should mention GOSILO_QUOTA_MODE, got: %v", err)
-	}
-}
-
-func TestValidate_QuotaTotal_RequiredForTotalMode(t *testing.T) {
-	cfg := validConfig()
-	cfg.QuotaMode = "total"
-	cfg.QuotaTotal = 0
-	err := cfg.Validate()
-	if err == nil {
-		t.Fatal("expected error for total mode without quota total")
-	}
-	if !strings.Contains(err.Error(), "GOSILO_QUOTA_TOTAL") {
-		t.Fatalf("error should mention GOSILO_QUOTA_TOTAL, got: %v", err)
-	}
-}
-
-func TestValidate_QuotaUser_RequiredForUserMode(t *testing.T) {
-	cfg := validConfig()
-	cfg.QuotaMode = "user"
-	cfg.QuotaUser = 0
-	err := cfg.Validate()
-	if err == nil {
-		t.Fatal("expected error for user mode without quota user")
-	}
-	if !strings.Contains(err.Error(), "GOSILO_QUOTA_USER") {
-		t.Fatalf("error should mention GOSILO_QUOTA_USER, got: %v", err)
-	}
-}
-
-func TestValidate_QuotaOff_NoLimitsNeeded(t *testing.T) {
-	cfg := validConfig()
-	cfg.QuotaMode = "off"
-	cfg.QuotaTotal = 0
-	cfg.QuotaUser = 0
-	if err := cfg.Validate(); err != nil {
-		t.Fatalf("quota off should not require limits, got: %v", err)
 	}
 }
