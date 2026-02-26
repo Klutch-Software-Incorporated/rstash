@@ -6,14 +6,17 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
-	"strconv"
 	"strings"
 
+	"gosilo/api"
 	"gosilo/internal/auth"
 	"gosilo/internal/config"
 	"gosilo/internal/db"
 	"gosilo/internal/model"
 )
+
+// Compile-time check: jsonApiHandler must implement the generated ServerInterface.
+var _ api.ServerInterface = (*jsonApiHandler)(nil)
 
 type jsonApiHandler struct {
 	deps *UIDeps
@@ -37,82 +40,11 @@ func jsonErr(w http.ResponseWriter, status int, msg string) {
 	json.NewEncoder(w).Encode(map[string]any{"ok": false, "error": msg})
 }
 
-// --- Middleware ---
-
-// JSONApiGuard checks that the json_api setting is enabled and authenticates
-// the request (session cookie or Bearer token), requiring admin privileges.
-// For state-changing requests (POST/PUT/DELETE), it requires Content-Type: application/json.
-func (h *jsonApiHandler) JSONApiGuard(next http.HandlerFunc) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		// Check if JSON API is enabled.
-		if h.deps.Settings.Load().JSONApi != "admin" {
-			http.NotFound(w, r)
-			return
-		}
-
-		// Authenticate: try session cookie first, then Bearer token.
-		var user *model.User
-
-		// Session cookie.
-		if cookie, err := r.Cookie(auth.SessionCookieName); err == nil && cookie.Value != "" {
-			sess, err := h.deps.Auth.GetSession(r.Context(), cookie.Value)
-			if err == nil && sess != nil {
-				u, err := h.deps.Auth.GetUser(r.Context(), sess.UserID)
-				if err == nil && u != nil && !u.Disabled {
-					user = u
-				}
-			}
-		}
-
-		// Bearer token (also a session token from /json/login).
-		if user == nil {
-			if ah := r.Header.Get("Authorization"); strings.HasPrefix(ah, "Bearer ") {
-				token := strings.TrimPrefix(ah, "Bearer ")
-				sess, err := h.deps.Auth.GetSession(r.Context(), token)
-				if err == nil && sess != nil {
-					u, err := h.deps.Auth.GetUser(r.Context(), sess.UserID)
-					if err == nil && u != nil && !u.Disabled {
-						user = u
-					}
-				}
-			}
-		}
-
-		if user == nil {
-			jsonErr(w, http.StatusUnauthorized, "authentication required")
-			return
-		}
-		if !user.IsAdmin {
-			jsonErr(w, http.StatusForbidden, "admin access required")
-			return
-		}
-
-		// Content-Type check for state-changing methods.
-		if r.Method == http.MethodPost || r.Method == http.MethodPut || r.Method == http.MethodDelete {
-			ct := r.Header.Get("Content-Type")
-			if !strings.HasPrefix(ct, "application/json") {
-				jsonErr(w, http.StatusUnsupportedMediaType, "Content-Type must be application/json")
-				return
-			}
-		}
-
-		// Store user in context (reuse ctxKeyUser from middleware.go).
-		ctx := context.WithValue(r.Context(), ctxKeyUser, user)
-		next.ServeHTTP(w, r.WithContext(ctx))
-	}
-}
-
-
-// --- Login/Logout (no guard — login is the entry point) ---
+// --- Login/Logout ---
 
 // Login handles POST /json/login — authenticates and returns a session token.
+// The json_api setting check is handled by the global middleware.
 func (h *jsonApiHandler) Login(w http.ResponseWriter, r *http.Request) {
-	// Check if JSON API is enabled.
-	if h.deps.Settings.Load().JSONApi != "admin" {
-		http.NotFound(w, r)
-		return
-	}
-
 	var req struct {
 		Username string `json:"username"`
 		Password string `json:"password"`
@@ -146,13 +78,8 @@ func (h *jsonApiHandler) Login(w http.ResponseWriter, r *http.Request) {
 }
 
 // Logout handles POST /json/logout — destroys the current session.
+// Auth is handled by the global middleware; this just extracts the token to destroy it.
 func (h *jsonApiHandler) Logout(w http.ResponseWriter, r *http.Request) {
-	// Authenticate first (reusing guard logic inline).
-	if h.deps.Settings.Load().JSONApi != "admin" {
-		http.NotFound(w, r)
-		return
-	}
-
 	token := ""
 	if cookie, err := r.Cookie(auth.SessionCookieName); err == nil && cookie.Value != "" {
 		token = cookie.Value
@@ -433,8 +360,8 @@ func (h *jsonApiHandler) ConfigList(w http.ResponseWriter, r *http.Request) {
 }
 
 // ConfigGet handles GET /json/config/get?key=...
-func (h *jsonApiHandler) ConfigGet(w http.ResponseWriter, r *http.Request) {
-	key := r.URL.Query().Get("key")
+func (h *jsonApiHandler) ConfigGet(w http.ResponseWriter, r *http.Request, params api.ConfigGetParams) {
+	key := params.Key
 	def := config.SettingDefByKey(key)
 	if def == nil {
 		jsonErr(w, http.StatusNotFound, "unknown setting")
@@ -533,10 +460,10 @@ func (h *jsonApiHandler) ConfigReset(w http.ResponseWriter, r *http.Request) {
 // --- Audit endpoint ---
 
 // AuditTail handles GET /json/audit/tail?n=25.
-func (h *jsonApiHandler) AuditTail(w http.ResponseWriter, r *http.Request) {
+func (h *jsonApiHandler) AuditTail(w http.ResponseWriter, r *http.Request, params api.AuditTailParams) {
 	n := 25
-	if v, err := strconv.Atoi(r.URL.Query().Get("n")); err == nil && v > 0 && v <= 500 {
-		n = v
+	if params.N != nil && *params.N > 0 && *params.N <= 500 {
+		n = *params.N
 	}
 
 	entries, err := db.ListAuditEntries(r.Context(), h.deps.DB, n, 0)
@@ -573,17 +500,83 @@ func (h *jsonApiHandler) AuditTail(w http.ResponseWriter, r *http.Request) {
 // --- Routes ---
 
 // RegisterRoutes adds all /json/* routes to the given mux.
+// Routing is generated from the OpenAPI spec via oapi-codegen; the guard
+// middleware is applied globally to all generated routes.
 func (h *jsonApiHandler) RegisterRoutes(mux *http.ServeMux) {
-	for _, r := range h.routes() {
-		handler := r.Handler
-		if r.Guard {
-			handler = h.JSONApiGuard(handler)
-		}
-		mux.HandleFunc(r.Method+" "+r.Path, handler)
-	}
-	// OpenAPI spec and Scalar docs UI.
+	api.HandlerWithOptions(h, api.StdHTTPServerOptions{
+		BaseRouter:  mux,
+		Middlewares: []api.MiddlewareFunc{h.jsonApiMiddleware},
+	})
+	// Docs endpoints (not in the OpenAPI spec, wired separately).
 	mux.HandleFunc("GET /json/openapi.yaml", h.ServeOpenAPISpec)
 	mux.HandleFunc("GET /json/", h.ServeDocs)
+}
+
+// jsonApiMiddleware is a global middleware applied to all generated routes.
+// It checks that the json_api setting is enabled, authenticates the request,
+// and enforces Content-Type on state-changing methods. Login is exempted from
+// auth (it is the entry point) but still gated on the json_api setting.
+func (h *jsonApiHandler) jsonApiMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Check if JSON API is enabled.
+		if h.deps.Settings.Load().JSONApi != "admin" {
+			http.NotFound(w, r)
+			return
+		}
+
+		// Login is the entry point — skip auth/content-type checks.
+		if r.URL.Path == "/json/login" {
+			next.ServeHTTP(w, r)
+			return
+		}
+
+		// Authenticate: try session cookie first, then Bearer token.
+		var user *model.User
+
+		if cookie, err := r.Cookie(auth.SessionCookieName); err == nil && cookie.Value != "" {
+			sess, err := h.deps.Auth.GetSession(r.Context(), cookie.Value)
+			if err == nil && sess != nil {
+				u, err := h.deps.Auth.GetUser(r.Context(), sess.UserID)
+				if err == nil && u != nil && !u.Disabled {
+					user = u
+				}
+			}
+		}
+
+		if user == nil {
+			if ah := r.Header.Get("Authorization"); strings.HasPrefix(ah, "Bearer ") {
+				token := strings.TrimPrefix(ah, "Bearer ")
+				sess, err := h.deps.Auth.GetSession(r.Context(), token)
+				if err == nil && sess != nil {
+					u, err := h.deps.Auth.GetUser(r.Context(), sess.UserID)
+					if err == nil && u != nil && !u.Disabled {
+						user = u
+					}
+				}
+			}
+		}
+
+		if user == nil {
+			jsonErr(w, http.StatusUnauthorized, "authentication required")
+			return
+		}
+		if !user.IsAdmin {
+			jsonErr(w, http.StatusForbidden, "admin access required")
+			return
+		}
+
+		// Content-Type check for state-changing methods.
+		if r.Method == http.MethodPost || r.Method == http.MethodPut || r.Method == http.MethodDelete {
+			ct := r.Header.Get("Content-Type")
+			if !strings.HasPrefix(ct, "application/json") {
+				jsonErr(w, http.StatusUnsupportedMediaType, "Content-Type must be application/json")
+				return
+			}
+		}
+
+		ctx := context.WithValue(r.Context(), ctxKeyUser, user)
+		next.ServeHTTP(w, r.WithContext(ctx))
+	})
 }
 
 // currentUserFromContext retrieves the user stored in context by JSONApiGuard.
