@@ -57,6 +57,7 @@ func activeNavFromPath(path string) string {
 func (d *UIDeps) adminPageData(w http.ResponseWriter, r *http.Request, title string, nav string, content any) ui.PageData {
 	pd := d.pageData(w, r, title, content)
 	pd.ActiveAdminNav = nav
+	pd.JSONApiEnabled = d.Settings.Load().JSONApi == "admin"
 	return pd
 }
 

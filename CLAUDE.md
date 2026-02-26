@@ -68,6 +68,7 @@ All configuration is via environment variables (see `gosilo env` for a documente
 - All assets embedded via go:embed for single-binary deployment
 - Audit logging for all state-changing operations (admin, CLI, storage, auth, OAuth)
 - Runtime settings: DB overrides take precedence over env defaults, atomic snapshot swap
+- SQLite LIKE is case-insensitive by default; we set `PRAGMA case_sensitive_like = ON` at DB init so path prefix queries are case-sensitive. If adding support for another database, ensure LIKE queries on paths remain case-sensitive (e.g. COLLATE BINARY or equivalent).
 
 ## remoteStorage Protocol
 

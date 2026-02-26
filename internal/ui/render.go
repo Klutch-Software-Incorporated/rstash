@@ -25,6 +25,7 @@ type PageData struct {
 	RegistrationMode string
 	ActiveNav        string
 	ActiveAdminNav   string
+	JSONApiEnabled   bool
 }
 
 // Renderer parses and renders HTML templates from the embedded filesystem.

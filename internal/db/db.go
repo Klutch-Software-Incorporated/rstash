@@ -123,6 +123,12 @@ func Open(dsn string) (*sql.DB, error) {
 		return nil, fmt.Errorf("enable foreign keys: %w", err)
 	}
 
+	// Enable case-sensitive LIKE (SQLite default is case-insensitive for ASCII).
+	if _, err := db.Exec("PRAGMA case_sensitive_like=ON"); err != nil {
+		db.Close()
+		return nil, fmt.Errorf("enable case-sensitive LIKE: %w", err)
+	}
+
 	// Run schema migrations.
 	if _, err := db.Exec(schema); err != nil {
 		db.Close()

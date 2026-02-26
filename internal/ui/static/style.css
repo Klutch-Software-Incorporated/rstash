@@ -113,6 +113,12 @@ table{width:100%;border-collapse:collapse;font-size:.875rem;margin:.5rem 0 1rem}
 th{text-align:left;font-size:.7rem;text-transform:uppercase;letter-spacing:.04em;color:var(--fg-faint);padding:.4rem .5rem;border-bottom:1px solid var(--border)}
 td{padding:.4rem .5rem;border-bottom:1px solid var(--border-light)}
 th:last-child,td:last-child{text-align:right}
+.file-table{table-layout:fixed}
+.file-table th:nth-child(3),.file-table td:nth-child(3){width:5rem}
+.file-table th:last-child,.file-table td:last-child{width:6rem}
+.file-table .cell-name{display:flex;align-items:center;gap:.25rem;min-width:0}
+.file-table .cell-name .truncate{min-width:0;flex:1}
+.file-table .cell-type{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 
 /* Definition lists (key-value) */
 dl{margin:.5rem 0 1rem}
@@ -160,8 +166,8 @@ form p{font-size:.75rem;color:var(--fg-faint);margin-top:.15rem;margin-bottom:.5
 .inline-form button{width:auto;padding:.25rem .5rem;font-size:.75rem}
 
 /* Inline buttons */
-button.btn-danger{display:inline;width:auto;background:none;border:none;color:var(--danger);cursor:pointer;font:inherit;font-size:.75rem;padding:.15rem .4rem}
-button.btn-danger:hover{text-decoration:underline}
+button.btn-danger{display:inline;width:auto;background:none;border:none;color:var(--danger);cursor:pointer;font:inherit;font-size:.75rem;padding:.15rem .4rem;border-radius:3px}
+button.btn-danger:hover{background:var(--danger-bg);text-decoration:none}
 button.btn-primary{display:inline-block;width:auto;padding:.4rem 1rem;background:var(--accent);color:#fff;border:none;border-radius:3px;font:inherit;font-size:.875rem;font-weight:600;cursor:pointer}
 button.btn-primary:hover{background:var(--accent-hover)}
 button.btn-secondary{display:inline-block;width:auto;padding:.4rem 1rem;background:var(--surface);color:var(--fg);border:1px solid var(--border);border-radius:3px;font:inherit;font-size:.875rem;font-weight:600;cursor:pointer}
@@ -230,6 +236,7 @@ button.oauth-btn-allow{flex:2}
 .admin-nav a{color:var(--fg-muted);text-decoration:none;padding:.25rem 0}
 .admin-nav a:hover{color:var(--fg)}
 .admin-nav a.active{color:var(--fg);font-weight:600;border-bottom:2px solid var(--accent);margin-bottom:-1px;padding-bottom:calc(.5rem - 1px)}
+.admin-nav .nav-disabled{color:var(--fg-faint);cursor:not-allowed}
 
 /* OAuth test */
 .oauth-test-result{border:1px solid var(--border);border-radius:3px;padding:.75rem;margin-bottom:1rem}
@@ -242,16 +249,33 @@ button.oauth-btn-allow{flex:2}
 .breadcrumb-sep{color:var(--fg-faint);user-select:none}
 .file-icon{margin-right:.25rem;font-size:.875rem}
 
+/* Inline new-folder (inside breadcrumb) */
+.new-folder-inline{display:inline-flex;align-items:center}
+.new-folder-inline summary{cursor:pointer;list-style:none;color:var(--fg-faint);font-weight:600}
+.new-folder-inline summary::-webkit-details-marker{display:none}
+.new-folder-inline summary::marker{display:none;content:""}
+.new-folder-inline summary:hover{color:var(--accent)}
+.new-folder-inline[open] summary{display:none}
+.new-folder-form{display:inline-flex;align-items:center;gap:.25rem}
+.new-folder-form input[type="text"]{width:10rem;margin-bottom:0;padding:.2rem .4rem;font-size:.8rem}
+
+/* Upload row (tfoot of file table) */
+.upload-row td{text-align:center;border-bottom:none;border-top:1px solid var(--border);padding:.75rem .5rem;margin-top:.5rem}
+.upload-row input[type="file"]{display:inline;width:auto;margin:0;border:none;padding:0;background:none;font-size:.85rem}
+.upload-label{font-size:.85rem;color:var(--fg-muted);margin-right:.25rem}
+.hint{text-decoration:underline dotted var(--fg-faint);text-underline-offset:.2rem;cursor:help}
+button.btn-upload{display:inline;width:auto;padding:.25rem .6rem;font:inherit;font-size:.8rem;font-weight:600;border:none;border-radius:3px;background:var(--consent-btn);color:#fff;cursor:pointer}
+button.btn-upload:hover{background:var(--consent-btn-hover)}
+button.btn-upload:disabled{background:var(--border);color:var(--fg-faint);cursor:not-allowed}
+button.btn-upload[hidden]{display:none}
+
 /* Upload area */
 .upload-area{border:2px dashed var(--border);border-radius:6px;padding:1rem;text-align:center;margin:.75rem 0;transition:border-color .15s,background .15s}
 .upload-area:hover,.upload-area.dragover{border-color:var(--accent);background:var(--surface-alt)}
 .upload-area input[type="file"]{display:inline;width:auto;margin:0;border:none;padding:0;background:none}
 
-/* Create module form */
-.create-module-form{margin:.75rem 0}
-.create-module-row{display:inline-flex;gap:.3rem;align-items:center}
-.create-module-row input[type="text"]{width:16rem;margin-bottom:0;padding:.25rem .5rem;font-size:.85rem}
-.create-module-row button{width:auto;padding:.25rem .6rem;font-size:.8rem}
+/* Files toolbar */
+.files-toolbar{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:.5rem;margin-bottom:.5rem}
 
 /* Search form */
 .search-form{display:inline-flex;gap:.3rem;align-items:center}
@@ -283,6 +307,7 @@ button.oauth-btn-allow{flex:2}
 .env-settings-list dd{margin:0 0 .25rem}
 
 /* Utilities */
+.truncate{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
 .text-center{text-align:center}
 .mono{font-family:ui-monospace,"Cascadia Code",Menlo,monospace}
@@ -304,9 +329,16 @@ button.oauth-btn-allow{flex:2}
   table.responsive-table tr{display:block;border-bottom:1px solid var(--border);padding:.5rem 0}
   table.responsive-table td{display:block;text-align:left;padding:.15rem .5rem;border-bottom:none}
   table.responsive-table td::before{content:attr(data-label);display:inline-block;font-size:.7rem;font-weight:600;text-transform:uppercase;color:var(--fg-faint);margin-right:.5rem;min-width:5rem}
+  table.file-table{table-layout:auto}
+  table.file-table th:nth-child(3),table.file-table td:nth-child(3),
+  table.file-table th:last-child,table.file-table td:last-child{width:auto}
+  table.file-table .cell-name{display:inline}
+  table.file-table .cell-type{overflow:visible;white-space:normal}
+  table.responsive-table td .truncate{display:inline;white-space:normal;overflow:visible}
 
-  .search-form{flex-direction:column;align-items:stretch}
-  .search-form input[type="text"]{width:100%}
+  .files-toolbar{flex-direction:column;align-items:stretch}
+  .search-form{flex-direction:row}
+  .search-form input[type="text"]{flex:1;width:auto}
   .settings-grid{grid-template-columns:1fr}
   .env-settings-list{grid-template-columns:1fr}
 }

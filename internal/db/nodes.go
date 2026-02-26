@@ -229,15 +229,35 @@ func DeleteSubtree(ctx context.Context, q Querier, userID int64, folderPath stri
 	return nil
 }
 
-// SearchUserNodes searches non-folder nodes by path substring match.
+// globToLike converts a user search query with glob wildcards (* and ?)
+// into a SQL LIKE pattern. If no wildcards are present, wraps the query
+// in % for substring matching.
+func globToLike(query string) string {
+	hasWild := strings.ContainsAny(query, "*?")
+	// Escape SQL LIKE metacharacters.
+	r := strings.NewReplacer("%", `\%`, "_", `\_`)
+	pattern := r.Replace(query)
+	// Translate glob wildcards to SQL LIKE wildcards.
+	pattern = strings.ReplaceAll(pattern, "*", "%")
+	pattern = strings.ReplaceAll(pattern, "?", "_")
+	if !hasWild {
+		pattern = "%" + pattern + "%"
+	}
+	return pattern
+}
+
+// SearchUserNodes searches non-folder nodes by path, supporting glob
+// wildcards (* and ?). Plain queries without wildcards fall back to
+// substring matching.
 func SearchUserNodes(ctx context.Context, q Querier, userID int64, query string, limit int) ([]*model.Node, error) {
+	pattern := globToLike(query)
 	rows, err := q.QueryContext(ctx,
 		`SELECT `+nodeColumns+`
 		 FROM nodes
-		 WHERE user_id = ? AND is_folder = 0 AND path LIKE '%' || ? || '%'
+		 WHERE user_id = ? AND is_folder = 0 AND path LIKE ? ESCAPE '\'
 		 ORDER BY updated_at DESC
 		 LIMIT ?`,
-		userID, query, limit,
+		userID, pattern, limit,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("search user nodes: %w", err)

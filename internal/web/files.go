@@ -17,6 +17,35 @@ import (
 )
 
 var moduleNameRe = regexp.MustCompile(`^[a-zA-Z0-9_-]+$`)
+var folderNameRe = regexp.MustCompile(`^[a-zA-Z0-9_.-]+$`)
+
+// fallbackMIME supplements Go's mime package for common extensions it doesn't know.
+var fallbackMIME = map[string]string{
+	".md":         "text/markdown",
+	".markdown":   "text/markdown",
+	".yaml":       "application/yaml",
+	".yml":        "application/yaml",
+	".toml":       "application/toml",
+	".go":         "text/x-go",
+	".rs":         "text/x-rust",
+	".sh":         "text/x-shellscript",
+	".bash":       "text/x-shellscript",
+	".zsh":        "text/x-shellscript",
+	".fish":       "text/x-shellscript",
+	".ps1":        "text/x-powershell",
+	".bat":        "text/x-bat",
+	".cmd":        "text/x-bat",
+	".dockerfile": "text/x-dockerfile",
+	".tf":         "text/x-terraform",
+	".tsx":        "text/tsx",
+	".jsx":        "text/jsx",
+}
+
+// knownFilenames maps extensionless filenames to MIME types.
+var knownFilenames = map[string]string{
+	"dockerfile": "text/x-dockerfile",
+	"makefile":   "text/x-makefile",
+}
 
 type filesHandler struct {
 	deps *UIDeps
@@ -28,11 +57,12 @@ func FilesHandler(deps *UIDeps) *filesHandler {
 }
 
 type filesContent struct {
-	Username    string
-	CurrentPath string
-	IsRoot      bool
-	Breadcrumbs []breadcrumb
-	Items       []*fileItem
+	Username       string
+	CurrentPath    string
+	IsRoot         bool
+	ParentBrowseURL string
+	Breadcrumbs    []breadcrumb
+	Items          []*fileItem
 }
 
 type breadcrumb struct {
@@ -114,12 +144,18 @@ func (h *filesHandler) browseFolder(w http.ResponseWriter, r *http.Request, user
 
 	breadcrumbs := buildBreadcrumbs(storagePath)
 
+	parentURL := "/files/"
+	if len(breadcrumbs) > 1 {
+		parentURL = breadcrumbs[len(breadcrumbs)-2].Path
+	}
+
 	h.deps.Renderer.Render(w, "files", h.deps.pageData(w, r, "Files — "+storagePath, filesContent{
-		Username:    username,
-		CurrentPath: storagePath,
-		IsRoot:      storagePath == "/",
-		Breadcrumbs: breadcrumbs,
-		Items:       items,
+		Username:        username,
+		CurrentPath:     storagePath,
+		IsRoot:          storagePath == "/",
+		ParentBrowseURL: parentURL,
+		Breadcrumbs:     breadcrumbs,
+		Items:           items,
 	}))
 }
 
@@ -238,9 +274,16 @@ func (h *filesHandler) Upload(w http.ResponseWriter, r *http.Request) {
 
 		contentType := fh.Header.Get("Content-Type")
 		if contentType == "" || contentType == "application/octet-stream" {
-			ext := path.Ext(fh.Filename)
+			ext := strings.ToLower(path.Ext(fh.Filename))
 			if detected := mime.TypeByExtension(ext); detected != "" {
 				contentType = detected
+			} else if detected, ok := fallbackMIME[ext]; ok {
+				contentType = detected
+			} else if ext == "" {
+				// Extensionless known filenames (e.g. Dockerfile, Makefile).
+				if detected, ok := knownFilenames[strings.ToLower(fh.Filename)]; ok {
+					contentType = detected
+				}
 			}
 		}
 
@@ -291,6 +334,44 @@ func (h *filesHandler) CreateModule(w http.ResponseWriter, r *http.Request) {
 
 	ui.SetFlash(w, fmt.Sprintf("Created module %s/", name))
 	http.Redirect(w, r, "/files/", http.StatusSeeOther)
+}
+
+// CreateFolder handles POST /files/create-folder — create a sub-folder within an existing folder.
+func (h *filesHandler) CreateFolder(w http.ResponseWriter, r *http.Request) {
+	if !RequireAuth(w, r) {
+		return
+	}
+	user := CurrentUser(r)
+
+	parent := r.FormValue("parent")
+	if parent == "" || !strings.HasSuffix(parent, "/") {
+		ui.SetFlashError(w, "Invalid parent folder.")
+		http.Redirect(w, r, "/files/", http.StatusSeeOther)
+		return
+	}
+
+	name := strings.TrimSpace(r.FormValue("name"))
+	if !folderNameRe.MatchString(name) {
+		ui.SetFlashError(w, "Invalid folder name. Use only letters, numbers, hyphens, underscores, and dots.")
+		http.Redirect(w, r, "/files"+parent, http.StatusSeeOther)
+		return
+	}
+
+	folderPath := parent + name + "/"
+	err := h.deps.Storage.CreateFolder(r.Context(), user.ID, folderPath)
+	if err != nil {
+		if err == storage.ErrConflict {
+			ui.SetFlashError(w, fmt.Sprintf("Folder %q already exists.", name))
+		} else {
+			slog.Error("failed to create folder", "error", err, "path", folderPath)
+			ui.SetFlashError(w, "Failed to create folder.")
+		}
+		http.Redirect(w, r, "/files"+parent, http.StatusSeeOther)
+		return
+	}
+
+	ui.SetFlash(w, fmt.Sprintf("Created folder %s/", name))
+	http.Redirect(w, r, "/files"+parent, http.StatusSeeOther)
 }
 
 type searchContent struct {

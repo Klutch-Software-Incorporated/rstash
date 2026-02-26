@@ -7,5 +7,6 @@
     <a href="/admin/logs" {{if eq $.ActiveAdminNav "logs"}}class="active"{{end}}>Logs</a>
     <a href="/admin/help" {{if eq $.ActiveAdminNav "help"}}class="active"{{end}}>CLI Reference</a>
     <a href="/admin/oauth-test" {{if eq $.ActiveAdminNav "oauth-test"}}class="active"{{end}}>OAuth Test</a>
+    {{if $.JSONApiEnabled}}<a href="/json/">API Docs</a>{{else}}<span class="nav-disabled" title="Enable the JSON API setting to access API documentation">API Docs</span>{{end}}
 </nav>
 {{end}}

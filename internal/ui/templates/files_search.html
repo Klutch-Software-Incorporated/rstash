@@ -5,7 +5,7 @@
 
 <form action="/files/search" method="GET" style="max-width:28rem;margin-bottom:1rem">
     <div style="display:flex;gap:.5rem">
-        <input type="text" name="q" value="{{.Query}}" placeholder="Search by filename or path..." style="flex:1;margin-bottom:0" autofocus>
+        <input type="text" name="q" value="{{.Query}}" placeholder="Search files... (e.g. *.md)" style="flex:1;margin-bottom:0" autofocus>
         <button type="submit" class="btn-primary" style="width:auto">Search</button>
     </div>
 </form>
@@ -20,10 +20,10 @@
     <tbody>
         {{range .Results}}
         <tr>
-            <td><a href="{{.BrowseURL}}">{{.Name}}</a></td>
+            <td><a href="{{.BrowseURL}}" title="{{.Name}}">{{.Name}}</a></td>
             <td><code>{{.Path}}</code></td>
             <td>{{.Size}}</td>
-            <td>{{.ContentType}}</td>
+            <td title="{{.ContentType}}">{{.ContentType}}</td>
         </tr>
         {{end}}
     </tbody>

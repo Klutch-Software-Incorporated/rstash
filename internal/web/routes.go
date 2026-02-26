@@ -63,6 +63,7 @@ func FullRoutes(deps *UIDeps) http.Handler {
 	mux.HandleFunc("POST /files/upload", RequireCSRF(filesHandler.Upload))
 	mux.HandleFunc("POST /files/bulk-delete", RequireCSRF(filesHandler.BulkDelete))
 	mux.HandleFunc("POST /files/create-module", RequireCSRF(filesHandler.CreateModule))
+	mux.HandleFunc("POST /files/create-folder", RequireCSRF(filesHandler.CreateFolder))
 
 	// Admin sub-pages — all protected by AdminGuard middleware.
 	adminHandler := AdminHandler(deps)

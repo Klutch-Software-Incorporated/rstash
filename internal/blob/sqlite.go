@@ -37,6 +37,12 @@ func NewSQLiteStore(path string) (*SQLiteStore, error) {
 		return nil, fmt.Errorf("enable WAL mode on blob database: %w", err)
 	}
 
+	// Enable case-sensitive LIKE (SQLite default is case-insensitive for ASCII).
+	if _, err := db.Exec("PRAGMA case_sensitive_like=ON"); err != nil {
+		db.Close()
+		return nil, fmt.Errorf("enable case-sensitive LIKE on blob database: %w", err)
+	}
+
 	if _, err := db.Exec(blobSchema); err != nil {
 		db.Close()
 		return nil, fmt.Errorf("create blobs table: %w", err)
