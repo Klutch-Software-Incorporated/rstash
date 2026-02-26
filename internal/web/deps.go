@@ -20,5 +20,6 @@ type UIDeps struct {
 	Storage       *storage.Service
 	Settings      *settings.Settings
 	SecureCookies bool // true when base URL scheme is https
+	LogFile       string // path to log file (empty = no file logging)
 	CommandIndex  []cmdinfo.CommandInfo // cobra command tree for /admin/help pages
 }

@@ -1,0 +1,762 @@
+openapi: 3.1.0
+info:
+  title: Gosilo JSON Management API
+  description: |
+    Administrative API for managing users, configuration, and audit logs.
+
+    All endpoints except `/json/login` require admin authentication via Bearer token.
+    State-changing requests (POST) must include `Content-Type: application/json`.
+
+    ## Response Envelope
+
+    Every response uses a consistent JSON envelope:
+
+    **Success:** `{"ok": true, "payload": { ... }}`
+
+    **Error:** `{"ok": false, "error": "description"}`
+  version: "1.0"
+
+servers:
+  - url: /
+    description: This server
+
+tags:
+  - name: Authentication
+    description: |
+      Token-based session management. Call `POST /json/login` with admin
+      credentials to obtain a session token, then pass it as
+      `Authorization: Bearer <token>` on all subsequent requests.
+      Only admin users may authenticate. Tokens are server-side sessions
+      that persist until explicitly destroyed via logout or server-side
+      expiry.
+  - name: User Management
+    description: Create, list, modify, and delete users
+  - name: Configuration
+    description: View and update runtime settings
+  - name: Audit
+    description: View audit log entries
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      description: Session token obtained from POST /json/login
+
+  schemas:
+    SuccessEnvelope:
+      type: object
+      required: [ok, payload]
+      properties:
+        ok:
+          type: boolean
+          const: true
+        payload:
+          type: object
+
+    ErrorEnvelope:
+      type: object
+      required: [ok, error]
+      properties:
+        ok:
+          type: boolean
+          const: false
+        error:
+          type: string
+
+    User:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        username:
+          type: string
+        is_admin:
+          type: boolean
+        disabled:
+          type: boolean
+        storage_quota:
+          type: integer
+          format: int64
+        created_at:
+          type: string
+        last_login_at:
+          type: ["string", "null"]
+
+    Setting:
+      type: object
+      properties:
+        key:
+          type: string
+        value:
+          type: string
+        default:
+          type: string
+        source:
+          type: string
+          enum: [default, env, db]
+        runtime_editable:
+          type: boolean
+        valid_values:
+          type: array
+          items:
+            type: string
+
+    SettingDetail:
+      allOf:
+        - $ref: "#/components/schemas/Setting"
+        - type: object
+          properties:
+            description:
+              type: string
+
+    AuditEntry:
+      type: object
+      properties:
+        actor:
+          type: string
+        action:
+          type: string
+        target_type:
+          type: string
+        target_id:
+          type: string
+        details:
+          type: string
+        created_at:
+          type: string
+
+  responses:
+    Unauthorized:
+      description: Authentication required
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorEnvelope"
+          example:
+            ok: false
+            error: authentication required
+    Forbidden:
+      description: Admin access required
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorEnvelope"
+          example:
+            ok: false
+            error: admin access required
+    NotFound:
+      description: Resource not found or API disabled
+    UnsupportedMediaType:
+      description: Content-Type must be application/json
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorEnvelope"
+          example:
+            ok: false
+            error: "Content-Type must be application/json"
+
+paths:
+  /json/login:
+    post:
+      tags: [Authentication]
+      summary: Authenticate and obtain a session token
+      description: |
+        Entry point for the JSON API. Authenticates with username and password
+        and returns a session token. Use this token as `Authorization: Bearer <token>`
+        on all subsequent requests.
+
+        - Only **admin** users may log in — non-admin users receive 403.
+        - Returns **404** when the `json_api` setting is disabled.
+        - Returns **400** for malformed JSON.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [username, password]
+              properties:
+                username:
+                  type: string
+                  description: Admin username
+                password:
+                  type: string
+                  description: Account password
+            example:
+              username: admin
+              password: secret
+      responses:
+        "200":
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    const: true
+                  payload:
+                    type: object
+                    properties:
+                      authToken:
+                        type: string
+                        description: |
+                          Session token. Include in subsequent requests as
+                          `Authorization: Bearer <authToken>`.
+              example:
+                ok: true
+                payload:
+                  authToken: "a1b2c3d4e5f6..."
+        "400":
+          description: Malformed JSON body
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+              example:
+                ok: false
+                error: invalid JSON body
+        "401":
+          description: Invalid username or password
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+              example:
+                ok: false
+                error: invalid credentials
+        "403":
+          description: User exists but is not an admin
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+              example:
+                ok: false
+                error: admin access required
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /json/logout:
+    post:
+      tags: [Authentication]
+      summary: Destroy the current session
+      description: |
+        Invalidates the session token used to authenticate this request.
+        After logout the token can no longer be used. Requires admin
+        authentication via the guard middleware.
+
+        The request body may be empty (`{}`); no fields are read.
+      security:
+        - bearerAuth: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+            example: {}
+      responses:
+        "200":
+          description: Session destroyed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessEnvelope"
+              example:
+                ok: true
+                payload:
+                  status: logged out
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "415":
+          $ref: "#/components/responses/UnsupportedMediaType"
+
+  /json/user/list:
+    get:
+      tags: [User Management]
+      summary: List all users
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: User list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    const: true
+                  payload:
+                    type: object
+                    properties:
+                      users:
+                        type: array
+                        items:
+                          $ref: "#/components/schemas/User"
+              example:
+                ok: true
+                payload:
+                  users:
+                    - id: 1
+                      username: admin
+                      is_admin: true
+                      disabled: false
+                      storage_quota: 0
+                      created_at: "2025-01-01 00:00:00"
+                      last_login_at: null
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /json/user/add:
+    post:
+      tags: [User Management]
+      summary: Create a new user
+      description: |
+        Password must be at least 8 characters. Returns 409 if the username already exists.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [username, password]
+              properties:
+                username:
+                  type: string
+                password:
+                  type: string
+                  minLength: 8
+                is_admin:
+                  type: boolean
+                  default: false
+            example:
+              username: alice
+              password: securepass1
+              is_admin: false
+      responses:
+        "200":
+          description: User created
+          content:
+            application/json:
+              example:
+                ok: true
+                payload:
+                  id: 2
+                  username: alice
+                  is_admin: false
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          description: Username already exists
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+
+  /json/user/delete:
+    post:
+      tags: [User Management]
+      summary: Delete a user
+      description: Cannot delete your own account.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [username]
+              properties:
+                username:
+                  type: string
+            example:
+              username: alice
+      responses:
+        "200":
+          description: User deleted
+          content:
+            application/json:
+              example:
+                ok: true
+                payload:
+                  status: deleted
+        "400":
+          description: Cannot delete own account
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          description: User not found
+
+  /json/user/passwd:
+    post:
+      tags: [User Management]
+      summary: Change a user's password
+      description: Password must be at least 8 characters.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [username, password]
+              properties:
+                username:
+                  type: string
+                password:
+                  type: string
+                  minLength: 8
+            example:
+              username: alice
+              password: newpass123
+      responses:
+        "200":
+          description: Password updated
+          content:
+            application/json:
+              example:
+                ok: true
+                payload:
+                  status: password updated
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          description: User not found
+
+  /json/user/promote:
+    post:
+      tags: [User Management]
+      summary: Toggle admin status
+      description: |
+        Toggles: admin becomes non-admin and vice versa. Cannot change your own status.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [username]
+              properties:
+                username:
+                  type: string
+            example:
+              username: alice
+      responses:
+        "200":
+          description: Admin status toggled
+          content:
+            application/json:
+              example:
+                ok: true
+                payload:
+                  username: alice
+                  is_admin: true
+        "400":
+          description: Cannot change own admin status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          description: User not found
+
+  /json/user/disable:
+    post:
+      tags: [User Management]
+      summary: Toggle disabled status
+      description: |
+        Toggles: enabled becomes disabled and vice versa.
+        Disabling terminates all sessions. Cannot disable yourself.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [username]
+              properties:
+                username:
+                  type: string
+            example:
+              username: alice
+      responses:
+        "200":
+          description: Disabled status toggled
+          content:
+            application/json:
+              example:
+                ok: true
+                payload:
+                  username: alice
+                  disabled: true
+        "400":
+          description: Cannot disable own account
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          description: User not found
+
+  /json/config/list:
+    get:
+      tags: [Configuration]
+      summary: List all configuration settings
+      description: |
+        Source is one of: `default`, `env`, `db`.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Settings list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    const: true
+                  payload:
+                    type: object
+                    properties:
+                      settings:
+                        type: array
+                        items:
+                          $ref: "#/components/schemas/Setting"
+              example:
+                ok: true
+                payload:
+                  settings:
+                    - key: log_level
+                      value: info
+                      default: info
+                      source: default
+                      runtime_editable: true
+                      valid_values: [debug, info, warn, error]
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /json/config/get:
+    get:
+      tags: [Configuration]
+      summary: Get a single configuration setting
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: key
+          in: query
+          required: true
+          schema:
+            type: string
+          example: log_level
+      responses:
+        "200":
+          description: Setting detail
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    const: true
+                  payload:
+                    $ref: "#/components/schemas/SettingDetail"
+              example:
+                ok: true
+                payload:
+                  key: log_level
+                  value: info
+                  default: info
+                  source: default
+                  runtime_editable: true
+                  description: "Logging verbosity level"
+                  valid_values: [debug, info, warn, error]
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          description: Unknown setting
+
+  /json/config/set:
+    post:
+      tags: [Configuration]
+      summary: Update a runtime-editable setting
+      description: |
+        Only `runtime_editable` settings can be changed. Returns 400 for invalid values.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [key, value]
+              properties:
+                key:
+                  type: string
+                value:
+                  type: string
+            example:
+              key: log_level
+              value: debug
+      responses:
+        "200":
+          description: Setting updated
+          content:
+            application/json:
+              example:
+                ok: true
+                payload:
+                  status: updated
+        "400":
+          description: Invalid value or non-editable setting
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          description: Unknown setting
+
+  /json/config/reset:
+    post:
+      tags: [Configuration]
+      summary: Reset a setting to its default value
+      description: |
+        Removes the database override; the setting reverts to env var or compiled default.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [key]
+              properties:
+                key:
+                  type: string
+            example:
+              key: log_level
+      responses:
+        "200":
+          description: Setting reset
+          content:
+            application/json:
+              example:
+                ok: true
+                payload:
+                  status: reset to default
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          description: Unknown setting
+
+  /json/audit/tail:
+    get:
+      tags: [Audit]
+      summary: Fetch recent audit log entries
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: "n"
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 25
+            minimum: 1
+            maximum: 500
+          description: Number of entries to return
+          example: 50
+      responses:
+        "200":
+          description: Audit entries
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    const: true
+                  payload:
+                    type: object
+                    properties:
+                      entries:
+                        type: array
+                        items:
+                          $ref: "#/components/schemas/AuditEntry"
+              example:
+                ok: true
+                payload:
+                  entries:
+                    - actor: admin
+                      action: user.created
+                      target_type: user
+                      target_id: "2"
+                      details: alice
+                      created_at: "2025-01-01 12:00:00"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"

@@ -3,6 +3,7 @@ package cli
 import (
 	"context"
 	"fmt"
+	"io"
 	"io/fs"
 	"log/slog"
 	"net/http"
@@ -67,7 +68,16 @@ func runServe(cmd *cobra.Command, args []string) error {
 	// Configure structured logging with dynamic level.
 	var levelVar slog.LevelVar
 	levelVar.Set(parseLogLevel(cfg.LogLevel))
-	slog.SetDefault(slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: &levelVar})))
+	var logWriter io.Writer = os.Stderr
+	if cfg.LogFile != "" {
+		logFile, err := os.OpenFile(cfg.LogFile, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+		if err != nil {
+			return fmt.Errorf("failed to open log file %q: %w", cfg.LogFile, err)
+		}
+		defer logFile.Close()
+		logWriter = io.MultiWriter(os.Stderr, logFile)
+	}
+	slog.SetDefault(slog.New(slog.NewTextHandler(logWriter, &slog.HandlerOptions{Level: &levelVar})))
 
 	// Open and migrate the metadata database.
 	database, err := db.Open(cfg.DatabaseDSN)
@@ -134,6 +144,7 @@ func runServe(cmd *cobra.Command, args []string) error {
 		Storage:       storageSvc,
 		Settings:      runtimeSettings,
 		SecureCookies: secureCookies,
+		LogFile:       cfg.LogFile,
 		CommandIndex:  cmdinfo.WalkCommands(rootCmd),
 	}
 
@@ -141,7 +152,17 @@ func runServe(cmd *cobra.Command, args []string) error {
 	mux := http.NewServeMux()
 
 	// Always registered: WebFinger, OAuth token, storage API, metrics.
-	mux.Handle("GET /metrics", api.MetricsAuth(database, localAuth, secureCookies, promhttp.Handler()))
+	metricsH := promhttp.Handler()
+	mux.HandleFunc("GET /metrics", func(w http.ResponseWriter, r *http.Request) {
+		switch runtimeSettings.Load().MetricsMode {
+		case "off":
+			http.NotFound(w, r)
+		case "admin":
+			api.MetricsAuth(database, localAuth, secureCookies, metricsH).ServeHTTP(w, r)
+		default: // "public"
+			metricsH.ServeHTTP(w, r)
+		}
+	})
 	mux.Handle("/.well-known/webfinger", api.CORS(api.WebFinger(cfg)))
 	mux.Handle("POST /oauth/token", api.CORS(api.OAuthToken(database,
 		func() string { return runtimeSettings.Load().TokenLifetime },
@@ -154,6 +175,10 @@ func runServe(cmd *cobra.Command, args []string) error {
 	mux.Handle("/storage/{user}/{path...}", api.CORS(api.Storage(database, storageSvc, func() int64 {
 		return runtimeSettings.Load().MaxUploadSize
 	})))
+
+	// JSON management API (registered outside web_mode gating).
+	jsonH := web.JSONApiHandler(uiDeps)
+	jsonH.RegisterRoutes(mux)
 
 	// Web mode gating.
 	if cfg.WebMode != "off" {

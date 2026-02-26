@@ -71,6 +71,8 @@ func FullRoutes(deps *UIDeps) http.Handler {
 	mux.HandleFunc("GET /admin/settings", AdminGuard(adminHandler.ShowSettings))
 	mux.HandleFunc("GET /admin/settings/{key}", AdminGuard(adminHandler.ShowSettingDetail))
 	mux.HandleFunc("GET /admin/audit", AdminGuard(adminHandler.ShowAudit))
+	logsH := LogsHandler(deps)
+	mux.HandleFunc("GET /admin/logs", AdminGuard(logsH.ShowLogs))
 	helpH := HelpHandler(deps)
 	mux.HandleFunc("GET /admin/help", AdminGuard(helpH.ShowIndex))
 	mux.HandleFunc("GET /admin/help/{command...}", AdminGuard(helpH.ShowCommand))

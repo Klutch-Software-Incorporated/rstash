@@ -25,6 +25,9 @@ type Config struct {
 	TokenLifetime        string  // GOSILO_TOKEN_LIFETIME — OAuth token lifetime: "30d", "24h", "0" (no expiry)
 	RefreshTokens        string  // "enabled" or "disabled"
 	RefreshTokenLifetime string  // refresh token lifetime: "90d", "0" (no expiry)
+	MetricsMode          string  // "public", "admin", or "off"
+	JSONApi              string  // "off" or "admin"
+	LogFile              string  // GOSILO_LOG_FILE — path to log file (empty = stderr only)
 	TLSCert              string  // GOSILO_TLS_CERT — path to TLS certificate file
 	TLSKey               string  // GOSILO_TLS_KEY — path to TLS private key file
 }
@@ -55,10 +58,13 @@ func Load() *Config {
 		BlobDSN:     envOrDefault(EnvBlob, "sqlite:gosilo-blobs.db"),
 		WebMode:     envOrDefault(EnvWebMode, "full"),
 		LogLevel:    envOrDefault(EnvLogLevel, "info"),
+		LogFile:     os.Getenv(EnvLogFile),
 		TLSCert:     os.Getenv(EnvTLSCert),
 		TLSKey:      os.Getenv(EnvTLSKey),
 
 		// Runtime-editable: sane defaults, changed via CLI/admin UI.
+		MetricsMode:      "public",
+		JSONApi:          "off",
 		RegistrationMode: "closed",
 		RateLimitRate:    10,
 		RateLimitBurst:   20,
@@ -106,6 +112,9 @@ func (c *Config) ValueMap() map[string]string {
 		"base_url":          c.BaseURL,
 		"database_dsn":      c.DatabaseDSN,
 		"blob_dsn":          c.BlobDSN,
+		"metrics_mode":      c.MetricsMode,
+		"json_api":          c.JSONApi,
+		"log_file":          c.LogFile,
 		"registration_mode": c.RegistrationMode,
 		"log_level":         c.LogLevel,
 		"rate_limit_rate":   fmt.Sprintf("%g", c.RateLimitRate),

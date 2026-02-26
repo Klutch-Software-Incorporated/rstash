@@ -1,0 +1,57 @@
+{{define "admin_logs"}}
+{{template "admin_nav" $}}
+{{with .Content}}
+
+<h2>Server Logs</h2>
+
+{{if not .HasLogFile}}
+<div class="card" style="padding: 1.5rem; margin-bottom: 1rem;">
+    <p><strong>No log file configured.</strong></p>
+    <p>Set the <code>GOSILO_LOG_FILE</code> environment variable to a file path to enable file logging and the log viewer.</p>
+    <p>Example: <code>GOSILO_LOG_FILE=/var/log/gosilo.log gosilo serve</code></p>
+</div>
+{{else}}
+
+<form method="GET" action="/admin/logs" style="display: flex; gap: 0.75rem; align-items: end; margin-bottom: 1rem; flex-wrap: wrap;">
+    <div>
+        <label for="lines" style="display: block; font-size: 0.85rem; margin-bottom: 0.25rem;">Lines</label>
+        <select name="lines" id="lines">
+            <option value="100" {{if eq .MaxLines 100}}selected{{end}}>100</option>
+            <option value="200" {{if eq .MaxLines 200}}selected{{end}}>200</option>
+            <option value="500" {{if eq .MaxLines 500}}selected{{end}}>500</option>
+            <option value="1000" {{if eq .MaxLines 1000}}selected{{end}}>1000</option>
+        </select>
+    </div>
+    <div>
+        <label for="level" style="display: block; font-size: 0.85rem; margin-bottom: 0.25rem;">Level filter</label>
+        <select name="level" id="level">
+            <option value="">All</option>
+            <option value="DEBUG" {{if eq .LevelFilter "DEBUG"}}selected{{end}}>DEBUG</option>
+            <option value="INFO" {{if eq .LevelFilter "INFO"}}selected{{end}}>INFO</option>
+            <option value="WARN" {{if eq .LevelFilter "WARN"}}selected{{end}}>WARN</option>
+            <option value="ERROR" {{if eq .LevelFilter "ERROR"}}selected{{end}}>ERROR</option>
+        </select>
+    </div>
+    <button type="submit" class="btn">Filter</button>
+</form>
+
+<div style="background: var(--bg-secondary, #1e1e2e); border-radius: 6px; padding: 1rem; overflow-x: auto; max-height: 70vh; overflow-y: auto;" id="log-output">
+{{if .Lines}}
+<pre style="margin: 0; font-size: 0.8rem; line-height: 1.5; white-space: pre-wrap; word-break: break-all;">{{range .Lines}}
+{{.}}{{end}}</pre>
+{{else}}
+<p class="empty-state">No log entries found.</p>
+{{end}}
+</div>
+
+<script>
+(function() {
+    var el = document.getElementById('log-output');
+    if (el) el.scrollTop = el.scrollHeight;
+})();
+</script>
+
+{{end}}
+
+{{end}}
+{{end}}

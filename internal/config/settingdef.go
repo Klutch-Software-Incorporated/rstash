@@ -21,6 +21,7 @@ const (
 	EnvBlob     = "GOSILO_BLOB"
 	EnvWebMode  = "GOSILO_WEB_MODE"
 	EnvLogLevel = "GOSILO_LOG_LEVEL"
+	EnvLogFile  = "GOSILO_LOG_FILE"
 	EnvTLSCert  = "GOSILO_TLS_CERT"
 	EnvTLSKey   = "GOSILO_TLS_KEY"
 )
@@ -221,6 +222,29 @@ func SettingDefs() []SettingDef {
 			RuntimeEditable: true,
 		},
 
+		// ── Monitoring (runtime-editable / env-only) ──
+		{
+			Key:             "metrics_mode",
+			Group:           "Monitoring",
+			Label:           "Metrics visibility",
+			Description:     "Who can access the /metrics endpoint.",
+			Help:            "Controls access to the Prometheus /metrics endpoint. \"public\" allows unauthenticated access (suitable when metrics are scraped from a private network). \"admin\" requires an authenticated admin session. \"off\" disables the endpoint entirely (returns 404). Changes take effect immediately.",
+			Default:         "public",
+			ValidValues:     []string{"public", "admin", "off"},
+			InputType:       InputSelect,
+			RuntimeEditable: true,
+		},
+		{
+			Key:             "log_file",
+			EnvVar:          EnvLogFile,
+			Group:           "Monitoring",
+			Label:           "Log file",
+			Description:     "Path to log file. Empty = stderr only.",
+			Help:            "When set, log output is written to both stderr and the specified file. This enables the admin log viewer at /admin/logs. The file is opened in append mode and created if it does not exist. Set via the " + EnvLogFile + " environment variable. Changing this setting requires a server restart.",
+			InputType:       InputText,
+			RuntimeEditable: false,
+		},
+
 		// ── OAuth (runtime-editable, no env var) ──
 		{
 			Key:             "token_lifetime",
@@ -251,6 +275,19 @@ func SettingDefs() []SettingDef {
 			Help:            "How long OAuth refresh tokens remain valid after issuance. Accepts Go duration strings and the convenience \"d\" suffix for days (e.g. \"90d\" = 90 days). Set to \"0\" for refresh tokens that never expire. Changes apply only to newly issued tokens.",
 			Default:         "90d",
 			InputType:       InputDuration,
+			RuntimeEditable: true,
+		},
+
+		// ── API (runtime-editable, no env var) ──
+		{
+			Key:             "json_api",
+			Group:           "API",
+			Label:           "JSON API",
+			Description:     "Enable the /json/* management API for programmatic admin access.",
+			Help:            "Controls the JSON management API at /json/*. When \"off\", all /json/* endpoints return 404. When \"admin\", the API is enabled and requires admin authentication via session cookie or Bearer token (obtained from POST /json/login). The API provides programmatic access to user management, settings, and audit log — mirroring CLI functionality. Changes take effect immediately.",
+			Default:         "off",
+			ValidValues:     []string{"off", "admin"},
+			InputType:       InputSelect,
 			RuntimeEditable: true,
 		},
 	}

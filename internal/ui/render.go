@@ -61,6 +61,7 @@ func NewRenderer() *Renderer {
 		"templates/admin_settings.html",
 		"templates/admin_setting_detail.html",
 		"templates/admin_audit.html",
+		"templates/admin_logs.html",
 		"templates/admin_help_index.html",
 		"templates/admin_help_command.html",
 		"templates/admin_oauth_test.html",
