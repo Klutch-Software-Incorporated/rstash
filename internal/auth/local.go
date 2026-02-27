@@ -43,8 +43,8 @@ func (s *LocalService) CheckPassword(user *model.User, password string) bool {
 
 // --- Sessions ---
 
-func (s *LocalService) CreateSession(ctx context.Context, userID int64) (*model.Session, error) {
-	return db.CreateSession(ctx, s.db, userID)
+func (s *LocalService) CreateSession(ctx context.Context, userID int64, ip string) (*model.Session, error) {
+	return db.CreateSession(ctx, s.db, userID, ip)
 }
 
 func (s *LocalService) GetSession(ctx context.Context, token string) (*model.Session, error) {

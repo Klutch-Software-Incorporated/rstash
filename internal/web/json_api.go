@@ -70,7 +70,7 @@ func (h *jsonApiHandler) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	sess, err := h.deps.Auth.CreateSession(r.Context(), user.ID)
+	sess, err := h.deps.Auth.CreateSession(r.Context(), user.ID, ClientIP(r))
 	if err != nil {
 		slog.Error("json api: failed to create session", "error", err)
 		jsonErr(w, http.StatusInternalServerError, "failed to create session")

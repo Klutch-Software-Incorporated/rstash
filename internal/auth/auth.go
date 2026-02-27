@@ -25,7 +25,7 @@ type Service interface {
 	CheckPassword(user *model.User, password string) bool
 
 	// Sessions
-	CreateSession(ctx context.Context, userID int64) (*model.Session, error)
+	CreateSession(ctx context.Context, userID int64, ip string) (*model.Session, error)
 	GetSession(ctx context.Context, token string) (*model.Session, error)
 	DestroySession(ctx context.Context, token string) error
 	InvalidateOtherSessions(ctx context.Context, userID int64, keepToken string) error

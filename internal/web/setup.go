@@ -93,7 +93,7 @@ func (h *setupHandler) DoSetup(w http.ResponseWriter, r *http.Request) {
 	_ = db.AcceptPrivacy(r.Context(), h.deps.DB, user.ID)
 
 	// Create session.
-	sess, err := h.deps.Auth.CreateSession(r.Context(), user.ID)
+	sess, err := h.deps.Auth.CreateSession(r.Context(), user.ID, ClientIP(r))
 	if err != nil {
 		slog.Error("failed to create session", "error", err)
 		http.Redirect(w, r, "/login", http.StatusSeeOther)

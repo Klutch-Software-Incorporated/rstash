@@ -20,7 +20,7 @@ func storageAudit(r *http.Request, database *sql.DB, userID int64, action, path 
 }
 
 // Storage handles GET/PUT/DELETE/HEAD requests on /storage/{user}/{path...}.
-func Storage(database *sql.DB, svc *storage.Service, maxUploadSize func() int64) http.Handler {
+func Storage(database *sql.DB, svc *storage.Service, maxUploadSize func() int64, publicWrites func() string) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		username := r.PathValue("user")
 		pathVal := r.PathValue("path")
@@ -35,6 +35,12 @@ func Storage(database *sql.DB, svc *storage.Service, maxUploadSize func() int64)
 		isFolder := strings.HasSuffix(storagePath, "/")
 		isPublic := isPublicPath(storagePath)
 		isReadOnly := r.Method == http.MethodGet || r.Method == http.MethodHead
+
+		// Reject writes to /public/ when disabled by operator.
+		if isPublic && !isReadOnly && publicWrites() == "off" {
+			http.Error(w, "public writes are disabled", http.StatusForbidden)
+			return
+		}
 
 		// Public documents are readable without auth (not folders, per spec).
 		needsAuth := !(isPublic && isReadOnly && !isFolder)

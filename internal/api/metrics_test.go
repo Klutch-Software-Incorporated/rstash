@@ -75,7 +75,7 @@ func TestMetricsAuth_AdminSession(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create user: %v", err)
 	}
-	sess, err := db.CreateSession(context.Background(), database, user.ID)
+	sess, err := db.CreateSession(context.Background(), database, user.ID, "")
 	if err != nil {
 		t.Fatalf("create session: %v", err)
 	}
@@ -114,7 +114,7 @@ func TestMetricsAuth_NonAdminSession(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create user: %v", err)
 	}
-	sess, err := db.CreateSession(context.Background(), database, user.ID)
+	sess, err := db.CreateSession(context.Background(), database, user.ID, "")
 	if err != nil {
 		t.Fatalf("create session: %v", err)
 	}

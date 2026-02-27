@@ -38,7 +38,7 @@ func testSetup(t *testing.T) (*httptest.Server, *testEnv) {
 	storageSvc := storage.NewService(database, blobs, quotaChecker)
 
 	mux := http.NewServeMux()
-	mux.Handle("/storage/{user}/{path...}", api.CORS(api.Storage(database, storageSvc, func() int64 { return 50 << 20 })))
+	mux.Handle("/storage/{user}/{path...}", api.CORS(api.Storage(database, storageSvc, func() int64 { return 50 << 20 }, func() string { return "on" })))
 	ts := httptest.NewServer(mux)
 	t.Cleanup(ts.Close)
 
@@ -830,5 +830,98 @@ func TestExpiredToken_Returns401(t *testing.T) {
 
 	if resp.StatusCode != http.StatusUnauthorized {
 		t.Fatalf("expected 401 for nonexistent token, got %d", resp.StatusCode)
+	}
+}
+
+// --- Public writes setting tests ---
+
+func TestPublicWrites_Off_RejectsPUT(t *testing.T) {
+	t.Helper()
+
+	database, err := db.Open(":memory:")
+	if err != nil {
+		t.Fatalf("open db: %v", err)
+	}
+	t.Cleanup(func() { database.Close() })
+
+	blobs, err := blob.NewSQLiteStore(":memory:")
+	if err != nil {
+		t.Fatalf("open blob store: %v", err)
+	}
+	t.Cleanup(func() { blobs.Close() })
+
+	quotaChecker := storage.NewQuotaChecker(storage.QuotaConfig{Mode: "off"}, database)
+	storageSvc := storage.NewService(database, blobs, quotaChecker)
+
+	mux := http.NewServeMux()
+	mux.Handle("/storage/{user}/{path...}", api.CORS(api.Storage(database, storageSvc, func() int64 { return 50 << 20 }, func() string { return "off" })))
+	ts := httptest.NewServer(mux)
+	t.Cleanup(ts.Close)
+
+	ctx := context.Background()
+	user, err := db.CreateUser(ctx, database, "testuser", "password", false, true)
+	if err != nil {
+		t.Fatalf("create user: %v", err)
+	}
+	_, err = db.UpsertOAuthClient(ctx, database, "https://example.com", "https://example.com/callback")
+	if err != nil {
+		t.Fatalf("upsert client: %v", err)
+	}
+	tok, err := db.CreateOAuthToken(ctx, database, user.ID, "https://example.com", []string{"*:rw"}, 0)
+	if err != nil {
+		t.Fatalf("create token: %v", err)
+	}
+
+	client := ts.Client()
+
+	// PUT to /public/ should be rejected with 403.
+	req := authReq("PUT", ts.URL+"/storage/testuser/public/test.txt", tok.Token, strings.NewReader("data"))
+	req.Header.Set("Content-Type", "text/plain")
+	resp, err := client.Do(req)
+	if err != nil {
+		t.Fatalf("request: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusForbidden {
+		t.Fatalf("expected 403 for PUT to /public/ when public_writes=off, got %d", resp.StatusCode)
+	}
+
+	// DELETE to /public/ should also be rejected with 403.
+	req = authReq("DELETE", ts.URL+"/storage/testuser/public/test.txt", tok.Token, nil)
+	resp, err = client.Do(req)
+	if err != nil {
+		t.Fatalf("request: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusForbidden {
+		t.Fatalf("expected 403 for DELETE to /public/ when public_writes=off, got %d", resp.StatusCode)
+	}
+
+	// PUT to non-public path should still work.
+	req = authReq("PUT", ts.URL+"/storage/testuser/private/test.txt", tok.Token, strings.NewReader("data"))
+	req.Header.Set("Content-Type", "text/plain")
+	resp, err = client.Do(req)
+	if err != nil {
+		t.Fatalf("request: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusCreated {
+		t.Fatalf("expected 201 for PUT to non-public path when public_writes=off, got %d", resp.StatusCode)
+	}
+
+	// GET on /public/ should still work (reads unaffected).
+	req = authReq("GET", ts.URL+"/storage/testuser/public/test.txt", "", nil)
+	resp, err = client.Do(req)
+	if err != nil {
+		t.Fatalf("request: %v", err)
+	}
+	defer resp.Body.Close()
+
+	// 404 is expected since we never wrote to it, but NOT 403.
+	if resp.StatusCode == http.StatusForbidden {
+		t.Fatal("GET on /public/ should not be blocked by public_writes=off")
 	}
 }

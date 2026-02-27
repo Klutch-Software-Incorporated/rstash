@@ -9,8 +9,8 @@ import (
 )
 
 // CreateSession generates a new session token and CSRF token for the given user,
-// with a 7-day expiry.
-func CreateSession(ctx context.Context, q Querier, userID int64) (*model.Session, error) {
+// with a 7-day expiry. The ip parameter records the client IP that created the session.
+func CreateSession(ctx context.Context, q Querier, userID int64, ip string) (*model.Session, error) {
 	token, err := RandomHex(32)
 	if err != nil {
 		return nil, fmt.Errorf("generate session token: %w", err)
@@ -22,11 +22,11 @@ func CreateSession(ctx context.Context, q Querier, userID int64) (*model.Session
 
 	var s model.Session
 	err = q.QueryRowContext(ctx,
-		`INSERT INTO sessions (token, user_id, csrf_token, expires_at)
-		 VALUES (?, ?, ?, datetime('now', '+7 days'))
-		 RETURNING token, user_id, csrf_token, created_at, expires_at`,
-		token, userID, csrf,
-	).Scan(&s.Token, &s.UserID, &s.CSRFToken, &s.CreatedAt, &s.ExpiresAt)
+		`INSERT INTO sessions (token, user_id, csrf_token, expires_at, ip)
+		 VALUES (?, ?, ?, datetime('now', '+7 days'), ?)
+		 RETURNING token, user_id, csrf_token, created_at, expires_at, ip`,
+		token, userID, csrf, ip,
+	).Scan(&s.Token, &s.UserID, &s.CSRFToken, &s.CreatedAt, &s.ExpiresAt, &s.IP)
 	if err != nil {
 		return nil, fmt.Errorf("create session: %w", err)
 	}
@@ -38,11 +38,11 @@ func CreateSession(ctx context.Context, q Querier, userID int64) (*model.Session
 func GetSessionByToken(ctx context.Context, q Querier, token string) (*model.Session, error) {
 	var s model.Session
 	err := q.QueryRowContext(ctx,
-		`SELECT token, user_id, csrf_token, created_at, expires_at
+		`SELECT token, user_id, csrf_token, created_at, expires_at, ip
 		 FROM sessions
 		 WHERE token = ? AND expires_at > datetime('now')`,
 		token,
-	).Scan(&s.Token, &s.UserID, &s.CSRFToken, &s.CreatedAt, &s.ExpiresAt)
+	).Scan(&s.Token, &s.UserID, &s.CSRFToken, &s.CreatedAt, &s.ExpiresAt, &s.IP)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -91,7 +91,7 @@ func DeleteUserSessions(ctx context.Context, q Querier, userID int64) error {
 // ListUserSessions returns active (non-expired) sessions for a user.
 func ListUserSessions(ctx context.Context, q Querier, userID int64) ([]*model.Session, error) {
 	rows, err := q.QueryContext(ctx,
-		`SELECT token, user_id, csrf_token, created_at, expires_at
+		`SELECT token, user_id, csrf_token, created_at, expires_at, ip
 		 FROM sessions
 		 WHERE user_id = ? AND expires_at > datetime('now')
 		 ORDER BY created_at DESC`,
@@ -105,7 +105,7 @@ func ListUserSessions(ctx context.Context, q Querier, userID int64) ([]*model.Se
 	var sessions []*model.Session
 	for rows.Next() {
 		var s model.Session
-		if err := rows.Scan(&s.Token, &s.UserID, &s.CSRFToken, &s.CreatedAt, &s.ExpiresAt); err != nil {
+		if err := rows.Scan(&s.Token, &s.UserID, &s.CSRFToken, &s.CreatedAt, &s.ExpiresAt, &s.IP); err != nil {
 			return nil, fmt.Errorf("scan session: %w", err)
 		}
 		sessions = append(sessions, &s)
@@ -155,7 +155,7 @@ func ActiveUserCount(ctx context.Context, q Querier, since string) (int64, error
 // time descending.
 func GetRecentUserSessions(ctx context.Context, q Querier, userID int64, limit int) ([]*model.Session, error) {
 	rows, err := q.QueryContext(ctx,
-		`SELECT token, user_id, csrf_token, created_at, expires_at
+		`SELECT token, user_id, csrf_token, created_at, expires_at, ip
 		 FROM sessions
 		 WHERE user_id = ?
 		 ORDER BY created_at DESC
@@ -170,7 +170,7 @@ func GetRecentUserSessions(ctx context.Context, q Querier, userID int64, limit i
 	var sessions []*model.Session
 	for rows.Next() {
 		var s model.Session
-		if err := rows.Scan(&s.Token, &s.UserID, &s.CSRFToken, &s.CreatedAt, &s.ExpiresAt); err != nil {
+		if err := rows.Scan(&s.Token, &s.UserID, &s.CSRFToken, &s.CreatedAt, &s.ExpiresAt, &s.IP); err != nil {
 			return nil, fmt.Errorf("scan session: %w", err)
 		}
 		sessions = append(sessions, &s)

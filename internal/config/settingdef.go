@@ -170,7 +170,7 @@ func SettingDefs() []SettingDef {
 		{
 			Key:             "log_level",
 			EnvVar:          EnvLogLevel,
-			Group:           "Access",
+			Group:           "Monitoring",
 			Label:           "Log level",
 			Description:     "Minimum severity for log output.",
 			Help:            "Controls the minimum severity of log messages written to stderr. \"debug\" is the most verbose, showing detailed request/response information. \"info\" shows normal operational messages. \"warn\" shows only warnings and errors. \"error\" shows only errors. The " + EnvLogLevel + " environment variable is read at startup for early logging; runtime changes via the admin UI take effect immediately.",
@@ -244,6 +244,17 @@ func SettingDefs() []SettingDef {
 			Help:            "The maximum size of a single PUT request body (i.e. a single file upload). Requests exceeding this limit are rejected with a 413 Payload Too Large response. Accepts human-readable sizes: B, KB, MB, GB. Must be greater than 0. Consider your available memory and storage when setting this value. Changes take effect immediately.",
 			Default:         "50MB",
 			InputType:       InputByteSize,
+			RuntimeEditable: true,
+		},
+		{
+			Key:             "public_writes",
+			Group:           "Storage",
+			Label:           "Public writes",
+			Description:     "Allow writes to /public/ paths (publicly readable storage).",
+			Help:            "Controls whether users can write to /public/ paths. Public paths are readable by anyone without authentication per the remoteStorage spec. When \"off\", PUT and DELETE requests to /public/ paths are rejected with 403 Forbidden. Users can still read existing public documents. When \"on\", writes are allowed normally. Operators concerned about users hosting publicly accessible content (piracy, illegal material) should set this to \"off\". Changes take effect immediately.",
+			Default:         "on",
+			ValidValues:     []string{"on", "off"},
+			InputType:       InputSelect,
 			RuntimeEditable: true,
 		},
 

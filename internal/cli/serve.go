@@ -208,6 +208,8 @@ func runServe(cmd *cobra.Command, args []string) error {
 	mux.Handle("POST /oauth/revoke", api.CORS(api.OAuthRevoke(database)))
 	mux.Handle("/storage/{user}/{path...}", api.CORS(api.Storage(database, storageSvc, func() int64 {
 		return runtimeSettings.Load().MaxUploadSize
+	}, func() string {
+		return runtimeSettings.Load().PublicWrites
 	})))
 
 	// JSON management API (registered outside web_mode gating).

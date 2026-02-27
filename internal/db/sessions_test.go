@@ -16,7 +16,7 @@ func TestCreateAndGetSession(t *testing.T) {
 		t.Fatalf("create user: %v", err)
 	}
 
-	sess, err := db.CreateSession(ctx, database, user.ID)
+	sess, err := db.CreateSession(ctx, database, user.ID, "")
 	if err != nil {
 		t.Fatalf("create session: %v", err)
 	}
@@ -61,7 +61,7 @@ func TestDeleteSession(t *testing.T) {
 	ctx := context.Background()
 
 	user, _ := db.CreateUser(ctx, database, "delsessuser", "password123", false, true)
-	sess, _ := db.CreateSession(ctx, database, user.ID)
+	sess, _ := db.CreateSession(ctx, database, user.ID, "")
 
 	if err := db.DeleteSession(ctx, database, sess.Token); err != nil {
 		t.Fatalf("delete session: %v", err)
@@ -81,8 +81,8 @@ func TestDeleteUserSessions(t *testing.T) {
 	ctx := context.Background()
 
 	user, _ := db.CreateUser(ctx, database, "multisessuser", "password123", false, true)
-	db.CreateSession(ctx, database, user.ID)
-	db.CreateSession(ctx, database, user.ID)
+	db.CreateSession(ctx, database, user.ID, "")
+	db.CreateSession(ctx, database, user.ID, "")
 
 	if err := db.DeleteUserSessions(ctx, database, user.ID); err != nil {
 		t.Fatalf("delete user sessions: %v", err)
@@ -94,7 +94,7 @@ func TestExpiredSessionReturnsNil(t *testing.T) {
 	ctx := context.Background()
 
 	user, _ := db.CreateUser(ctx, database, "expuser", "password123", false, true)
-	sess, _ := db.CreateSession(ctx, database, user.ID)
+	sess, _ := db.CreateSession(ctx, database, user.ID, "")
 
 	// Manually expire the session.
 	database.ExecContext(ctx, "UPDATE sessions SET expires_at = datetime('now', '-1 day') WHERE token = ?", sess.Token)

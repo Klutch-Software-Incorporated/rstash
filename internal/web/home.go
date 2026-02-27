@@ -80,9 +80,13 @@ func buildActivityFeed(ctx context.Context, database *sql.DB, userID int64) []*a
 		slog.Error("failed to get recent sessions", "error", err)
 	} else {
 		for _, s := range sessions {
+			summary := "Logged in"
+			if s.IP != nil && *s.IP != "" {
+				summary = "Logged in from " + *s.IP
+			}
 			events = append(events, &activityEvent{
 				Type:      "login",
-				Summary:   "Logged in",
+				Summary:   summary,
 				Timestamp: s.CreatedAt,
 			})
 		}

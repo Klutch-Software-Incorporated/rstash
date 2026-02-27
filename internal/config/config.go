@@ -30,6 +30,7 @@ type Config struct {
 	RefreshTokens        string  // "enabled" or "disabled"
 	RefreshTokenLifetime string  // refresh token lifetime: "90d", "0" (no expiry)
 	MetricsMode          string  // "public", "admin", or "off"
+	PublicWrites         string  // "on" or "off"
 	JSONApi              string  // "off" or "admin"
 	TOSMode              string  // "off", "text", "url"
 	TOSContent           string
@@ -76,6 +77,7 @@ func Load() *Config {
 
 		// Runtime-editable: sane defaults, changed via CLI/admin UI.
 		MetricsMode:      "public",
+		PublicWrites:     "on",
 		JSONApi:          "off",
 		TOSMode:          "text",
 		TOSContent:       defaultTOSContent,

@@ -48,6 +48,7 @@ type Session struct {
 	CSRFToken string
 	CreatedAt string
 	ExpiresAt string
+	IP        *string
 }
 
 type AuditEntry struct {

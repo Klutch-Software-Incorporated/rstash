@@ -66,7 +66,7 @@ func (h *authHandler) DoLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	sess, err := h.deps.Auth.CreateSession(r.Context(), user.ID)
+	sess, err := h.deps.Auth.CreateSession(r.Context(), user.ID, ClientIP(r))
 	if err != nil {
 		slog.Error("failed to create session", "error", err)
 		renderErr("An error occurred. Please try again.")

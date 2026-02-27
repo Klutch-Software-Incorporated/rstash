@@ -152,6 +152,7 @@
         </tr>
         {{end}}
     </tbody>
+    {{if not .PublicWritesOff}}
     <tfoot>
         <tr class="upload-row">
             <td colspan="5">
@@ -163,6 +164,11 @@
             </td>
         </tr>
     </tfoot>
+    {{else}}
+    <tfoot>
+        <tr><td colspan="5"><span class="hint">Uploads to public paths are disabled by the server operator.</span></td></tr>
+    </tfoot>
+    {{end}}
 </table>
 <script>
 (function(){
