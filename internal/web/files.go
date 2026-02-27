@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"mime"
 	"net/http"
+	"net/url"
 	"path"
 	"regexp"
 	"sort"
@@ -60,6 +61,7 @@ type filesContent struct {
 	Username        string
 	CurrentPath     string
 	IsRoot          bool
+	IsPublic        bool
 	ParentBrowseURL string
 	Breadcrumbs     []breadcrumb
 	Items           []*fileItem
@@ -156,6 +158,7 @@ func (h *filesHandler) browseFolder(w http.ResponseWriter, r *http.Request, user
 		Username:        username,
 		CurrentPath:     storagePath,
 		IsRoot:          storagePath == "/",
+		IsPublic:        strings.HasPrefix(storagePath, "/public/") || storagePath == "/public/",
 		ParentBrowseURL: parentURL,
 		Breadcrumbs:     breadcrumbs,
 		Items:           items,
@@ -417,7 +420,7 @@ func (h *filesHandler) Search(w http.ResponseWriter, r *http.Request) {
 				results[i] = &searchResultRow{
 					Name:        path.Base(n.Path),
 					Path:        n.Path,
-					BrowseURL:   "/files" + n.Path,
+					BrowseURL:   "/files" + path.Dir(n.Path) + "/#file-" + url.PathEscape(path.Base(n.Path)),
 					Size:        formatBytes(n.ContentLength),
 					ContentType: n.ContentType,
 				}

@@ -36,6 +36,7 @@ type adminDashboardContent struct {
 	ActiveUsers7d      int64
 	TopUsers           []*topUserRow
 	OpenAbuseReports   int64
+	RecentAudit        []*auditRow
 }
 
 type adminUsersContent struct {
@@ -173,6 +174,24 @@ func (h *adminHandler) ShowDashboard(w http.ResponseWriter, r *http.Request) {
 
 	pendingCount, _ := db.CountPendingUsers(ctx, h.deps.DB)
 	content.PendingApproval = pendingCount
+
+	auditEntries, err := db.ListAuditEntries(ctx, h.deps.DB, 15, 0)
+	if err != nil {
+		slog.Error("failed to list recent audit entries", "error", err)
+	} else {
+		aRows := make([]*auditRow, len(auditEntries))
+		for i, e := range auditEntries {
+			aRows[i] = &auditRow{
+				ActorUsername: e.ActorUsername,
+				Action:       e.Action,
+				TargetType:   e.TargetType,
+				TargetID:     e.TargetID,
+				Details:      e.Details,
+				CreatedAt:    e.CreatedAt,
+			}
+		}
+		content.RecentAudit = aRows
+	}
 
 	h.deps.Renderer.Render(w, "admin_dashboard", h.deps.adminPageData(w, r, "Admin — Gosilo", "overview", content))
 }

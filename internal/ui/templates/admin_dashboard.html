@@ -43,5 +43,25 @@
 </table>
 {{end}}
 
+{{if .RecentAudit}}
+<h2>Recent Activity</h2>
+<table>
+    <thead>
+        <tr><th>Actor</th><th>Action</th><th>Details</th><th>Time</th></tr>
+    </thead>
+    <tbody>
+        {{range .RecentAudit}}
+        <tr>
+            <td>{{.ActorUsername}}</td>
+            <td><code>{{.Action}}</code></td>
+            <td>{{.Details}}</td>
+            <td><time datetime="{{.CreatedAt}}">{{.CreatedAt}}</time></td>
+        </tr>
+        {{end}}
+    </tbody>
+</table>
+<p><a href="/admin/audit">Full audit log &rarr;</a></p>
+{{end}}
+
 {{end}}
 {{end}}

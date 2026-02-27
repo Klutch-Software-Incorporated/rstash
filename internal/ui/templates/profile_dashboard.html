@@ -36,18 +36,6 @@
 {{end}}
 
 {{if .IsSelf}}
-{{/* ===== Two-column: RS Address + Storage (self-view) ===== */}}
-<div class="dash-grid">
-<div>
-<h2>remoteStorage Address</h2>
-<dl class="compact">
-    <dt>Address</dt>
-    <dd><code>{{.Username}}@{{.Host}}</code></dd>
-    <dt>WebFinger</dt>
-    <dd><code>{{.BaseURL}}/.well-known/webfinger?resource=acct:{{.Username}}@{{.Host}}</code></dd>
-</dl>
-</div>
-<div>
 <h2>Storage</h2>
 {{if eq .QuotaMode "user"}}
 <p>{{.Stats.StorageUsed}} used of {{.Stats.StorageQuota}} ({{.Stats.QuotaPercent}}%) &mdash; {{.Stats.FileCount}} files</p>
@@ -56,8 +44,6 @@
 <p>{{.Stats.StorageUsed}} used &mdash; {{.Stats.FileCount}} files</p>
 {{end}}
 <p>Connected Apps: {{.Stats.OAuthApps}} &nbsp; Active Sessions: {{.SessionCount}} &nbsp; <a href="{{.URLPrefix}}/settings">Manage &rarr;</a></p>
-</div>
-</div>
 {{else}}
 {{/* ===== Storage (admin view, no side-by-side) ===== */}}
 <h2>Storage</h2>

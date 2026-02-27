@@ -21,14 +21,6 @@
     <dd>draft-dejong-remotestorage-26</dd>
 </dl>
 
-<h2>Storage</h2>
-{{if eq .QuotaMode "user"}}
-<p>{{.Stats.StorageUsed}} used of {{.Stats.StorageQuota}} ({{.Stats.QuotaPercent}}%)</p>
-<meter min="0" max="{{.Stats.QuotaBytes}}" value="{{.Stats.StorageBytes}}">{{.Stats.QuotaPercent}}%</meter>
-{{else}}
-<p>{{.Stats.StorageUsed}} used &mdash; {{.Stats.FileCount}} files</p>
-{{end}}
-
 {{if .IsSelf}}
 <h2>Change Password</h2>
 <form method="POST" action="{{.URLPrefix}}/settings/password" style="max-width:28rem">

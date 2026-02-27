@@ -28,6 +28,12 @@
     </form>
 </div>
 
+{{if .IsPublic}}
+<div role="alert" class="alert-warning" style="margin-bottom:.75rem">
+    &#127760; Files under <code>/public/</code> are readable by anyone without authentication.
+</div>
+{{end}}
+
 {{if .IsRoot}}
 {{if .Items}}
 <form method="POST" action="/files/bulk-delete" id="bulk-form">
@@ -49,10 +55,10 @@
     </thead>
     <tbody>
         {{range .Items}}
-        <tr>
+        <tr id="file-{{.Name}}">
             <td class="bulk-check-col" style="text-align:center"><input type="checkbox" name="paths[]" value="{{.Path}}" class="bulk-check" form="bulk-form"></td>
             <td data-label="Name" class="cell-name">
-                <span class="file-icon">&#128193;</span>
+                {{if eq .Name "public/"}}<span class="file-icon">&#127760;</span>{{else}}<span class="file-icon">&#128193;</span>{{end}}
                 <a href="{{.BrowseURL}}" class="truncate" title="{{.Name}}">{{.Name}}</a>
             </td>
             <td data-label="Size">{{.Size}}</td>
@@ -124,7 +130,7 @@
             <td></td>
         </tr>
         {{range .Items}}
-        <tr>
+        <tr id="file-{{.Name}}">
             <td class="bulk-check-col" style="text-align:center"><input type="checkbox" name="paths[]" value="{{.Path}}" class="bulk-check" form="bulk-form"></td>
             <td data-label="Name" class="cell-name">
                 {{if .IsFolder}}<span class="file-icon">&#128193;</span>{{else}}<span class="file-icon">&#128196;</span>{{end}}

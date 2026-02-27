@@ -96,7 +96,7 @@ func (h *profileHandler) ShowDashboard(w http.ResponseWriter, r *http.Request) {
 		fileRows[i] = &recentFileRow{
 			Name:        path.Base(n.Path),
 			Path:        n.Path,
-			BrowseURL:   prefix + "/files" + n.Path,
+			BrowseURL:   prefix + "/files" + path.Dir(n.Path) + "/#file-" + url.PathEscape(path.Base(n.Path)),
 			Size:        formatBytes(n.ContentLength),
 			ContentType: n.ContentType,
 			UpdatedAt:   n.UpdatedAt,
@@ -109,7 +109,7 @@ func (h *profileHandler) ShowDashboard(w http.ResponseWriter, r *http.Request) {
 		largestRows[i] = &recentFileRow{
 			Name:        path.Base(n.Path),
 			Path:        n.Path,
-			BrowseURL:   prefix + "/files" + n.Path,
+			BrowseURL:   prefix + "/files" + path.Dir(n.Path) + "/#file-" + url.PathEscape(path.Base(n.Path)),
 			Size:        formatBytes(n.ContentLength),
 			ContentType: n.ContentType,
 			UpdatedAt:   n.UpdatedAt,
@@ -375,6 +375,7 @@ type profileFilesContent struct {
 	Username        string
 	CurrentPath     string
 	IsRoot          bool
+	IsPublic        bool
 	ParentBrowseURL string
 	Breadcrumbs     []breadcrumb
 	Items           []*fileItem
@@ -457,6 +458,7 @@ func (h *profileHandler) browseFolder(w http.ResponseWriter, r *http.Request, us
 		Username:        username,
 		CurrentPath:     storagePath,
 		IsRoot:          storagePath == "/",
+		IsPublic:        strings.HasPrefix(storagePath, "/public/") || storagePath == "/public/",
 		ParentBrowseURL: parentURL,
 		Breadcrumbs:     breadcrumbs,
 		Items:           items,
@@ -503,7 +505,7 @@ func (h *profileHandler) SearchFiles(w http.ResponseWriter, r *http.Request) {
 				results[i] = &searchResultRow{
 					Name:        path.Base(n.Path),
 					Path:        n.Path,
-					BrowseURL:   prefix + "/files" + n.Path,
+					BrowseURL:   prefix + "/files" + path.Dir(n.Path) + "/#file-" + url.PathEscape(path.Base(n.Path)),
 					Size:        formatBytes(n.ContentLength),
 					ContentType: n.ContentType,
 				}
