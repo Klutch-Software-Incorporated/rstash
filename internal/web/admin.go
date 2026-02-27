@@ -522,6 +522,7 @@ func (h *adminHandler) ToggleDisabled(w http.ResponseWriter, r *http.Request) {
 }
 
 type recentFileRow struct {
+	Name        string
 	Path        string
 	BrowseURL   string
 	Size        string

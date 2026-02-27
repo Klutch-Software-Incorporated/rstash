@@ -187,6 +187,22 @@ func GetRecentUserNodes(ctx context.Context, q Querier, userID int64, limit int)
 	return scanNodes(rows)
 }
 
+// GetLargestUserNodes returns the largest non-folder nodes for a user by content_length.
+func GetLargestUserNodes(ctx context.Context, q Querier, userID int64, limit int) ([]*model.Node, error) {
+	rows, err := q.QueryContext(ctx,
+		`SELECT `+nodeColumns+`
+		 FROM nodes
+		 WHERE user_id = ? AND is_folder = 0
+		 ORDER BY content_length DESC
+		 LIMIT ?`,
+		userID, limit,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("get largest user nodes: %w", err)
+	}
+	return scanNodes(rows)
+}
+
 // GetSubtreeSize returns the total content_length of all non-folder descendants
 // under the given folder path.
 func GetSubtreeSize(ctx context.Context, q Querier, userID int64, folderPath string) (int64, error) {

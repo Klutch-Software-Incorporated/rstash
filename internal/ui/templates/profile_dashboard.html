@@ -1,6 +1,11 @@
 {{define "profile_dashboard"}}
 {{with .Content}}
 
+<style>
+.dash-grid { display: grid; grid-template-columns: 1fr; gap: 1.5rem; }
+@media (min-width: 768px) { .dash-grid { grid-template-columns: 1fr 1fr; } }
+</style>
+
 {{if not .IsSelf}}
 {{/* ===== Admin viewing another user ===== */}}
 {{if .TargetUser}}
@@ -31,7 +36,9 @@
 {{end}}
 
 {{if .IsSelf}}
-{{/* ===== Quick-Reference Card (self-view only) ===== */}}
+{{/* ===== Two-column: RS Address + Storage (self-view) ===== */}}
+<div class="dash-grid">
+<div>
 <h2>remoteStorage Address</h2>
 <dl class="compact">
     <dt>Address</dt>
@@ -39,9 +46,8 @@
     <dt>WebFinger</dt>
     <dd><code>{{.BaseURL}}/.well-known/webfinger?resource=acct:{{.Username}}@{{.Host}}</code></dd>
 </dl>
-{{end}}
-
-{{/* ===== Stats Summary ===== */}}
+</div>
+<div>
 <h2>Storage</h2>
 {{if eq .QuotaMode "user"}}
 <p>{{.Stats.StorageUsed}} used of {{.Stats.StorageQuota}} ({{.Stats.QuotaPercent}}%) &mdash; {{.Stats.FileCount}} files</p>
@@ -49,24 +55,33 @@
 {{else}}
 <p>{{.Stats.StorageUsed}} used &mdash; {{.Stats.FileCount}} files</p>
 {{end}}
-
-{{if .IsSelf}}
 <p>Connected Apps: {{.Stats.OAuthApps}} &nbsp; Active Sessions: {{.SessionCount}} &nbsp; <a href="{{.URLPrefix}}/settings">Manage &rarr;</a></p>
+</div>
+</div>
+{{else}}
+{{/* ===== Storage (admin view, no side-by-side) ===== */}}
+<h2>Storage</h2>
+{{if eq .QuotaMode "user"}}
+<p>{{.Stats.StorageUsed}} used of {{.Stats.StorageQuota}} ({{.Stats.QuotaPercent}}%) &mdash; {{.Stats.FileCount}} files</p>
+<meter min="0" max="{{.Stats.QuotaBytes}}" value="{{.Stats.StorageBytes}}">{{.Stats.QuotaPercent}}%</meter>
+{{else}}
+<p>{{.Stats.StorageUsed}} used &mdash; {{.Stats.FileCount}} files</p>
+{{end}}
 {{end}}
 
-{{/* ===== Recent Files (all users) ===== */}}
+{{/* ===== Recent Files + Largest Files (two-column) ===== */}}
+<div class="dash-grid">
+<div>
 <h2>Recent Files</h2>
 {{if .RecentFiles}}
 <table class="responsive-table">
     <thead>
-        <tr><th>Path</th><th>Size</th><th>Type</th><th>Updated</th></tr>
+        <tr><th>Name</th><th>Updated</th></tr>
     </thead>
     <tbody>
         {{range .RecentFiles}}
         <tr>
-            <td data-label="Path"><a href="{{.BrowseURL}}"><code>{{.Path}}</code></a></td>
-            <td data-label="Size">{{.Size}}</td>
-            <td data-label="Type">{{.ContentType}}</td>
+            <td data-label="Name"><a href="{{.BrowseURL}}">{{.Name}}</a></td>
             <td data-label="Updated"><time datetime="{{.UpdatedAt}}">{{.UpdatedAt}}</time></td>
         </tr>
         {{end}}
@@ -75,6 +90,28 @@
 {{else}}
 <p class="empty-state">No files stored yet. Use a <a href="https://remotestorage.io/apps/">remoteStorage app</a> to get started.</p>
 {{end}}
+</div>
+<div>
+<h2>Largest Files</h2>
+{{if .LargestFiles}}
+<table class="responsive-table">
+    <thead>
+        <tr><th>Name</th><th>Size</th></tr>
+    </thead>
+    <tbody>
+        {{range .LargestFiles}}
+        <tr>
+            <td data-label="Name"><a href="{{.BrowseURL}}">{{.Name}}</a></td>
+            <td data-label="Size">{{.Size}}</td>
+        </tr>
+        {{end}}
+    </tbody>
+</table>
+{{else}}
+<p class="empty-state">No files stored yet.</p>
+{{end}}
+</div>
+</div>
 
 <h2>Recent Activity</h2>
 {{if .Activity}}

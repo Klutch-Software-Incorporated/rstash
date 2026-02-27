@@ -40,6 +40,7 @@ type profileDashboardContent struct {
 	Stats        *homeStats
 	Activity     []*activityEvent
 	RecentFiles  []*recentFileRow
+	LargestFiles []*recentFileRow
 	SessionCount int64
 	QuotaMode    string
 	Tokens       []*tokenRow
@@ -90,6 +91,20 @@ func (h *profileHandler) ShowDashboard(w http.ResponseWriter, r *http.Request) {
 	fileRows := make([]*recentFileRow, len(recentNodes))
 	for i, n := range recentNodes {
 		fileRows[i] = &recentFileRow{
+			Name:        path.Base(n.Path),
+			Path:        n.Path,
+			BrowseURL:   prefix + "/files" + n.Path,
+			Size:        formatBytes(n.ContentLength),
+			ContentType: n.ContentType,
+			UpdatedAt:   n.UpdatedAt,
+		}
+	}
+
+	largestNodes, _ := db.GetLargestUserNodes(ctx, h.deps.DB, target.ID, 10)
+	largestRows := make([]*recentFileRow, len(largestNodes))
+	for i, n := range largestNodes {
+		largestRows[i] = &recentFileRow{
+			Name:        path.Base(n.Path),
 			Path:        n.Path,
 			BrowseURL:   prefix + "/files" + n.Path,
 			Size:        formatBytes(n.ContentLength),
@@ -148,6 +163,7 @@ func (h *profileHandler) ShowDashboard(w http.ResponseWriter, r *http.Request) {
 		Stats:        hs,
 		Activity:     activity,
 		RecentFiles:  fileRows,
+		LargestFiles: largestRows,
 		SessionCount: sessCount,
 		QuotaMode:    snap.QuotaMode,
 		Tokens:       tokenRows,
