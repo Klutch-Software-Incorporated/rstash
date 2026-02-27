@@ -1,64 +1,4 @@
 {{define "home"}}
-{{if .Content}}
-{{/* ===== Logged-in: User Dashboard ===== */}}
-{{with .Content}}
-
-<h2>Storage</h2>
-{{if eq $.Content.QuotaMode "user"}}
-<p>{{.Stats.StorageUsed}} used of {{.Stats.StorageQuota}} ({{.Stats.QuotaPercent}}%)</p>
-<meter min="0" max="{{.Stats.QuotaBytes}}" value="{{.Stats.StorageBytes}}">{{.Stats.QuotaPercent}}%</meter>
-{{else}}
-<p>{{.Stats.StorageUsed}} used &mdash; {{.Stats.FileCount}} files</p>
-{{end}}
-
-<h2>Data Modules</h2>
-{{if .Modules}}
-<table>
-    <thead>
-        <tr><th>Module</th><th>Files</th><th>Size</th></tr>
-    </thead>
-    <tbody>
-        {{range .Modules}}
-        <tr>
-            <td><a href="/files/{{.Name}}/"><code>{{.Name}}/</code></a></td>
-            <td>{{.FileCount}}</td>
-            <td>{{.Size}}</td>
-        </tr>
-        {{end}}
-    </tbody>
-</table>
-{{else}}
-<p class="empty-state">No files stored yet. Use a <a href="https://remotestorage.io/apps/">remoteStorage app</a> to get started.</p>
-{{end}}
-
-<h2>Recent Activity</h2>
-{{if .Activity}}
-<table>
-    <thead>
-        <tr><th>Event</th><th>Time</th></tr>
-    </thead>
-    <tbody>
-        {{range .Activity}}
-        <tr>
-            <td>
-                {{if eq .Type "file_update"}}<span class="badge badge-available">file</span>
-                {{else if eq .Type "login"}}<span class="badge badge-admin">login</span>
-                {{else if eq .Type "oauth_grant"}}<span class="badge badge-used">oauth</span>
-                {{end}}
-                {{.Summary}}
-            </td>
-            <td><time datetime="{{.Timestamp}}">{{.Timestamp}}</time></td>
-        </tr>
-        {{end}}
-    </tbody>
-</table>
-{{else}}
-<p class="empty-state">No recent activity.</p>
-{{end}}
-
-{{end}}
-
-{{else}}
 {{/* ===== Logged-out: Server Info ===== */}}
 <div class="hero">
     <h1>Welcome to Gosilo</h1>
@@ -80,5 +20,4 @@
         {{end}}
     </div>
 </div>
-{{end}}
 {{end}}

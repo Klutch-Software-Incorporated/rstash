@@ -637,8 +637,8 @@ func TestJSONApi_DocsPage(t *testing.T) {
 		t.Fatalf("expected 200, got %d", resp.StatusCode)
 	}
 	body, _ := io.ReadAll(resp.Body)
-	if !bytes.Contains(body, []byte("scalar")) {
-		t.Fatal("response body does not contain 'scalar'")
+	if !bytes.Contains(body, []byte("redoc")) {
+		t.Fatal("response body does not contain 'redoc'")
 	}
 }
 

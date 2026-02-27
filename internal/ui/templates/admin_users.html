@@ -37,7 +37,7 @@
     <tbody>
         {{range .Users}}
         <tr>
-            <td data-label="Username"><a href="/admin/users/{{.ID}}/activity">{{.Username}}</a></td>
+            <td data-label="Username"><a href="/~{{.Username}}/">{{.Username}}</a></td>
             <td data-label="Role">{{if .IsAdmin}}<span class="badge badge-admin">admin</span>{{else}}user{{end}}</td>
             <td data-label="Status">{{if .Disabled}}<span class="badge badge-disabled">disabled</span>{{else}}<span class="badge badge-active">active</span>{{end}}</td>
             <td data-label="Storage">
@@ -46,7 +46,7 @@
                 <span style="color:#888;font-size:.75rem">/ {{.StorageQuota}}</span>
                 {{end}}
             </td>
-            <td data-label="Sessions"><a href="/admin/users/{{.ID}}/sessions">{{.SessionCount}}</a></td>
+            <td data-label="Sessions"><a href="/~{{.Username}}/settings">{{.SessionCount}}</a></td>
             <td data-label="Created"><time datetime="{{.CreatedAt}}">{{.CreatedAt}}</time></td>
             <td data-label="Last Login">{{if .LastLoginAt}}<time datetime="{{.LastLoginAt}}">{{.LastLoginAt}}</time>{{if .LastLoginIP}} <span style="color:#888;font-size:.75rem">({{.LastLoginIP}})</span>{{end}}{{else}}Never{{end}}</td>
             <td data-label="Actions">

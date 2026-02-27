@@ -14,8 +14,10 @@ import (
 type contextKey string
 
 const (
-	ctxKeyUser    contextKey = "user"
-	ctxKeySession contextKey = "session"
+	ctxKeyUser       contextKey = "user"
+	ctxKeySession    contextKey = "session"
+	ctxKeyTargetUser contextKey = "targetUser"
+	ctxKeyIsSelf     contextKey = "isSelf"
 )
 
 // AuthLoader returns middleware that reads the session cookie and loads
@@ -167,6 +169,55 @@ func SetupGuard(authSvc auth.Service) func(http.Handler) http.Handler {
 			next.ServeHTTP(w, r)
 		})
 	}
+}
+
+// UserScopeGuard returns middleware that resolves {username} from the URL,
+// verifies the current user is either the target user or an admin, and
+// stores the target user + isSelf flag in context.
+func UserScopeGuard(authSvc auth.Service) func(http.HandlerFunc) http.HandlerFunc {
+	return func(next http.HandlerFunc) http.HandlerFunc {
+		return func(w http.ResponseWriter, r *http.Request) {
+			currentUser := CurrentUser(r)
+			if currentUser == nil {
+				http.Redirect(w, r, "/login", http.StatusSeeOther)
+				return
+			}
+
+			username := r.PathValue("username")
+			if username == "" {
+				http.NotFound(w, r)
+				return
+			}
+
+			targetUser, err := authSvc.GetUserByUsername(r.Context(), username)
+			if err != nil || targetUser == nil {
+				http.NotFound(w, r)
+				return
+			}
+
+			isSelf := currentUser.ID == targetUser.ID
+			if !isSelf && !currentUser.IsAdmin {
+				http.Error(w, "Forbidden", http.StatusForbidden)
+				return
+			}
+
+			ctx := context.WithValue(r.Context(), ctxKeyTargetUser, targetUser)
+			ctx = context.WithValue(ctx, ctxKeyIsSelf, isSelf)
+			next.ServeHTTP(w, r.WithContext(ctx))
+		}
+	}
+}
+
+// TargetUser returns the target user from context (set by UserScopeGuard).
+func TargetUser(r *http.Request) *model.User {
+	u, _ := r.Context().Value(ctxKeyTargetUser).(*model.User)
+	return u
+}
+
+// IsSelf returns true if the current user is viewing their own profile.
+func IsSelf(r *http.Request) bool {
+	v, _ := r.Context().Value(ctxKeyIsSelf).(bool)
+	return v
 }
 
 // userInfo converts a model.User to a ui.UserInfo, or nil if user is nil.

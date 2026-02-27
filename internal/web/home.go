@@ -6,7 +6,6 @@ import (
 	"log/slog"
 	"net/http"
 	"sort"
-	"strings"
 
 	"gosilo/internal/db"
 )
@@ -18,16 +17,6 @@ type homeHandler struct {
 // HomeHandler returns handler methods for the home page.
 func HomeHandler(deps *UIDeps) *homeHandler {
 	return &homeHandler{deps: deps}
-}
-
-type homeContent struct {
-	Stats         *homeStats
-	Modules       []*moduleRow
-	Activity      []*activityEvent
-	QuotaMode     string
-	Tokens        []*tokenRow
-	PasswordError string
-	BaseURL       string
 }
 
 type homeStats struct {
@@ -52,8 +41,8 @@ type activityEvent struct {
 	Timestamp string
 }
 
-// Show handles GET / — account overview for logged-in users, server info for
-// logged-out visitors.
+// Show handles GET / — redirect logged-in users to their profile,
+// show server info for logged-out visitors.
 func (h *homeHandler) Show(w http.ResponseWriter, r *http.Request) {
 	if r.URL.Path != "/" {
 		http.NotFound(w, r)
@@ -61,93 +50,12 @@ func (h *homeHandler) Show(w http.ResponseWriter, r *http.Request) {
 	}
 
 	user := CurrentUser(r)
-	if user == nil {
-		h.deps.Renderer.Render(w, "home", h.deps.pageData(w, r, "Gosilo", nil))
+	if user != nil {
+		http.Redirect(w, r, "/~"+user.Username+"/", http.StatusSeeOther)
 		return
 	}
 
-	ctx := r.Context()
-
-	stats, err := db.GetUserStorageStats(ctx, h.deps.DB, user.ID)
-	if err != nil {
-		slog.Error("failed to get storage stats", "error", err)
-		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
-		return
-	}
-
-	tokenCount, err := db.CountUserOAuthTokens(ctx, h.deps.DB, user.ID)
-	if err != nil {
-		slog.Error("failed to count oauth tokens", "error", err)
-		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
-		return
-	}
-
-	modules, err := db.GetUserModuleStats(ctx, h.deps.DB, user.ID)
-	if err != nil {
-		slog.Error("failed to get module stats", "error", err)
-		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
-		return
-	}
-
-	moduleRows := make([]*moduleRow, len(modules))
-	for i, m := range modules {
-		moduleRows[i] = &moduleRow{
-			Name:      m.Module,
-			FileCount: m.FileCount,
-			Size:      formatBytes(m.TotalBytes),
-		}
-	}
-
-	activity := buildActivityFeed(ctx, h.deps.DB, user.ID)
-
-	// Load OAuth tokens for "Connected Apps" section.
-	oauthTokens, err := db.ListOAuthTokensByUserID(ctx, h.deps.DB, user.ID)
-	if err != nil {
-		slog.Error("failed to list oauth tokens", "error", err)
-		oauthTokens = nil
-	}
-	tokenRows := make([]*tokenRow, len(oauthTokens))
-	for i, t := range oauthTokens {
-		tokenRows[i] = &tokenRow{
-			TokenPrefix: t.Token[:8] + "...",
-			TokenFull:   t.Token,
-			ClientID:    t.ClientID,
-			Scopes:      strings.Join(t.Scopes, ", "),
-			CreatedAt:   t.CreatedAt,
-		}
-	}
-
-	hs := &homeStats{
-		FileCount:    stats.FileCount,
-		StorageUsed:  formatBytes(stats.TotalBytes),
-		StorageBytes: stats.TotalBytes,
-		OAuthApps:    tokenCount,
-	}
-	snap := h.deps.Settings.Load()
-	if snap.QuotaMode == "user" {
-		limit := snap.QuotaUser
-		if user.StorageQuota > 0 {
-			limit = user.StorageQuota
-		}
-		hs.StorageQuota = formatBytes(limit)
-		hs.QuotaBytes = limit
-		if limit > 0 {
-			pct := int(stats.TotalBytes * 100 / limit)
-			if pct > 100 {
-				pct = 100
-			}
-			hs.QuotaPercent = pct
-		}
-	}
-
-	h.deps.Renderer.Render(w, "home", h.deps.pageData(w, r, "Gosilo", &homeContent{
-		Stats:     hs,
-		Modules:   moduleRows,
-		Activity:  activity,
-		QuotaMode: snap.QuotaMode,
-		Tokens:    tokenRows,
-		BaseURL:   h.deps.Config.BaseURL,
-	}))
+	h.deps.Renderer.Render(w, "home", h.deps.pageData(w, r, "Gosilo", nil))
 }
 
 func buildActivityFeed(ctx context.Context, database *sql.DB, userID int64) []*activityEvent {

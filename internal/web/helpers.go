@@ -39,6 +39,26 @@ func (d *UIDeps) pageData(w http.ResponseWriter, r *http.Request, title string, 
 
 // activeNavFromPath returns the nav identifier based on the request path.
 func activeNavFromPath(path string) string {
+	// Handle /~{username}/... paths.
+	if strings.HasPrefix(path, "/~") {
+		// Find the sub-path after /~username/
+		idx := strings.Index(path[2:], "/")
+		if idx < 0 {
+			return "home"
+		}
+		sub := path[2+idx+1:] // everything after /~username/
+		switch {
+		case sub == "" || sub == "/":
+			return "home"
+		case strings.HasPrefix(sub, "files"):
+			return "files"
+		case strings.HasPrefix(sub, "settings"):
+			return "settings"
+		default:
+			return "home"
+		}
+	}
+
 	switch {
 	case path == "/":
 		return "home"

@@ -12,9 +12,9 @@
   <nav aria-label="Main">
     <ul>
       {{if .CurrentUser}}
-        <li><a href="/"{{if eq .ActiveNav "home"}} class="nav-active" aria-current="page"{{end}}>Dashboard</a></li>
-        <li><a href="/files/"{{if eq .ActiveNav "files"}} class="nav-active" aria-current="page"{{end}}>Files</a></li>
-        <li><a href="/settings"{{if eq .ActiveNav "settings"}} class="nav-active" aria-current="page"{{end}}>Settings</a></li>
+        <li><a href="/~{{.CurrentUser.Username}}/"{{if eq .ActiveNav "home"}} class="nav-active" aria-current="page"{{end}}>Dashboard</a></li>
+        <li><a href="/~{{.CurrentUser.Username}}/files/"{{if eq .ActiveNav "files"}} class="nav-active" aria-current="page"{{end}}>Files</a></li>
+        <li><a href="/~{{.CurrentUser.Username}}/settings"{{if eq .ActiveNav "settings"}} class="nav-active" aria-current="page"{{end}}>Settings</a></li>
         {{if .CurrentUser.IsAdmin}}<li><a href="/admin"{{if eq .ActiveNav "admin"}} class="nav-active" aria-current="page"{{end}}>Admin</a></li>{{end}}
         <li><form method="POST" action="/logout">
           <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">

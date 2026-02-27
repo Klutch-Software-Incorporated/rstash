@@ -66,12 +66,14 @@ func NewRenderer() *Renderer {
 		"templates/admin_help_index.html",
 		"templates/admin_help_command.html",
 		"templates/admin_oauth_test.html",
-		"templates/admin_sessions.html",
-		"templates/admin_user.html",
 		"templates/oauth_authorize.html",
 		"templates/files.html",
 		"templates/files_search.html",
 		"templates/settings.html",
+		"templates/profile_dashboard.html",
+		"templates/profile_settings.html",
+		"templates/profile_files.html",
+		"templates/profile_files_search.html",
 	)
 	if err != nil {
 		slog.Error("failed to parse templates", "error", err)

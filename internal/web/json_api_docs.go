@@ -34,7 +34,7 @@ const docsHTML = `<!DOCTYPE html>
   <title>Gosilo JSON API Reference</title>
 </head>
 <body>
-  <script id="api-reference" data-url="/json/openapi.yaml"></script>
-  <script src="/static/scalar.min.js"></script>
+  <redoc spec-url="/json/openapi.yaml"></redoc>
+  <script src="/static/redoc.standalone.js"></script>
 </body>
 </html>`

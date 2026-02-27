@@ -1,0 +1,149 @@
+{{define "profile_settings"}}
+{{with .Content}}
+
+{{if not .IsSelf}}
+<h2><a href="{{.URLPrefix}}/">&larr; {{.Username}}</a> / Settings</h2>
+{{end}}
+
+<h2>Account</h2>
+<dl>
+    <dt>Username</dt>
+    <dd>{{.Username}}</dd>
+    <dt>Created</dt>
+    <dd><time datetime="{{.CreatedAt}}">{{.CreatedAt}}</time></dd>
+    <dt>User address</dt>
+    <dd><code>{{.Username}}@{{.Host}}</code></dd>
+    <dt>WebFinger</dt>
+    <dd><code>{{.BaseURL}}/.well-known/webfinger?resource=acct:{{.Username}}@{{.Host}}</code></dd>
+    <dt>Storage root</dt>
+    <dd><code>{{.BaseURL}}/storage/{{.Username}}/</code></dd>
+    <dt>Protocol</dt>
+    <dd>draft-dejong-remotestorage-26</dd>
+</dl>
+
+<h2>Storage</h2>
+{{if eq .QuotaMode "user"}}
+<p>{{.Stats.StorageUsed}} used of {{.Stats.StorageQuota}} ({{.Stats.QuotaPercent}}%)</p>
+<meter min="0" max="{{.Stats.QuotaBytes}}" value="{{.Stats.StorageBytes}}">{{.Stats.QuotaPercent}}%</meter>
+{{else}}
+<p>{{.Stats.StorageUsed}} used &mdash; {{.Stats.FileCount}} files</p>
+{{end}}
+
+{{if .IsSelf}}
+<h2>Change Password</h2>
+<form method="POST" action="{{.URLPrefix}}/settings/password" style="max-width:28rem">
+    <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
+    <div>
+        <label for="current_password">Current Password</label>
+        <input type="password" id="current_password" name="current_password" required autocomplete="current-password">
+    </div>
+    <div>
+        <label for="new_password">New Password</label>
+        <input type="password" id="new_password" name="new_password" required minlength="8" autocomplete="new-password">
+    </div>
+    <div>
+        <label for="confirm_password">Confirm New Password</label>
+        <input type="password" id="confirm_password" name="confirm_password" required minlength="8" autocomplete="new-password">
+    </div>
+    <button type="submit">Change Password</button>
+</form>
+{{end}}
+
+<h2>Active Sessions</h2>
+{{if .Sessions}}
+{{if and (not .IsSelf) .IsAdmin}}
+<form method="POST" action="{{.URLPrefix}}/settings/sessions/terminate-all" style="margin-bottom:.75rem"
+    onsubmit="return confirm('Terminate all sessions for {{.Username}}?')">
+    <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
+    <button type="submit" class="btn-danger">Terminate All Sessions</button>
+</form>
+{{end}}
+<table class="responsive-table">
+    <thead>
+        <tr><th>Token</th><th>Created</th><th>Expires</th><th>Actions</th></tr>
+    </thead>
+    <tbody>
+        {{range .Sessions}}
+        <tr>
+            <td data-label="Token">
+                <code>{{.TokenPrefix}}</code>
+                {{if .IsCurrent}} <span class="badge badge-active">current</span>{{end}}
+            </td>
+            <td data-label="Created"><time datetime="{{.CreatedAt}}">{{.CreatedAt}}</time></td>
+            <td data-label="Expires"><time datetime="{{.ExpiresAt}}">{{.ExpiresAt}}</time></td>
+            <td data-label="Actions">
+                {{if not .IsCurrent}}
+                <form method="POST" action="{{$.Content.URLPrefix}}/settings/sessions/{{.TokenFull}}/terminate">
+                    <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
+                    <button type="submit" class="btn-danger">Terminate</button>
+                </form>
+                {{end}}
+            </td>
+        </tr>
+        {{end}}
+    </tbody>
+</table>
+{{else}}
+<p>No active sessions.</p>
+{{end}}
+
+<h2>Connected Apps</h2>
+{{if .Tokens}}
+<table class="responsive-table">
+    <thead>
+        <tr><th>Application</th><th>Scopes</th><th>Granted</th><th>Actions</th></tr>
+    </thead>
+    <tbody>
+        {{range .Tokens}}
+        <tr>
+            <td data-label="Application">{{.ClientID}}</td>
+            <td data-label="Scopes"><code>{{.Scopes}}</code></td>
+            <td data-label="Granted"><time datetime="{{.CreatedAt}}">{{.CreatedAt}}</time></td>
+            <td data-label="Actions">
+                <form method="POST" action="{{$.Content.URLPrefix}}/settings/tokens/{{.TokenFull}}/revoke"
+                    onsubmit="return confirm('Revoke this token?')">
+                    <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
+                    <button type="submit" class="btn-danger">Revoke</button>
+                </form>
+            </td>
+        </tr>
+        {{end}}
+    </tbody>
+</table>
+{{else}}
+<p>No connected apps.</p>
+{{end}}
+
+{{if and (not .IsSelf) .IsAdmin}}
+<h2>Admin Actions</h2>
+{{if .TargetUser}}
+<div style="display:flex;gap:.5rem;flex-wrap:wrap;margin-bottom:1rem">
+    <form method="POST" action="{{.URLPrefix}}/admin/toggle-admin">
+        <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
+        <button type="submit" class="btn-secondary">{{if .TargetUser.IsAdmin}}Demote from Admin{{else}}Promote to Admin{{end}}</button>
+    </form>
+    <form method="POST" action="{{.URLPrefix}}/admin/toggle-disabled">
+        <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
+        <button type="submit" class="btn-secondary">{{if .TargetUser.Disabled}}Enable Account{{else}}Disable Account{{end}}</button>
+    </form>
+    <form method="POST" action="{{.URLPrefix}}/admin/delete"
+        onsubmit="return confirm('Delete user {{.Username}}? This cannot be undone.')">
+        <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
+        <button type="submit" class="btn-danger">Delete User</button>
+    </form>
+</div>
+{{if eq .QuotaMode "user"}}
+<form method="POST" action="{{.URLPrefix}}/admin/quota" class="inline-form" style="max-width:20rem">
+    <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
+    <label>Storage Quota</label>
+    <div style="display:flex;gap:.5rem">
+        <input type="text" name="quota" placeholder="e.g. 1GB" style="margin-bottom:0">
+        <button type="submit" class="btn-primary" style="width:auto">Set Quota</button>
+    </div>
+</form>
+{{end}}
+{{end}}
+{{end}}
+
+{{end}}
+{{end}}
