@@ -44,6 +44,8 @@ type authorizeContent struct {
 	CodeChallenge       string
 	CodeChallengeMethod string
 	Error               string
+	TOSUrl              string
+	PrivacyUrl          string
 }
 
 func buildScopeDisplay(scopes []string) ([]scopeDisplay, bool) {
@@ -151,6 +153,19 @@ func (h *oauthHandler) ShowAuthorize(w http.ResponseWriter, r *http.Request) {
 
 	scopeDisplayList, hasRootScope := buildScopeDisplay(scopes)
 
+	snap := h.deps.Settings.Load()
+	var tosUrl, privacyUrl string
+	if snap.TOSMode == "url" {
+		tosUrl = snap.TOSContent
+	} else if snap.TOSMode == "text" {
+		tosUrl = "/legal/terms"
+	}
+	if snap.PrivacyMode == "url" {
+		privacyUrl = snap.PrivacyContent
+	} else if snap.PrivacyMode == "text" {
+		privacyUrl = "/legal/privacy"
+	}
+
 	h.deps.Renderer.Render(w, "oauth_authorize", ui.PageData{
 		Title:       "Authorize — Gosilo",
 		CurrentUser: userInfo(user),
@@ -169,6 +184,8 @@ func (h *oauthHandler) ShowAuthorize(w http.ResponseWriter, r *http.Request) {
 			ResponseType:        responseType,
 			CodeChallenge:       codeChallenge,
 			CodeChallengeMethod: codeChallengeMethod,
+			TOSUrl:              tosUrl,
+			PrivacyUrl:          privacyUrl,
 		},
 	})
 }

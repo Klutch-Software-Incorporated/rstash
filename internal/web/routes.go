@@ -23,6 +23,11 @@ func OAuthRoutes(deps *UIDeps) http.Handler {
 	mux.HandleFunc("POST /login", authHandler.DoLogin)
 	mux.HandleFunc("POST /logout", RequireCSRF(authHandler.DoLogout))
 
+	// Legal pages (public, no auth).
+	legalH := LegalHandler(deps)
+	mux.HandleFunc("GET /legal/terms", legalH.ShowTerms)
+	mux.HandleFunc("GET /legal/privacy", legalH.ShowPrivacy)
+
 	return mux
 }
 
@@ -49,6 +54,16 @@ func FullRoutes(deps *UIDeps) http.Handler {
 	registerHandler := RegisterHandler(deps)
 	mux.HandleFunc("GET /register", registerHandler.ShowRegister)
 	mux.HandleFunc("POST /register", registerHandler.DoRegister)
+
+	// Legal pages (public, no auth).
+	legalH := LegalHandler(deps)
+	mux.HandleFunc("GET /legal/terms", legalH.ShowTerms)
+	mux.HandleFunc("GET /legal/privacy", legalH.ShowPrivacy)
+
+	// Abuse reporting (public, no auth).
+	abuseH := AbuseHandler(deps)
+	mux.HandleFunc("GET /abuse/report", abuseH.ShowReportForm)
+	mux.HandleFunc("POST /abuse/report", abuseH.DoReport)
 
 	// --- Legacy redirects for old URL paths ---
 	mux.HandleFunc("GET /settings", redirectToSelf("/settings"))
@@ -91,6 +106,8 @@ func FullRoutes(deps *UIDeps) http.Handler {
 	mux.HandleFunc("POST /admin/users/{id}/toggle-disabled", AdminGuard(RequireCSRF(adminHandler.ToggleDisabled)))
 	mux.HandleFunc("POST /admin/settings", AdminGuard(RequireCSRF(adminHandler.UpdateSettings)))
 	mux.HandleFunc("POST /admin/settings/{key}/reset", AdminGuard(RequireCSRF(adminHandler.ResetSetting)))
+	mux.HandleFunc("GET /admin/abuse", AdminGuard(abuseH.ShowAbuseReports))
+	mux.HandleFunc("POST /admin/abuse/{id}/review", AdminGuard(RequireCSRF(abuseH.ReviewAbuseReport)))
 
 	// Legacy admin user detail/session redirects.
 	mux.HandleFunc("GET /admin/users/{id}/activity", AdminGuard(func(w http.ResponseWriter, r *http.Request) {

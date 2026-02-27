@@ -272,6 +272,7 @@ func TestRegistrationOpen(t *testing.T) {
 		"username":         {"newuser"},
 		"password":         {"newpassword123"},
 		"password_confirm": {"newpassword123"},
+		"tos_accept":       {"on"},
 	}
 	resp, err := client.Post(ts.URL+"/register", "application/x-www-form-urlencoded", strings.NewReader(form.Encode()))
 	if err != nil {

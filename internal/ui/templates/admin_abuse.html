@@ -1,0 +1,64 @@
+{{define "admin_abuse"}}
+{{template "admin_nav" $}}
+{{with .Content}}
+
+<h2>Abuse Reports</h2>
+
+<div style="margin-bottom:1rem;display:flex;gap:.5rem">
+    <a href="/admin/abuse?status=open" class="{{if eq .StatusFilter "open"}}btn-primary{{end}}" style="padding:.25rem .75rem;font-size:.85rem">
+        Open{{if .OpenCount}} ({{.OpenCount}}){{end}}
+    </a>
+    <a href="/admin/abuse?status=reviewed" class="{{if eq .StatusFilter "reviewed"}}btn-primary{{end}}" style="padding:.25rem .75rem;font-size:.85rem">Reviewed</a>
+    <a href="/admin/abuse?status=dismissed" class="{{if eq .StatusFilter "dismissed"}}btn-primary{{end}}" style="padding:.25rem .75rem;font-size:.85rem">Dismissed</a>
+    <a href="/admin/abuse?status=actioned" class="{{if eq .StatusFilter "actioned"}}btn-primary{{end}}" style="padding:.25rem .75rem;font-size:.85rem">Actioned</a>
+    <a href="/admin/abuse?status=all" class="{{if eq .StatusFilter "all"}}btn-primary{{end}}" style="padding:.25rem .75rem;font-size:.85rem">All</a>
+</div>
+
+{{if .Reports}}
+<table class="data-table" style="width:100%">
+    <thead>
+        <tr>
+            <th>#</th>
+            <th>Path</th>
+            <th>Reason</th>
+            <th>Reporter</th>
+            <th>Date</th>
+            <th>Status</th>
+            <th>Actions</th>
+        </tr>
+    </thead>
+    <tbody>
+        {{range .Reports}}
+        <tr>
+            <td>{{.ID}}</td>
+            <td style="max-width:16rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="{{.ReportedPath}}"><code>{{.ReportedPath}}</code></td>
+            <td>{{.Reason}}</td>
+            <td>{{.ReporterEmail}}</td>
+            <td style="white-space:nowrap;font-size:.8rem">{{.CreatedAt}}</td>
+            <td><span class="badge badge-{{.Status}}">{{.Status}}</span></td>
+            <td style="text-align:left">
+                {{if eq .Status "open"}}
+                <form method="POST" action="/admin/abuse/{{.ID}}/review" style="display:flex;flex-direction:column;gap:.3rem;max-width:14rem">
+                    <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
+                    <input type="text" name="note" placeholder="Note..." style="width:100%;font-size:.8rem;padding:.15rem .3rem;margin-bottom:0">
+                    <div style="display:flex;gap:.25rem">
+                        <button type="submit" name="status" value="reviewed" class="btn-secondary" style="font-size:.75rem;padding:.15rem .4rem;width:auto">Review</button>
+                        <button type="submit" name="status" value="dismissed" class="btn-secondary" style="font-size:.75rem;padding:.15rem .4rem;width:auto">Dismiss</button>
+                        <button type="submit" name="status" value="actioned" class="btn-danger" style="font-size:.75rem;padding:.15rem .4rem;width:auto">Action</button>
+                    </div>
+                </form>
+                {{else}}
+                    {{if .ReviewerUsername}}<span style="font-size:.8rem;color:var(--fg-faint)">by {{.ReviewerUsername}}</span>{{end}}
+                    {{if .ReviewNote}}<span style="font-size:.8rem" title="{{.ReviewNote}}"> — {{.ReviewNote}}</span>{{end}}
+                {{end}}
+            </td>
+        </tr>
+        {{end}}
+    </tbody>
+</table>
+{{else}}
+<p style="color:var(--fg-faint)">No reports found.</p>
+{{end}}
+
+{{end}}
+{{end}}

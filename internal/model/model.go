@@ -8,8 +8,10 @@ type User struct {
 	StorageQuota int64 // 0 = use server default
 	Disabled     bool
 	CreatedAt    string
-	LastLoginAt  *string // NULL until first login
-	LastLoginIP  *string // NULL until first login
+	LastLoginAt        *string // NULL until first login
+	LastLoginIP        *string // NULL until first login
+	TOSAcceptedAt      *string // NULL until TOS accepted
+	PrivacyAcceptedAt  *string // NULL until Privacy Policy accepted
 }
 
 type OAuthClient struct {
@@ -65,6 +67,20 @@ type RefreshToken struct {
 	AccessToken string
 	CreatedAt   string
 	ExpiresAt   *string
+}
+
+type AbuseReport struct {
+	ID            int64
+	ReporterEmail string
+	ReportedPath  string
+	Reason        string
+	Description   *string
+	Status        string // "open", "reviewed", "dismissed", "actioned"
+	ReporterIP    *string
+	ReviewerID    *int64
+	ReviewNote    *string
+	CreatedAt     string
+	ReviewedAt    *string
 }
 
 type AuthorizationCode struct {

@@ -88,6 +88,10 @@ func (h *setupHandler) DoSetup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Auto-accept TOS/Privacy for the initial admin (operator-created).
+	_ = db.AcceptTOS(r.Context(), h.deps.DB, user.ID)
+	_ = db.AcceptPrivacy(r.Context(), h.deps.DB, user.ID)
+
 	// Create session.
 	sess, err := h.deps.Auth.CreateSession(r.Context(), user.ID)
 	if err != nil {

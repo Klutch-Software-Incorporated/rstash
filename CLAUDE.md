@@ -41,6 +41,8 @@ All configuration is via environment variables (see `gosilo env` for a documente
 | GOSILO_TOKEN_LIFETIME | 30d | OAuth token lifetime (30d, 24h, 0=no expiry) |
 | GOSILO_TLS_CERT | | TLS certificate file path |
 | GOSILO_TLS_KEY | | TLS private key file path |
+| GOSILO_TLS_MODE | *(empty)* | TLS mode: off, manual, auto (empty=auto-detect) |
+| GOSILO_TLS_CACHE | ./certs | Autocert certificate cache directory |
 
 ## Architecture
 

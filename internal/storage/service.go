@@ -23,6 +23,7 @@ var (
 	ErrConflict           = errors.New("conflict")
 	ErrNotModified        = errors.New("not modified")
 	ErrPayloadTooLarge    = errors.New("payload too large")
+	ErrContentRejected    = errors.New("content rejected")
 )
 
 // Conditions holds parsed If-Match / If-None-Match header values (unquoted).
@@ -62,6 +63,12 @@ type Service struct {
 	database *sql.DB
 	blobs    blob.Store
 	quota    *QuotaChecker
+	scanner  ContentScanner
+}
+
+// SetScanner sets the content scanner used to inspect uploads.
+func (s *Service) SetScanner(sc ContentScanner) {
+	s.scanner = sc
 }
 
 // NewService creates a new storage service.
@@ -83,6 +90,14 @@ func (s *Service) PutDocument(ctx context.Context, userID int64, path string, co
 			return nil, ErrPayloadTooLarge
 		}
 		return nil, fmt.Errorf("read content: %w", err)
+	}
+
+	// Run content scanner if configured.
+	if s.scanner != nil {
+		result := s.scanner.Scan(ctx, data, contentType, userID, path)
+		if !result.Allowed {
+			return nil, fmt.Errorf("%w: %s", ErrContentRejected, result.Reason)
+		}
 	}
 
 	etag := DocumentETag(data)

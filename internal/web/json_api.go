@@ -109,25 +109,29 @@ func (h *jsonApiHandler) UserList(w http.ResponseWriter, r *http.Request) {
 	}
 
 	type userJSON struct {
-		ID           int64   `json:"id"`
-		Username     string  `json:"username"`
-		IsAdmin      bool    `json:"is_admin"`
-		Disabled     bool    `json:"disabled"`
-		StorageQuota int64   `json:"storage_quota"`
-		CreatedAt    string  `json:"created_at"`
-		LastLoginAt  *string `json:"last_login_at"`
+		ID                int64   `json:"id"`
+		Username          string  `json:"username"`
+		IsAdmin           bool    `json:"is_admin"`
+		Disabled          bool    `json:"disabled"`
+		StorageQuota      int64   `json:"storage_quota"`
+		CreatedAt         string  `json:"created_at"`
+		LastLoginAt       *string `json:"last_login_at"`
+		TOSAcceptedAt     *string `json:"tos_accepted_at"`
+		PrivacyAcceptedAt *string `json:"privacy_accepted_at"`
 	}
 
 	result := make([]userJSON, len(users))
 	for i, u := range users {
 		result[i] = userJSON{
-			ID:           u.ID,
-			Username:     u.Username,
-			IsAdmin:      u.IsAdmin,
-			Disabled:     u.Disabled,
-			StorageQuota: u.StorageQuota,
-			CreatedAt:    u.CreatedAt,
-			LastLoginAt:  u.LastLoginAt,
+			ID:                u.ID,
+			Username:          u.Username,
+			IsAdmin:           u.IsAdmin,
+			Disabled:          u.Disabled,
+			StorageQuota:      u.StorageQuota,
+			CreatedAt:         u.CreatedAt,
+			LastLoginAt:       u.LastLoginAt,
+			TOSAcceptedAt:     u.TOSAcceptedAt,
+			PrivacyAcceptedAt: u.PrivacyAcceptedAt,
 		}
 	}
 
@@ -159,6 +163,10 @@ func (h *jsonApiHandler) UserAdd(w http.ResponseWriter, r *http.Request) {
 		jsonErr(w, http.StatusConflict, "failed to create user (username may already exist)")
 		return
 	}
+
+	// Auto-accept TOS/Privacy for admin-created users.
+	_ = db.AcceptTOS(r.Context(), h.deps.DB, newUser.ID)
+	_ = db.AcceptPrivacy(r.Context(), h.deps.DB, newUser.ID)
 
 	actor := currentUserFromContext(r)
 	db.Audit(r.Context(), h.deps.DB, actor.ID, "user.created", "user", fmt.Sprintf("%d", newUser.ID), req.Username)
@@ -302,6 +310,8 @@ func (h *jsonApiHandler) UserDisable(w http.ResponseWriter, r *http.Request) {
 
 	if newDisabled {
 		h.deps.Auth.TerminateAllSessions(r.Context(), user.ID)
+		_ = db.DeleteOAuthTokensByUserID(r.Context(), h.deps.DB, user.ID)
+		_ = db.DeleteRefreshTokensByUserID(r.Context(), h.deps.DB, user.ID)
 		db.Audit(r.Context(), h.deps.DB, actor.ID, "user.disabled", "user", fmt.Sprintf("%d", user.ID), user.Username)
 	} else {
 		db.Audit(r.Context(), h.deps.DB, actor.ID, "user.enabled", "user", fmt.Sprintf("%d", user.ID), user.Username)

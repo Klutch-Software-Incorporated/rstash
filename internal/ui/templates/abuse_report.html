@@ -1,0 +1,59 @@
+{{define "abuse_report"}}
+<div class="form-page" style="max-width:36rem">
+    <h1>Report Abuse</h1>
+
+    {{with .Content}}
+        {{if .Submitted}}
+            <div role="alert" class="alert-success" style="text-align:center">
+                Your report has been submitted. Thank you for helping keep this service safe.
+            </div>
+            <p style="text-align:center;margin-top:1rem">
+                <a href="/">Return to home</a>
+            </p>
+        {{else}}
+            <p style="color:var(--fg-faint);font-size:.85rem;margin-bottom:1rem">
+                Use this form to report content that violates our terms of service.
+                Reports are reviewed by the server operator.
+            </p>
+
+            {{if .Error}}
+                <div role="alert" class="alert-error">{{.Error}}</div>
+            {{end}}
+
+            <form method="POST" action="/abuse/report">
+                <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
+
+                <div>
+                    <label for="email">Your email address</label>
+                    <input type="email" id="email" name="email" required placeholder="you@example.com">
+                </div>
+
+                <div>
+                    <label for="path">Content path (optional)</label>
+                    <input type="text" id="path" name="path" value="{{.Path}}" placeholder="/storage/user/path/to/file">
+                </div>
+
+                <div>
+                    <label for="reason">Reason</label>
+                    <select id="reason" name="reason" required>
+                        <option value="">— Select a reason —</option>
+                        <option value="illegal">Illegal content</option>
+                        <option value="dmca">Copyright infringement (DMCA)</option>
+                        <option value="spam">Spam or phishing</option>
+                        <option value="malware">Malware</option>
+                        <option value="doxxing">Personal information / doxxing</option>
+                        <option value="other">Other</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label for="description">Description (optional)</label>
+                    <textarea id="description" name="description" rows="5" style="display:block;width:100%;padding:.5rem .6rem;border:1px solid var(--border);border-radius:3px;background:var(--surface);font:inherit;font-size:.9rem;color:var(--fg);margin-bottom:.75rem;resize:vertical" placeholder="Provide additional details about the content you are reporting..."></textarea>
+                </div>
+
+                <button type="submit">Submit Report</button>
+            </form>
+        {{end}}
+    {{end}}
+</div>
+{{end}}

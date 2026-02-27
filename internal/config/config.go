@@ -7,6 +7,10 @@ import (
 	"strings"
 )
 
+const defaultTOSContent = "Terms of Service\n\n1. Acceptance. By creating an account or using this service, you agree to these terms.\n2. Acceptable Use. You shall not use this service to store, transmit, or distribute content that is unlawful, harmful, threatening, abusive, defamatory, or otherwise objectionable.\n3. Prohibited Content. You shall not store content that: (a) violates any applicable law or regulation; (b) infringes any intellectual property right; (c) contains child sexual abuse material; or (d) contains malware or other harmful code.\n4. Termination. The operator may suspend or terminate your account at any time, with or without cause or notice.\n5. No Warranty. This service is provided \"as is\" without warranty of any kind, express or implied.\n6. Limitation of Liability. The operator shall not be liable for any indirect, incidental, special, consequential, or punitive damages.\n7. Modifications. These terms may be updated at any time. Continued use constitutes acceptance."
+
+const defaultPrivacyContent = "Privacy Policy\n\n1. Data Collected. This service stores account credentials (username, hashed password) and files you upload. Server logs may record IP addresses, timestamps, and user agents.\n2. Use of Data. Your data is used solely to provide the service. The operator does not sell, share, or disclose your data to third parties except as required by law.\n3. Data Access. The server operator has technical access to the infrastructure. Your files are not routinely accessed by the operator.\n4. Data Retention. Your data is retained for the duration of your account. Upon deletion, your data is permanently removed.\n5. Security. Reasonable measures are taken to protect your data. No method of storage or transmission is completely secure.\n6. Contact. For questions, contact the server operator."
+
 // Config holds all application configuration, loaded from environment variables.
 type Config struct {
 	Addr             string  // GOSILO_ADDR — listen address
@@ -27,9 +31,15 @@ type Config struct {
 	RefreshTokenLifetime string  // refresh token lifetime: "90d", "0" (no expiry)
 	MetricsMode          string  // "public", "admin", or "off"
 	JSONApi              string  // "off" or "admin"
+	TOSMode              string  // "off", "text", "url"
+	TOSContent           string
+	PrivacyMode          string  // "off", "text", "url"
+	PrivacyContent       string
 	LogFile              string  // GOSILO_LOG_FILE — path to log file (empty = stderr only)
 	TLSCert              string  // GOSILO_TLS_CERT — path to TLS certificate file
 	TLSKey               string  // GOSILO_TLS_KEY — path to TLS private key file
+	TLSMode              string  // GOSILO_TLS_MODE — "off", "manual", "auto", or "" (auto-detect)
+	TLSCacheDir          string  // GOSILO_TLS_CACHE — autocert cache directory
 }
 
 // ParseDSN splits a DSN string into its scheme and path components.
@@ -61,10 +71,16 @@ func Load() *Config {
 		LogFile:     os.Getenv(EnvLogFile),
 		TLSCert:     os.Getenv(EnvTLSCert),
 		TLSKey:      os.Getenv(EnvTLSKey),
+		TLSMode:     os.Getenv(EnvTLSMode),
+		TLSCacheDir: envOrDefault(EnvTLSCache, "./certs"),
 
 		// Runtime-editable: sane defaults, changed via CLI/admin UI.
 		MetricsMode:      "public",
 		JSONApi:          "off",
+		TOSMode:          "text",
+		TOSContent:       defaultTOSContent,
+		PrivacyMode:      "text",
+		PrivacyContent:   defaultPrivacyContent,
 		RegistrationMode: "closed",
 		RateLimitRate:    10,
 		RateLimitBurst:   20,
@@ -129,5 +145,7 @@ func (c *Config) ValueMap() map[string]string {
 		"refresh_token_lifetime": c.RefreshTokenLifetime,
 		"tls_cert":               c.TLSCert,
 		"tls_key":                c.TLSKey,
+		"tls_mode":               c.TLSMode,
+		"tls_cache":              c.TLSCacheDir,
 	}
 }

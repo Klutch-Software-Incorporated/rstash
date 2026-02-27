@@ -6,7 +6,9 @@ import (
 	"io"
 	"io/fs"
 	"log/slog"
+	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -28,6 +30,7 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/spf13/cobra"
+	"golang.org/x/crypto/acme/autocert"
 )
 
 var webModeFlag string
@@ -127,13 +130,30 @@ func runServe(cmd *cobra.Command, args []string) error {
 	// Initialize storage service.
 	storageSvc := storage.NewService(database, blobs, quotaChecker)
 
+	// Initialize content scanner.
+	mimeScanner := storage.NewMIMEScanner(func() string {
+		return runtimeSettings.Load().BlockedMIMETypes
+	})
+	storageSvc.SetScanner(mimeScanner)
+
 	// Initialize auth service.
 	localAuth := auth.NewLocalService(database)
 
 	// Initialize template renderer.
 	renderer := ui.NewRenderer()
 
-	secureCookies := strings.HasPrefix(cfg.BaseURL, "https://") || (cfg.TLSCert != "" && cfg.TLSKey != "")
+	// Compute effective TLS mode for serving.
+	effectiveTLSMode := cfg.TLSMode
+	if effectiveTLSMode == "" {
+		if cfg.TLSCert != "" && cfg.TLSKey != "" {
+			effectiveTLSMode = "manual"
+		} else {
+			effectiveTLSMode = "off"
+		}
+	}
+
+	secureCookies := strings.HasPrefix(cfg.BaseURL, "https://") ||
+		effectiveTLSMode == "manual" || effectiveTLSMode == "auto"
 
 	// UI dependencies (shared by UI handlers and OAuth).
 	uiDeps := &web.UIDeps{
@@ -312,13 +332,43 @@ func runServe(cmd *cobra.Command, args []string) error {
 	}()
 
 	go func() {
-		if cfg.TLSCert != "" && cfg.TLSKey != "" {
+		switch effectiveTLSMode {
+		case "auto":
+			hostname := extractHostname(cfg.BaseURL)
+			m := &autocert.Manager{
+				Prompt:     autocert.AcceptTOS,
+				HostPolicy: autocert.HostWhitelist(hostname),
+				Cache:      autocert.DirCache(cfg.TLSCacheDir),
+			}
+			srv.TLSConfig = m.TLSConfig()
+
+			// HTTP server for ACME challenges + HTTP→HTTPS redirect.
+			httpSrv := &http.Server{
+				Addr:    ":80",
+				Handler: m.HTTPHandler(nil), // nil = redirect to HTTPS
+			}
+			go httpSrv.ListenAndServe()
+
+			slog.Info("server starting (autocert)", "addr", cfg.Addr,
+				"base_url", cfg.BaseURL, "hostname", hostname)
+			if err := srv.ListenAndServeTLS("", ""); err != nil && err != http.ErrServerClosed {
+				slog.Error("server error", "error", err)
+				os.Exit(1)
+			}
+
+		case "manual":
 			slog.Info("server starting (TLS)", "addr", cfg.Addr, "base_url", cfg.BaseURL, "web_mode", cfg.WebMode)
 			if err := srv.ListenAndServeTLS(cfg.TLSCert, cfg.TLSKey); err != nil && err != http.ErrServerClosed {
 				slog.Error("server error", "error", err)
 				os.Exit(1)
 			}
-		} else {
+
+		default: // "off"
+			if !isLocalhost(cfg.Addr) && !strings.HasPrefix(cfg.BaseURL, "https://") {
+				slog.Warn("running without TLS on a non-localhost address",
+					"addr", cfg.Addr,
+					"hint", "set GOSILO_TLS_MODE=auto for Let's Encrypt, or use a reverse proxy")
+			}
 			slog.Info("server starting", "addr", cfg.Addr, "base_url", cfg.BaseURL, "web_mode", cfg.WebMode)
 			if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 				slog.Error("server error", "error", err)
@@ -338,4 +388,22 @@ func runServe(cmd *cobra.Command, args []string) error {
 	}
 
 	return nil
+}
+
+// isLocalhost reports whether the listen address host is localhost or empty.
+func isLocalhost(addr string) bool {
+	host, _, err := net.SplitHostPort(addr)
+	if err != nil {
+		host = addr
+	}
+	return host == "" || host == "127.0.0.1" || host == "::1" || host == "localhost"
+}
+
+// extractHostname parses a URL and returns just the hostname (no port).
+func extractHostname(baseURL string) string {
+	u, err := url.Parse(baseURL)
+	if err != nil {
+		return ""
+	}
+	return u.Hostname()
 }

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"strings"
 
 	"gosilo/internal/blob"
 	"gosilo/internal/config"
@@ -126,6 +127,7 @@ func runDoctor(cmd *cobra.Command, args []string) error {
 	expectedTables := []string{
 		"users", "oauth_clients", "oauth_tokens", "nodes",
 		"sessions", "audit_log", "authorization_codes", "settings",
+		"abuse_reports",
 	}
 	rows, err := database.Query("SELECT name FROM sqlite_master WHERE type='table'")
 	if err != nil {
@@ -193,15 +195,75 @@ func runDoctor(cmd *cobra.Command, args []string) error {
 	// Check 10: settings consistency.
 	svc := settings.New(database, cfg)
 	snap := svc.Load()
+	settingsOK := true
 	if snap.QuotaMode == "user" && snap.QuotaUser == 0 {
 		add("Settings consistency", "warn", "quota_mode=user but quota_user is not set")
-	} else if snap.QuotaMode == "total" && snap.QuotaTotal == 0 {
+		settingsOK = false
+	}
+	if snap.QuotaMode == "total" && snap.QuotaTotal == 0 {
 		add("Settings consistency", "warn", "quota_mode=total but quota_total is not set")
-	} else {
+		settingsOK = false
+	}
+	if snap.TOSMode == "text" && snap.TOSContent == "" {
+		add("Settings consistency", "warn", "tos_mode=text but tos_content is empty")
+		settingsOK = false
+	}
+	if snap.TOSMode == "url" && snap.TOSContent == "" {
+		add("Settings consistency", "warn", "tos_mode=url but tos_content is empty")
+		settingsOK = false
+	}
+	if snap.PrivacyMode == "text" && snap.PrivacyContent == "" {
+		add("Settings consistency", "warn", "privacy_mode=text but privacy_content is empty")
+		settingsOK = false
+	}
+	if snap.PrivacyMode == "url" && snap.PrivacyContent == "" {
+		add("Settings consistency", "warn", "privacy_mode=url but privacy_content is empty")
+		settingsOK = false
+	}
+	if settingsOK {
 		add("Settings consistency", "ok", "")
 	}
 
-	// Check 11: blob store health.
+	// Check 11: TLS configuration.
+	tlsMode := cfg.TLSMode
+	if tlsMode == "" {
+		if cfg.TLSCert != "" && cfg.TLSKey != "" {
+			tlsMode = "manual"
+		} else {
+			tlsMode = "off"
+		}
+	}
+	switch tlsMode {
+	case "auto":
+		if _, err := os.Stat(cfg.TLSCacheDir); os.IsNotExist(err) {
+			add("TLS configuration", "warn", fmt.Sprintf("cache dir %q does not exist (will be created on first use)", cfg.TLSCacheDir))
+		} else {
+			add("TLS configuration", "ok", "mode=auto")
+		}
+	case "manual":
+		var tlsProblems []string
+		if _, err := os.Stat(cfg.TLSCert); err != nil {
+			tlsProblems = append(tlsProblems, fmt.Sprintf("cert file: %v", err))
+		}
+		if _, err := os.Stat(cfg.TLSKey); err != nil {
+			tlsProblems = append(tlsProblems, fmt.Sprintf("key file: %v", err))
+		}
+		if len(tlsProblems) > 0 {
+			add("TLS configuration", "fail", strings.Join(tlsProblems, "; "))
+		} else {
+			add("TLS configuration", "ok", "mode=manual")
+		}
+	default: // "off"
+		if strings.HasPrefix(cfg.BaseURL, "https://") {
+			add("TLS configuration", "warn", "base_url uses https but TLS is off — ensure a reverse proxy handles TLS")
+		} else if !isLocalhost(cfg.Addr) {
+			add("TLS configuration", "warn", "running without TLS on a non-localhost address")
+		} else {
+			add("TLS configuration", "ok", "mode=off (localhost)")
+		}
+	}
+
+	// Check 12: blob store health.
 	blobScheme, blobPath, blobErr := config.ParseDSN(cfg.BlobDSN)
 	if blobErr != nil {
 		add("Blob store", "fail", blobErr.Error())

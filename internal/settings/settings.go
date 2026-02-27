@@ -29,6 +29,11 @@ type Snapshot struct {
 	TokenLifetime        string // duration string: "30d", "24h", "0" (no expiry)
 	RefreshTokens        string // "enabled" or "disabled"
 	RefreshTokenLifetime string // duration string: "90d", "0" (no expiry)
+	BlockedMIMETypes     string
+	TOSMode              string // "off", "text", "url"
+	TOSContent           string
+	PrivacyMode          string // "off", "text", "url"
+	PrivacyContent       string
 }
 
 // Settings provides runtime-configurable settings backed by SQLite.
@@ -149,6 +154,11 @@ func (snap *Snapshot) ValueMap() map[string]string {
 		"token_lifetime":         snap.TokenLifetime,
 		"refresh_tokens":         snap.RefreshTokens,
 		"refresh_token_lifetime": snap.RefreshTokenLifetime,
+		"blocked_mime_types":     snap.BlockedMIMETypes,
+		"tos_mode":               snap.TOSMode,
+		"tos_content":            snap.TOSContent,
+		"privacy_mode":           snap.PrivacyMode,
+		"privacy_content":        snap.PrivacyContent,
 	}
 }
 
@@ -168,6 +178,10 @@ func (s *Settings) buildSnapshot(overrides map[string]string) *Snapshot {
 		TokenLifetime:        s.defaults.TokenLifetime,
 		RefreshTokens:        s.defaults.RefreshTokens,
 		RefreshTokenLifetime: s.defaults.RefreshTokenLifetime,
+		TOSMode:              s.defaults.TOSMode,
+		TOSContent:           s.defaults.TOSContent,
+		PrivacyMode:          s.defaults.PrivacyMode,
+		PrivacyContent:       s.defaults.PrivacyContent,
 	}
 
 	if overrides == nil {
@@ -222,6 +236,21 @@ func (s *Settings) buildSnapshot(overrides map[string]string) *Snapshot {
 	}
 	if v, ok := overrides["refresh_token_lifetime"]; ok {
 		snap.RefreshTokenLifetime = v
+	}
+	if v, ok := overrides["blocked_mime_types"]; ok {
+		snap.BlockedMIMETypes = v
+	}
+	if v, ok := overrides["tos_mode"]; ok {
+		snap.TOSMode = v
+	}
+	if v, ok := overrides["tos_content"]; ok {
+		snap.TOSContent = v
+	}
+	if v, ok := overrides["privacy_mode"]; ok {
+		snap.PrivacyMode = v
+	}
+	if v, ok := overrides["privacy_content"]; ok {
+		snap.PrivacyContent = v
 	}
 
 	return snap

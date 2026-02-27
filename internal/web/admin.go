@@ -24,16 +24,17 @@ func AdminHandler(deps *UIDeps) *adminHandler {
 // --- Content structs (one per sub-page) ---
 
 type adminDashboardContent struct {
-	UserCount        int64
-	RegistrationMode string
-	BaseURL          string
-	BlobDSN          string
-	TotalStorageUsed string
-	QuotaMode        string
-	QuotaLimit       string
-	ActiveUsers24h   int64
-	ActiveUsers7d    int64
-	TopUsers         []*topUserRow
+	UserCount          int64
+	RegistrationMode   string
+	BaseURL            string
+	BlobDSN            string
+	TotalStorageUsed   string
+	QuotaMode          string
+	QuotaLimit         string
+	ActiveUsers24h     int64
+	ActiveUsers7d      int64
+	TopUsers           []*topUserRow
+	OpenAbuseReports   int64
 }
 
 type adminUsersContent struct {
@@ -161,6 +162,9 @@ func (h *adminHandler) ShowDashboard(w http.ResponseWriter, r *http.Request) {
 		}
 		content.TopUsers = topRows
 	}
+
+	openReports, _ := db.CountOpenAbuseReports(ctx, h.deps.DB)
+	content.OpenAbuseReports = openReports
 
 	h.deps.Renderer.Render(w, "admin_dashboard", h.deps.adminPageData(w, r, "Admin — Gosilo", "overview", content))
 }
@@ -430,6 +434,10 @@ func (h *adminHandler) CreateUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Auto-accept TOS/Privacy for admin-created users.
+	_ = db.AcceptTOS(r.Context(), h.deps.DB, newUser.ID)
+	_ = db.AcceptPrivacy(r.Context(), h.deps.DB, newUser.ID)
+
 	h.audit(r, "user.created", "user", fmt.Sprintf("%d", newUser.ID), username)
 
 	ui.SetFlash(w, fmt.Sprintf("User %q created.", username))
@@ -511,6 +519,12 @@ func (h *adminHandler) ToggleDisabled(w http.ResponseWriter, r *http.Request) {
 	if newDisabled {
 		if err := h.deps.Auth.TerminateAllSessions(r.Context(), id); err != nil {
 			slog.Error("failed to terminate sessions on disable", "error", err)
+		}
+		if err := db.DeleteOAuthTokensByUserID(r.Context(), h.deps.DB, id); err != nil {
+			slog.Error("failed to revoke oauth tokens on disable", "error", err)
+		}
+		if err := db.DeleteRefreshTokensByUserID(r.Context(), h.deps.DB, id); err != nil {
+			slog.Error("failed to revoke refresh tokens on disable", "error", err)
 		}
 		h.audit(r, "user.disabled", "user", idStr, user.Username)
 		ui.SetFlash(w, fmt.Sprintf("%s has been disabled.", user.Username))

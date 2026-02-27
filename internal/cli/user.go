@@ -157,6 +157,10 @@ func runUserAdd(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("create user: %w", err)
 	}
 
+	// Auto-accept TOS/Privacy for CLI-created users.
+	_ = db.AcceptTOS(ctx, database, user.ID)
+	_ = db.AcceptPrivacy(ctx, database, user.ID)
+
 	db.Audit(ctx, database, db.SystemActorID, "user.created", "user", fmt.Sprintf("%d", user.ID), username)
 	fmt.Fprintf(os.Stderr, "User %q created (ID: %d, admin: %v)\n", user.Username, user.ID, user.IsAdmin)
 	return nil
@@ -176,15 +180,25 @@ func runUserList(cmd *cobra.Command, args []string) error {
 
 	if jsonFlag {
 		type userJSON struct {
-			ID        int64  `json:"id"`
-			Username  string `json:"username"`
-			IsAdmin   bool   `json:"is_admin"`
-			Disabled  bool   `json:"disabled"`
-			CreatedAt string `json:"created_at"`
+			ID                int64   `json:"id"`
+			Username          string  `json:"username"`
+			IsAdmin           bool    `json:"is_admin"`
+			Disabled          bool    `json:"disabled"`
+			CreatedAt         string  `json:"created_at"`
+			TOSAcceptedAt     *string `json:"tos_accepted_at,omitempty"`
+			PrivacyAcceptedAt *string `json:"privacy_accepted_at,omitempty"`
 		}
 		out := make([]userJSON, len(users))
 		for i, u := range users {
-			out[i] = userJSON{u.ID, u.Username, u.IsAdmin, u.Disabled, u.CreatedAt}
+			out[i] = userJSON{
+				ID:                u.ID,
+				Username:          u.Username,
+				IsAdmin:           u.IsAdmin,
+				Disabled:          u.Disabled,
+				CreatedAt:         u.CreatedAt,
+				TOSAcceptedAt:     u.TOSAcceptedAt,
+				PrivacyAcceptedAt: u.PrivacyAcceptedAt,
+			}
 		}
 		return json.NewEncoder(os.Stdout).Encode(out)
 	}
@@ -296,8 +310,10 @@ func runUserDisable(cmd *cobra.Command, args []string) error {
 
 	idStr := fmt.Sprintf("%d", user.ID)
 	if disable {
-		// Terminate sessions when disabling.
+		// Terminate sessions and revoke all tokens when disabling.
 		_ = svc.TerminateAllSessions(ctx, user.ID)
+		_ = db.DeleteOAuthTokensByUserID(ctx, database, user.ID)
+		_ = db.DeleteRefreshTokensByUserID(ctx, database, user.ID)
 		db.Audit(ctx, database, db.SystemActorID, "user.disabled", "user", idStr, username)
 		fmt.Fprintf(os.Stderr, "%q has been disabled.\n", username)
 	} else {

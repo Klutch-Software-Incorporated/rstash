@@ -69,9 +69,36 @@ func (c *Config) Validate() error {
 		errs = append(errs, fmt.Errorf("%s: must be one of: full, oauth, off — got %q", EnvWebMode, c.WebMode))
 	}
 
-	// TLS: both or neither must be set.
-	if (c.TLSCert != "") != (c.TLSKey != "") {
-		errs = append(errs, fmt.Errorf("%s and %s must both be set or both be empty", EnvTLSCert, EnvTLSKey))
+	// TLS mode-aware validation.
+	switch c.TLSMode {
+	case "manual":
+		if c.TLSCert == "" || c.TLSKey == "" {
+			errs = append(errs, fmt.Errorf("%s=manual requires both %s and %s", EnvTLSMode, EnvTLSCert, EnvTLSKey))
+		}
+	case "auto":
+		if c.TLSCert != "" || c.TLSKey != "" {
+			errs = append(errs, fmt.Errorf("%s=auto conflicts with %s/%s — remove cert/key settings", EnvTLSMode, EnvTLSCert, EnvTLSKey))
+		}
+		if u, err := url.Parse(c.BaseURL); err == nil && u.Scheme != "https" {
+			errs = append(errs, fmt.Errorf("%s=auto requires %s to use https scheme", EnvTLSMode, EnvBaseURL))
+		}
+		if u, err := url.Parse(c.BaseURL); err == nil {
+			host := u.Hostname()
+			if host == "localhost" || host == "127.0.0.1" || host == "::1" {
+				errs = append(errs, fmt.Errorf("%s=auto cannot use localhost — Let's Encrypt requires a public hostname", EnvTLSMode))
+			}
+		}
+	case "off":
+		if c.TLSCert != "" || c.TLSKey != "" {
+			errs = append(errs, fmt.Errorf("%s=off conflicts with %s/%s — remove cert/key settings or change mode", EnvTLSMode, EnvTLSCert, EnvTLSKey))
+		}
+	case "":
+		// Auto-detect: existing "both or neither" logic.
+		if (c.TLSCert != "") != (c.TLSKey != "") {
+			errs = append(errs, fmt.Errorf("%s and %s must both be set or both be empty", EnvTLSCert, EnvTLSKey))
+		}
+	default:
+		errs = append(errs, fmt.Errorf("%s: must be one of: off, manual, auto — got %q", EnvTLSMode, c.TLSMode))
 	}
 
 	return errors.Join(errs...)

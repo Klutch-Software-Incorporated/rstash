@@ -20,9 +20,9 @@ func CreateUser(ctx context.Context, q Querier, username, password string, isAdm
 	var u model.User
 	err = q.QueryRowContext(ctx,
 		`INSERT INTO users (username, password_hash, is_admin) VALUES (?, ?, ?)
-		 RETURNING id, username, password_hash, is_admin, storage_quota, disabled, created_at, last_login_at, last_login_ip`,
+		 RETURNING id, username, password_hash, is_admin, storage_quota, disabled, created_at, last_login_at, last_login_ip, tos_accepted_at, privacy_accepted_at`,
 		username, string(hash), isAdmin,
-	).Scan(&u.ID, &u.Username, &u.PasswordHash, &u.IsAdmin, &u.StorageQuota, &u.Disabled, &u.CreatedAt, &u.LastLoginAt, &u.LastLoginIP)
+	).Scan(&u.ID, &u.Username, &u.PasswordHash, &u.IsAdmin, &u.StorageQuota, &u.Disabled, &u.CreatedAt, &u.LastLoginAt, &u.LastLoginIP, &u.TOSAcceptedAt, &u.PrivacyAcceptedAt)
 	if err != nil {
 		return nil, fmt.Errorf("create user: %w", err)
 	}
@@ -33,9 +33,9 @@ func CreateUser(ctx context.Context, q Querier, username, password string, isAdm
 func GetUserByUsername(ctx context.Context, q Querier, username string) (*model.User, error) {
 	var u model.User
 	err := q.QueryRowContext(ctx,
-		"SELECT id, username, password_hash, is_admin, storage_quota, disabled, created_at, last_login_at, last_login_ip FROM users WHERE username = ?",
+		"SELECT id, username, password_hash, is_admin, storage_quota, disabled, created_at, last_login_at, last_login_ip, tos_accepted_at, privacy_accepted_at FROM users WHERE username = ?",
 		username,
-	).Scan(&u.ID, &u.Username, &u.PasswordHash, &u.IsAdmin, &u.StorageQuota, &u.Disabled, &u.CreatedAt, &u.LastLoginAt, &u.LastLoginIP)
+	).Scan(&u.ID, &u.Username, &u.PasswordHash, &u.IsAdmin, &u.StorageQuota, &u.Disabled, &u.CreatedAt, &u.LastLoginAt, &u.LastLoginIP, &u.TOSAcceptedAt, &u.PrivacyAcceptedAt)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -49,9 +49,9 @@ func GetUserByUsername(ctx context.Context, q Querier, username string) (*model.
 func GetUserByID(ctx context.Context, q Querier, id int64) (*model.User, error) {
 	var u model.User
 	err := q.QueryRowContext(ctx,
-		"SELECT id, username, password_hash, is_admin, storage_quota, disabled, created_at, last_login_at, last_login_ip FROM users WHERE id = ?",
+		"SELECT id, username, password_hash, is_admin, storage_quota, disabled, created_at, last_login_at, last_login_ip, tos_accepted_at, privacy_accepted_at FROM users WHERE id = ?",
 		id,
-	).Scan(&u.ID, &u.Username, &u.PasswordHash, &u.IsAdmin, &u.StorageQuota, &u.Disabled, &u.CreatedAt, &u.LastLoginAt, &u.LastLoginIP)
+	).Scan(&u.ID, &u.Username, &u.PasswordHash, &u.IsAdmin, &u.StorageQuota, &u.Disabled, &u.CreatedAt, &u.LastLoginAt, &u.LastLoginIP, &u.TOSAcceptedAt, &u.PrivacyAcceptedAt)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -69,7 +69,7 @@ func CheckPassword(user *model.User, password string) bool {
 // ListUsers returns all users ordered by id, excluding the _system sentinel.
 func ListUsers(ctx context.Context, q Querier) ([]*model.User, error) {
 	rows, err := q.QueryContext(ctx,
-		"SELECT id, username, password_hash, is_admin, storage_quota, disabled, created_at, last_login_at, last_login_ip FROM users WHERE id > 0 ORDER BY id")
+		"SELECT id, username, password_hash, is_admin, storage_quota, disabled, created_at, last_login_at, last_login_ip, tos_accepted_at, privacy_accepted_at FROM users WHERE id > 0 ORDER BY id")
 	if err != nil {
 		return nil, fmt.Errorf("list users: %w", err)
 	}
@@ -78,7 +78,7 @@ func ListUsers(ctx context.Context, q Querier) ([]*model.User, error) {
 	var users []*model.User
 	for rows.Next() {
 		var u model.User
-		if err := rows.Scan(&u.ID, &u.Username, &u.PasswordHash, &u.IsAdmin, &u.StorageQuota, &u.Disabled, &u.CreatedAt, &u.LastLoginAt, &u.LastLoginIP); err != nil {
+		if err := rows.Scan(&u.ID, &u.Username, &u.PasswordHash, &u.IsAdmin, &u.StorageQuota, &u.Disabled, &u.CreatedAt, &u.LastLoginAt, &u.LastLoginIP, &u.TOSAcceptedAt, &u.PrivacyAcceptedAt); err != nil {
 			return nil, fmt.Errorf("scan user: %w", err)
 		}
 		users = append(users, &u)
@@ -142,6 +142,24 @@ func UpdateUserDisabled(ctx context.Context, q Querier, userID int64, disabled b
 	_, err := q.ExecContext(ctx, "UPDATE users SET disabled = ? WHERE id = ?", disabled, userID)
 	if err != nil {
 		return fmt.Errorf("update user disabled: %w", err)
+	}
+	return nil
+}
+
+// AcceptTOS records that the user accepted the Terms of Service.
+func AcceptTOS(ctx context.Context, q Querier, userID int64) error {
+	_, err := q.ExecContext(ctx, "UPDATE users SET tos_accepted_at = datetime('now') WHERE id = ?", userID)
+	if err != nil {
+		return fmt.Errorf("accept tos: %w", err)
+	}
+	return nil
+}
+
+// AcceptPrivacy records that the user accepted the Privacy Policy.
+func AcceptPrivacy(ctx context.Context, q Querier, userID int64) error {
+	_, err := q.ExecContext(ctx, "UPDATE users SET privacy_accepted_at = datetime('now') WHERE id = ?", userID)
+	if err != nil {
+		return fmt.Errorf("accept privacy: %w", err)
 	}
 	return nil
 }

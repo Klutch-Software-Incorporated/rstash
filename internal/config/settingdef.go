@@ -9,6 +9,7 @@ const (
 	InputSelect   InputType = "select"
 	InputByteSize InputType = "bytesize" // renders as text, validated as byte size
 	InputDuration InputType = "duration" // renders as text, validated as duration
+	InputTextArea InputType = "textarea" // renders as <textarea>
 )
 
 // Environment variable names for boot-critical settings.
@@ -24,6 +25,8 @@ const (
 	EnvLogFile  = "GOSILO_LOG_FILE"
 	EnvTLSCert  = "GOSILO_TLS_CERT"
 	EnvTLSKey   = "GOSILO_TLS_KEY"
+	EnvTLSMode  = "GOSILO_TLS_MODE"
+	EnvTLSCache = "GOSILO_TLS_CACHE"
 )
 
 // SettingDef describes one configurable setting — the single source of truth
@@ -126,6 +129,28 @@ func SettingDefs() []SettingDef {
 			Label:           "TLS private key",
 			Description:     "Path to TLS private key file. Both " + EnvTLSCert + " and " + EnvTLSKey + " must be set to enable TLS.",
 			Help:            "The filesystem path to a PEM-encoded TLS private key file, set via the " + EnvTLSKey + " environment variable. Must be set together with tls_cert. Keep this file secure and restrict its permissions. Changing this setting requires a server restart.",
+			InputType:       InputText,
+			RuntimeEditable: false,
+		},
+		{
+			Key:             "tls_mode",
+			EnvVar:          EnvTLSMode,
+			Group:           "Server",
+			Label:           "TLS mode",
+			Description:     "TLS mode: off, manual, auto. Empty = auto-detect from TLS_CERT/TLS_KEY.",
+			Help:            "Controls how TLS is configured. \"off\" disables TLS (plain HTTP). \"manual\" uses the certificate and key files specified by " + EnvTLSCert + " and " + EnvTLSKey + ". \"auto\" uses Let's Encrypt autocert to automatically obtain and renew certificates. When empty (not set), the mode is auto-detected: if both TLS_CERT and TLS_KEY are set, behaves as \"manual\"; otherwise behaves as \"off\". Changing this setting requires a server restart.",
+			ValidValues:     []string{"", "off", "manual", "auto"},
+			InputType:       InputSelect,
+			RuntimeEditable: false,
+		},
+		{
+			Key:             "tls_cache",
+			EnvVar:          EnvTLSCache,
+			Group:           "Server",
+			Label:           "TLS cache directory",
+			Description:     "Directory for autocert certificate cache (used when TLS mode is auto).",
+			Help:            "The filesystem directory where Let's Encrypt certificates are cached when using TLS mode \"auto\". The directory is created if it does not exist. Must be writable by the server process. Changing this setting requires a server restart.",
+			Default:         "./certs",
 			InputType:       InputText,
 			RuntimeEditable: false,
 		},
@@ -275,6 +300,60 @@ func SettingDefs() []SettingDef {
 			Help:            "How long OAuth refresh tokens remain valid after issuance. Accepts Go duration strings and the convenience \"d\" suffix for days (e.g. \"90d\" = 90 days). Set to \"0\" for refresh tokens that never expire. Changes apply only to newly issued tokens.",
 			Default:         "90d",
 			InputType:       InputDuration,
+			RuntimeEditable: true,
+		},
+
+		{
+			Key:             "blocked_mime_types",
+			Group:           "Storage",
+			Label:           "Blocked MIME types",
+			Description:     "Comma-separated MIME types to reject on upload (e.g. application/x-executable,video/*).",
+			Help:            "A comma-separated list of MIME types that will be rejected when uploaded. Uses http.DetectContentType on the actual file content (not the Content-Type header). Supports wildcards like \"video/*\" to block all video types. Leave empty to allow all types. Changes take effect immediately.",
+			InputType:       InputText,
+			RuntimeEditable: true,
+		},
+
+		// ── Legal (runtime-editable, no env var) ──
+		{
+			Key:             "tos_mode",
+			Group:           "Legal",
+			Label:           "Terms of Service mode",
+			Description:     "How the Terms of Service is provided: off, text, or url.",
+			Help:            "Controls the Terms of Service page. \"off\" disables TOS entirely. \"text\" renders the tos_content setting as a page at /legal/terms. \"url\" redirects /legal/terms to an external URL specified in tos_content. When active (not off), registration requires TOS acceptance.",
+			Default:         "text",
+			ValidValues:     []string{"off", "text", "url"},
+			InputType:       InputSelect,
+			RuntimeEditable: true,
+		},
+		{
+			Key:             "tos_content",
+			Group:           "Legal",
+			Label:           "Terms of Service content",
+			Description:     "TOS text (when mode=text) or URL (when mode=url).",
+			Help:            "The content of the Terms of Service. When tos_mode is \"text\", this is rendered as formatted text on the /legal/terms page. When tos_mode is \"url\", this should be a full URL that /legal/terms will redirect to.",
+			Default:         "Terms of Service\n\n1. Acceptance. By creating an account or using this service, you agree to these terms.\n2. Acceptable Use. You shall not use this service to store, transmit, or distribute content that is unlawful, harmful, threatening, abusive, defamatory, or otherwise objectionable.\n3. Prohibited Content. You shall not store content that: (a) violates any applicable law or regulation; (b) infringes any intellectual property right; (c) contains child sexual abuse material; or (d) contains malware or other harmful code.\n4. Termination. The operator may suspend or terminate your account at any time, with or without cause or notice.\n5. No Warranty. This service is provided \"as is\" without warranty of any kind, express or implied.\n6. Limitation of Liability. The operator shall not be liable for any indirect, incidental, special, consequential, or punitive damages.\n7. Modifications. These terms may be updated at any time. Continued use constitutes acceptance.",
+			InputType:       InputTextArea,
+			RuntimeEditable: true,
+		},
+		{
+			Key:             "privacy_mode",
+			Group:           "Legal",
+			Label:           "Privacy Policy mode",
+			Description:     "How the Privacy Policy is provided: off, text, or url.",
+			Help:            "Controls the Privacy Policy page. \"off\" disables the privacy policy. \"text\" renders the privacy_content setting as a page at /legal/privacy. \"url\" redirects /legal/privacy to an external URL specified in privacy_content. When active (not off), registration shows the privacy policy link.",
+			Default:         "text",
+			ValidValues:     []string{"off", "text", "url"},
+			InputType:       InputSelect,
+			RuntimeEditable: true,
+		},
+		{
+			Key:             "privacy_content",
+			Group:           "Legal",
+			Label:           "Privacy Policy content",
+			Description:     "Privacy Policy text (when mode=text) or URL (when mode=url).",
+			Help:            "The content of the Privacy Policy. When privacy_mode is \"text\", this is rendered as formatted text on the /legal/privacy page. When privacy_mode is \"url\", this should be a full URL that /legal/privacy will redirect to.",
+			Default:         "Privacy Policy\n\n1. Data Collected. This service stores account credentials (username, hashed password) and files you upload. Server logs may record IP addresses, timestamps, and user agents.\n2. Use of Data. Your data is used solely to provide the service. The operator does not sell, share, or disclose your data to third parties except as required by law.\n3. Data Access. The server operator has technical access to the infrastructure. Your files are not routinely accessed by the operator.\n4. Data Retention. Your data is retained for the duration of your account. Upon deletion, your data is permanently removed.\n5. Security. Reasonable measures are taken to protect your data. No method of storage or transmission is completely secure.\n6. Contact. For questions, contact the server operator.",
+			InputType:       InputTextArea,
 			RuntimeEditable: true,
 		},
 

@@ -78,6 +78,12 @@ func Storage(database *sql.DB, svc *storage.Service, maxUploadSize func() int64)
 			return
 		}
 
+		// Reject disabled accounts.
+		if needsAuth && user.Disabled {
+			http.Error(w, "account disabled", http.StatusForbidden)
+			return
+		}
+
 		// Ownership check: token must belong to the path's user.
 		if needsAuth && tokenUserID != user.ID {
 			http.Error(w, "forbidden", http.StatusForbidden)
@@ -105,8 +111,12 @@ func Storage(database *sql.DB, svc *storage.Service, maxUploadSize func() int64)
 				return
 			}
 			r.Body = http.MaxBytesReader(w, r.Body, maxUploadSize())
-			handlePutDocument(w, r, svc, user.ID, storagePath, cond)
-			storageAudit(r, database, user.ID, "storage.put", storagePath)
+			putErr := handlePutDocumentErr(w, r, svc, user.ID, storagePath, cond)
+			if putErr != nil && errors.Is(putErr, storage.ErrContentRejected) {
+				storageAudit(r, database, user.ID, "storage.upload_rejected", storagePath)
+			} else if putErr == nil {
+				storageAudit(r, database, user.ID, "storage.put", storagePath)
+			}
 		case http.MethodDelete:
 			handleDeleteDocument(w, r, svc, user.ID, storagePath, cond)
 			storageAudit(r, database, user.ID, "storage.delete", storagePath)
@@ -183,6 +193,10 @@ func handleGetFolder(w http.ResponseWriter, r *http.Request, svc *storage.Servic
 }
 
 func handlePutDocument(w http.ResponseWriter, r *http.Request, svc *storage.Service, userID int64, path string, cond storage.Conditions) {
+	handlePutDocumentErr(w, r, svc, userID, path, cond)
+}
+
+func handlePutDocumentErr(w http.ResponseWriter, r *http.Request, svc *storage.Service, userID int64, path string, cond storage.Conditions) error {
 	contentType := r.Header.Get("Content-Type")
 	if contentType == "" {
 		contentType = "application/octet-stream"
@@ -191,7 +205,7 @@ func handlePutDocument(w http.ResponseWriter, r *http.Request, svc *storage.Serv
 	result, err := svc.PutDocument(r.Context(), userID, path, r.Body, contentType, cond)
 	if err != nil {
 		writeServiceError(w, err)
-		return
+		return err
 	}
 
 	w.Header().Set("ETag", storage.QuoteETag(result.ETag))
@@ -200,6 +214,7 @@ func handlePutDocument(w http.ResponseWriter, r *http.Request, svc *storage.Serv
 	} else {
 		w.WriteHeader(http.StatusOK)
 	}
+	return nil
 }
 
 func handleDeleteDocument(w http.ResponseWriter, r *http.Request, svc *storage.Service, userID int64, path string, cond storage.Conditions) {
@@ -239,6 +254,8 @@ func writeServiceError(w http.ResponseWriter, err error) {
 		http.Error(w, "payload too large", http.StatusRequestEntityTooLarge)
 	case errors.Is(err, storage.ErrQuotaExceeded):
 		http.Error(w, "quota exceeded", http.StatusRequestEntityTooLarge)
+	case errors.Is(err, storage.ErrContentRejected):
+		http.Error(w, err.Error(), http.StatusUnsupportedMediaType)
 	default:
 		slog.Error("storage error", "error", err)
 		http.Error(w, "internal error", http.StatusInternalServerError)

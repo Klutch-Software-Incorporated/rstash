@@ -114,6 +114,16 @@
 <p>No connected apps.</p>
 {{end}}
 
+{{if and (not .IsSelf) .IsAdmin .TargetUser}}
+<h2>Legal Acceptance</h2>
+<dl>
+    <dt>Terms of Service</dt>
+    <dd>{{if .TargetUser.TOSAcceptedAt}}Accepted <time datetime="{{.TargetUser.TOSAcceptedAt}}">{{.TargetUser.TOSAcceptedAt}}</time>{{else}}Not accepted{{end}}</dd>
+    <dt>Privacy Policy</dt>
+    <dd>{{if .TargetUser.PrivacyAcceptedAt}}Accepted <time datetime="{{.TargetUser.PrivacyAcceptedAt}}">{{.TargetUser.PrivacyAcceptedAt}}</time>{{else}}Not accepted{{end}}</dd>
+</dl>
+{{end}}
+
 {{if and (not .IsSelf) .IsAdmin}}
 <h2>Admin Actions</h2>
 {{if .TargetUser}}

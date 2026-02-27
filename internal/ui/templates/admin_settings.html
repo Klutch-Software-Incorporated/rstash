@@ -32,6 +32,8 @@
                 </select>
                 {{else if eq .InputType "number"}}
                 <input type="number" name="{{.Key}}" value="{{.Value}}" {{if .NumberMin}}min="{{.NumberMin}}"{{end}} {{if .NumberStep}}step="{{.NumberStep}}"{{end}}>
+                {{else if eq .InputType "textarea"}}
+                <textarea name="{{.Key}}" rows="6" style="width:100%;font-family:inherit;font-size:.85rem">{{.Value}}</textarea>
                 {{else}}
                 <input type="text" name="{{.Key}}" value="{{.Value}}">
                 {{end}}

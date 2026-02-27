@@ -16,6 +16,10 @@
     <dd>{{.ActiveUsers24h}}</dd>
     <dt>Active Users (7d)</dt>
     <dd>{{.ActiveUsers7d}}</dd>
+    {{if .OpenAbuseReports}}
+    <dt>Open Abuse Reports</dt>
+    <dd><a href="/admin/abuse">{{.OpenAbuseReports}}</a></dd>
+    {{end}}
 </dl>
 
 {{if .TopUsers}}

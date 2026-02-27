@@ -95,6 +95,13 @@
             Only authorize applications you trust.
             This application is not affiliated with Gosilo.
         </p>
+        {{if or .TOSUrl .PrivacyUrl}}
+        <p style="text-align:center;font-size:.75rem;color:var(--fg-faint);margin-top:.5rem">
+            {{if .TOSUrl}}<a href="{{.TOSUrl}}" target="_blank">Terms of Service</a>{{end}}
+            {{if and .TOSUrl .PrivacyUrl}} · {{end}}
+            {{if .PrivacyUrl}}<a href="{{.PrivacyUrl}}" target="_blank">Privacy Policy</a>{{end}}
+        </p>
+        {{end}}
     {{end}}
 </div>
 {{end}}

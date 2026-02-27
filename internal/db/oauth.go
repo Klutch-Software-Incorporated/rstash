@@ -154,6 +154,15 @@ func DeleteOAuthToken(ctx context.Context, q Querier, token string) error {
 	return nil
 }
 
+// DeleteOAuthTokensByUserID deletes all OAuth tokens for a user.
+func DeleteOAuthTokensByUserID(ctx context.Context, q Querier, userID int64) error {
+	_, err := q.ExecContext(ctx, "DELETE FROM oauth_tokens WHERE user_id = ?", userID)
+	if err != nil {
+		return fmt.Errorf("delete oauth tokens by user id: %w", err)
+	}
+	return nil
+}
+
 // DeleteExpiredOAuthTokens removes all expired tokens.
 func DeleteExpiredOAuthTokens(ctx context.Context, q Querier) error {
 	_, err := q.ExecContext(ctx, "DELETE FROM oauth_tokens WHERE expires_at IS NOT NULL AND expires_at <= datetime('now')")

@@ -56,15 +56,17 @@ type profileDashboardContent struct {
 }
 
 type profileTargetUser struct {
-	ID          int64
-	Username    string
-	IsAdmin     bool
-	Disabled    bool
-	CreatedAt   string
-	LastLoginAt string
-	LastLoginIP string
-	StorageUsed string
-	FileCount   int64
+	ID                int64
+	Username          string
+	IsAdmin           bool
+	Disabled          bool
+	CreatedAt         string
+	LastLoginAt       string
+	LastLoginIP       string
+	StorageUsed       string
+	FileCount         int64
+	TOSAcceptedAt     string
+	PrivacyAcceptedAt string
 }
 
 func (h *profileHandler) ShowDashboard(w http.ResponseWriter, r *http.Request) {
@@ -202,6 +204,12 @@ func (h *profileHandler) ShowDashboard(w http.ResponseWriter, r *http.Request) {
 		}
 		if target.LastLoginIP != nil {
 			pt.LastLoginIP = *target.LastLoginIP
+		}
+		if target.TOSAcceptedAt != nil {
+			pt.TOSAcceptedAt = *target.TOSAcceptedAt
+		}
+		if target.PrivacyAcceptedAt != nil {
+			pt.PrivacyAcceptedAt = *target.PrivacyAcceptedAt
 		}
 		pt.StorageUsed = hs.StorageUsed
 		pt.FileCount = stats.FileCount
@@ -342,6 +350,12 @@ func (h *profileHandler) ShowSettings(w http.ResponseWriter, r *http.Request) {
 		}
 		if target.LastLoginIP != nil {
 			pt.LastLoginIP = *target.LastLoginIP
+		}
+		if target.TOSAcceptedAt != nil {
+			pt.TOSAcceptedAt = *target.TOSAcceptedAt
+		}
+		if target.PrivacyAcceptedAt != nil {
+			pt.PrivacyAcceptedAt = *target.PrivacyAcceptedAt
 		}
 		pt.StorageUsed = hs.StorageUsed
 		pt.FileCount = stats.FileCount
@@ -890,6 +904,8 @@ func (h *profileHandler) ToggleDisabled(w http.ResponseWriter, r *http.Request) 
 		if err := h.deps.Auth.TerminateAllSessions(r.Context(), target.ID); err != nil {
 			slog.Error("failed to terminate sessions on disable", "error", err)
 		}
+		_ = db.DeleteOAuthTokensByUserID(r.Context(), h.deps.DB, target.ID)
+		_ = db.DeleteRefreshTokensByUserID(r.Context(), h.deps.DB, target.ID)
 		h.audit(r, "user.disabled", "user", idStr, target.Username)
 		ui.SetFlash(w, fmt.Sprintf("%s has been disabled.", target.Username))
 	} else {

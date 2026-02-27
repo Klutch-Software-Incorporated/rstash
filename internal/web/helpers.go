@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strings"
 
+	"gosilo/internal/db"
 	"gosilo/internal/ui"
 )
 
@@ -26,15 +27,29 @@ func formatBytes(b int64) string {
 // pageData builds a ui.PageData with the standard fields (CurrentUser, CSRFToken,
 // Flash, RegistrationMode) populated from the request context and config.
 func (d *UIDeps) pageData(w http.ResponseWriter, r *http.Request, title string, content any) ui.PageData {
+	snap := d.Settings.Load()
 	return ui.PageData{
 		Title:            title,
 		CurrentUser:      userInfo(CurrentUser(r)),
 		CSRFToken:        CSRFToken(r),
 		Flash:            ui.GetFlash(w, r),
-		RegistrationMode: d.Settings.Load().RegistrationMode,
+		RegistrationMode: snap.RegistrationMode,
 		Content:          content,
 		ActiveNav:        activeNavFromPath(r.URL.Path),
+		TOSUrl:           legalURL(snap.TOSMode, snap.TOSContent, "/legal/terms"),
+		PrivacyUrl:       legalURL(snap.PrivacyMode, snap.PrivacyContent, "/legal/privacy"),
 	}
+}
+
+// legalURL returns the URL for a legal page based on the mode and content settings.
+func legalURL(mode, content, textPath string) string {
+	switch mode {
+	case "url":
+		return content
+	case "text":
+		return textPath
+	}
+	return ""
 }
 
 // activeNavFromPath returns the nav identifier based on the request path.
@@ -78,6 +93,7 @@ func (d *UIDeps) adminPageData(w http.ResponseWriter, r *http.Request, title str
 	pd := d.pageData(w, r, title, content)
 	pd.ActiveAdminNav = nav
 	pd.JSONApiEnabled = d.Settings.Load().JSONApi == "admin"
+	pd.OpenAbuseReports, _ = db.CountOpenAbuseReports(r.Context(), d.DB)
 	return pd
 }
 

@@ -32,7 +32,9 @@ func testDB(t *testing.T) *sql.DB {
 		disabled INTEGER NOT NULL DEFAULT 0,
 		created_at TEXT NOT NULL DEFAULT (datetime('now')),
 		last_login_at TEXT,
-		last_login_ip TEXT
+		last_login_ip TEXT,
+		tos_accepted_at TEXT,
+		privacy_accepted_at TEXT
 	);
 	CREATE TABLE nodes (
 		id INTEGER PRIMARY KEY,

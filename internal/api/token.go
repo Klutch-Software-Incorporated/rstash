@@ -71,6 +71,18 @@ func handleAuthorizationCode(w http.ResponseWriter, r *http.Request, database *s
 		return
 	}
 
+	// Reject if user account is disabled.
+	acUser, err := db.GetUserByID(r.Context(), database, ac.UserID)
+	if err != nil {
+		slog.Error("get user for auth code", "error", err)
+		tokenError(w, "server_error", "internal error", http.StatusInternalServerError)
+		return
+	}
+	if acUser == nil || acUser.Disabled {
+		tokenError(w, "invalid_grant", "user account is disabled", http.StatusBadRequest)
+		return
+	}
+
 	// Mark code as used.
 	if err := db.UseAuthorizationCode(r.Context(), database, code); err != nil {
 		slog.Error("use authorization code", "error", err)
@@ -131,6 +143,19 @@ func handleRefreshToken(w http.ResponseWriter, r *http.Request, database *sql.DB
 	}
 	if rt == nil {
 		tokenError(w, "invalid_grant", "refresh token is invalid or expired", http.StatusBadRequest)
+		return
+	}
+
+	// Reject if user account is disabled, and revoke the refresh token.
+	rtUser, err := db.GetUserByID(r.Context(), database, rt.UserID)
+	if err != nil {
+		slog.Error("get user for refresh token", "error", err)
+		tokenError(w, "server_error", "internal error", http.StatusInternalServerError)
+		return
+	}
+	if rtUser == nil || rtUser.Disabled {
+		_ = db.DeleteRefreshToken(r.Context(), database, refreshToken)
+		tokenError(w, "invalid_grant", "user account is disabled", http.StatusBadRequest)
 		return
 	}
 

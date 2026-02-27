@@ -31,6 +31,22 @@
                     <label for="password_confirm">Confirm Password</label>
                     <input type="password" id="password_confirm" name="password_confirm" required autocomplete="new-password">
                 </div>
+                {{if .TOSUrl}}
+                <div style="margin:.5rem 0">
+                    <label style="display:flex;align-items:start;gap:.5rem;font-size:.85rem;cursor:pointer">
+                        <input type="checkbox" name="tos_accept" required style="margin-top:.2rem">
+                        <span>I agree to the <a href="{{.TOSUrl}}" target="_blank">Terms of Service</a>{{if .PrivacyUrl}} and <a href="{{.PrivacyUrl}}" target="_blank">Privacy Policy</a>{{end}}</span>
+                    </label>
+                </div>
+                {{end}}
+                {{if and (not .TOSUrl) .PrivacyUrl}}
+                <div style="margin:.5rem 0">
+                    <label style="display:flex;align-items:start;gap:.5rem;font-size:.85rem;cursor:pointer">
+                        <input type="checkbox" name="privacy_accept" required style="margin-top:.2rem">
+                        <span>I agree to the <a href="{{.PrivacyUrl}}" target="_blank">Privacy Policy</a></span>
+                    </label>
+                </div>
+                {{end}}
                 <button type="submit">Register</button>
             </form>
         {{end}}

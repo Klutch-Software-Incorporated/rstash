@@ -79,7 +79,13 @@ func (s *LocalService) ListUsers(ctx context.Context) ([]*model.User, error) {
 }
 
 func (s *LocalService) DeleteUser(ctx context.Context, id int64) error {
-	// Delete all sessions first, then the user record.
+	// Delete OAuth tokens and refresh tokens first (no ON DELETE CASCADE), then sessions, then user.
+	if err := db.DeleteOAuthTokensByUserID(ctx, s.db, id); err != nil {
+		return err
+	}
+	if err := db.DeleteRefreshTokensByUserID(ctx, s.db, id); err != nil {
+		return err
+	}
 	if err := db.DeleteUserSessions(ctx, s.db, id); err != nil {
 		return err
 	}

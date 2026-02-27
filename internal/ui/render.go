@@ -26,6 +26,9 @@ type PageData struct {
 	ActiveNav        string
 	ActiveAdminNav   string
 	JSONApiEnabled   bool
+	TOSUrl           string
+	PrivacyUrl       string
+	OpenAbuseReports int64
 }
 
 // Renderer parses and renders HTML templates from the embedded filesystem.
@@ -74,6 +77,9 @@ func NewRenderer() *Renderer {
 		"templates/profile_settings.html",
 		"templates/profile_files.html",
 		"templates/profile_files_search.html",
+		"templates/legal.html",
+		"templates/abuse_report.html",
+		"templates/admin_abuse.html",
 	)
 	if err != nil {
 		slog.Error("failed to parse templates", "error", err)
