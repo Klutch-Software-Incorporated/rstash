@@ -55,6 +55,10 @@ func (h *authHandler) DoLogin(w http.ResponseWriter, r *http.Request) {
 		if errors.Is(err, auth.ErrInvalidCredentials) {
 			db.Audit(r.Context(), h.deps.DB, db.SystemActorID, "auth.login_failed", "user", username, "invalid credentials")
 			renderErr("Invalid username or password.")
+		} else if errors.Is(err, auth.ErrAccountPendingApproval) {
+			renderErr("Your account is pending approval.")
+		} else if errors.Is(err, auth.ErrAccountDisabled) {
+			renderErr("Your account has been disabled.")
 		} else {
 			slog.Error("failed to authenticate", "error", err)
 			renderErr("An error occurred. Please try again.")

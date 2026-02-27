@@ -31,6 +31,9 @@ func (s *LocalService) Authenticate(ctx context.Context, username, password stri
 	if user.Disabled {
 		return nil, ErrAccountDisabled
 	}
+	if !user.Approved {
+		return nil, ErrAccountPendingApproval
+	}
 	return user, nil
 }
 
@@ -62,8 +65,8 @@ func (s *LocalService) CleanupExpiredSessions(ctx context.Context) error {
 
 // --- User CRUD ---
 
-func (s *LocalService) CreateUser(ctx context.Context, username, password string, isAdmin bool) (*model.User, error) {
-	return db.CreateUser(ctx, s.db, username, password, isAdmin)
+func (s *LocalService) CreateUser(ctx context.Context, username, password string, isAdmin, approved bool) (*model.User, error) {
+	return db.CreateUser(ctx, s.db, username, password, isAdmin, approved)
 }
 
 func (s *LocalService) GetUser(ctx context.Context, id int64) (*model.User, error) {
@@ -108,6 +111,10 @@ func (s *LocalService) ToggleAdmin(ctx context.Context, userID int64, isAdmin bo
 
 func (s *LocalService) SetDisabled(ctx context.Context, userID int64, disabled bool) error {
 	return db.UpdateUserDisabled(ctx, s.db, userID, disabled)
+}
+
+func (s *LocalService) SetApproved(ctx context.Context, userID int64, approved bool) error {
+	return db.UpdateUserApproved(ctx, s.db, userID, approved)
 }
 
 func (s *LocalService) ListUserSessions(ctx context.Context, userID int64) ([]*model.Session, error) {

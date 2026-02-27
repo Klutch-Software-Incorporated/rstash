@@ -6,6 +6,10 @@
 <dl>
     <dt>Users</dt>
     <dd>{{.UserCount}}</dd>
+    {{if .PendingApproval}}
+    <dt>Pending Approvals</dt>
+    <dd><a href="/admin/users">{{.PendingApproval}}</a></dd>
+    {{end}}
     <dt>Base URL</dt>
     <dd><code>{{.BaseURL}}</code></dd>
     <dt>Blob Store</dt>

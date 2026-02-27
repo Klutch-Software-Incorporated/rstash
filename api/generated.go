@@ -82,6 +82,7 @@ type SuccessEnvelope struct {
 
 // User defines model for User.
 type User struct {
+	Approved     *bool   `json:"approved,omitempty"`
 	CreatedAt    *string `json:"created_at,omitempty"`
 	Disabled     *bool   `json:"disabled,omitempty"`
 	Id           *int64  `json:"id,omitempty"`
@@ -157,8 +158,18 @@ type UserPasswdJSONBody struct {
 	Username string `json:"username"`
 }
 
+// UserApproveJSONBody defines parameters for UserApprove.
+type UserApproveJSONBody struct {
+	Username string `json:"username"`
+}
+
 // UserPromoteJSONBody defines parameters for UserPromote.
 type UserPromoteJSONBody struct {
+	Username string `json:"username"`
+}
+
+// UserRejectJSONBody defines parameters for UserReject.
+type UserRejectJSONBody struct {
 	Username string `json:"username"`
 }
 
@@ -186,8 +197,14 @@ type UserDisableJSONRequestBody UserDisableJSONBody
 // UserPasswdJSONRequestBody defines body for UserPasswd for application/json ContentType.
 type UserPasswdJSONRequestBody UserPasswdJSONBody
 
+// UserApproveJSONRequestBody defines body for UserApprove for application/json ContentType.
+type UserApproveJSONRequestBody UserApproveJSONBody
+
 // UserPromoteJSONRequestBody defines body for UserPromote for application/json ContentType.
 type UserPromoteJSONRequestBody UserPromoteJSONBody
+
+// UserRejectJSONRequestBody defines body for UserReject for application/json ContentType.
+type UserRejectJSONRequestBody UserRejectJSONBody
 
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
@@ -215,6 +232,9 @@ type ServerInterface interface {
 	// Create a new user
 	// (POST /json/user/add)
 	UserAdd(w http.ResponseWriter, r *http.Request)
+	// Approve a pending user
+	// (POST /json/user/approve)
+	UserApprove(w http.ResponseWriter, r *http.Request)
 	// Delete a user
 	// (POST /json/user/delete)
 	UserDelete(w http.ResponseWriter, r *http.Request)
@@ -230,6 +250,9 @@ type ServerInterface interface {
 	// Toggle admin status
 	// (POST /json/user/promote)
 	UserPromote(w http.ResponseWriter, r *http.Request)
+	// Reject a pending user
+	// (POST /json/user/reject)
+	UserReject(w http.ResponseWriter, r *http.Request)
 }
 
 // ServerInterfaceWrapper converts contexts to parameters.
@@ -428,6 +451,26 @@ func (siw *ServerInterfaceWrapper) UserAdd(w http.ResponseWriter, r *http.Reques
 	handler.ServeHTTP(w, r)
 }
 
+// UserApprove operation middleware
+func (siw *ServerInterfaceWrapper) UserApprove(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UserApprove(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // UserDelete operation middleware
 func (siw *ServerInterfaceWrapper) UserDelete(w http.ResponseWriter, r *http.Request) {
 
@@ -519,6 +562,26 @@ func (siw *ServerInterfaceWrapper) UserPromote(w http.ResponseWriter, r *http.Re
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.UserPromote(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UserReject operation middleware
+func (siw *ServerInterfaceWrapper) UserReject(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UserReject(w, r)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -656,11 +719,13 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc("POST "+options.BaseURL+"/json/login", wrapper.Login)
 	m.HandleFunc("POST "+options.BaseURL+"/json/logout", wrapper.Logout)
 	m.HandleFunc("POST "+options.BaseURL+"/json/user/add", wrapper.UserAdd)
+	m.HandleFunc("POST "+options.BaseURL+"/json/user/approve", wrapper.UserApprove)
 	m.HandleFunc("POST "+options.BaseURL+"/json/user/delete", wrapper.UserDelete)
 	m.HandleFunc("POST "+options.BaseURL+"/json/user/disable", wrapper.UserDisable)
 	m.HandleFunc("GET "+options.BaseURL+"/json/user/list", wrapper.UserList)
 	m.HandleFunc("POST "+options.BaseURL+"/json/user/passwd", wrapper.UserPasswd)
 	m.HandleFunc("POST "+options.BaseURL+"/json/user/promote", wrapper.UserPromote)
+	m.HandleFunc("POST "+options.BaseURL+"/json/user/reject", wrapper.UserReject)
 
 	return m
 }

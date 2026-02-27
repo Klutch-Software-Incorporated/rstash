@@ -29,7 +29,7 @@ func tokenTestServer(t *testing.T) (*httptest.Server, *tokenTestEnv) {
 	t.Cleanup(ts.Close)
 
 	ctx := context.Background()
-	user, err := db.CreateUser(ctx, database, "tokenuser", "password", false)
+	user, err := db.CreateUser(ctx, database, "tokenuser", "password", false, true)
 	if err != nil {
 		t.Fatalf("create user: %v", err)
 	}
@@ -287,7 +287,7 @@ func refreshTokenTestServer(t *testing.T) (*httptest.Server, *tokenTestEnv) {
 	t.Cleanup(ts.Close)
 
 	ctx := context.Background()
-	user, err := db.CreateUser(ctx, database, "refreshuser", "password", false)
+	user, err := db.CreateUser(ctx, database, "refreshuser", "password", false, true)
 	if err != nil {
 		t.Fatalf("create user: %v", err)
 	}

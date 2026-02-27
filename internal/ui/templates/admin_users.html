@@ -2,6 +2,12 @@
 {{template "admin_nav" $}}
 {{with .Content}}
 
+{{if .PendingCount}}
+<div role="alert" class="alert-info" style="margin-bottom:1rem">
+    {{.PendingCount}} user(s) pending approval.
+</div>
+{{end}}
+
 <h2>Create User</h2>
 <form method="POST" action="/admin/users/create" style="max-width:28rem">
     <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
@@ -39,7 +45,7 @@
         <tr>
             <td data-label="Username"><a href="/~{{.Username}}/">{{.Username}}</a></td>
             <td data-label="Role">{{if .IsAdmin}}<span class="badge badge-admin">admin</span>{{else}}user{{end}}</td>
-            <td data-label="Status">{{if .Disabled}}<span class="badge badge-disabled">disabled</span>{{else}}<span class="badge badge-active">active</span>{{end}}</td>
+            <td data-label="Status">{{if .PendingApproval}}<span class="badge badge-warning">pending</span>{{else if .Disabled}}<span class="badge badge-disabled">disabled</span>{{else}}<span class="badge badge-active">active</span>{{end}}</td>
             <td data-label="Storage">
                 {{.StorageUsed}}
                 {{if $.Content.QuotaMode | eq "user"}}
@@ -52,6 +58,17 @@
             <td data-label="Actions">
                 {{if not .IsSelf}}
                 <div style="display:flex;gap:.25rem;flex-wrap:wrap;justify-content:flex-end">
+                    {{if .PendingApproval}}
+                    <form method="POST" action="/admin/users/{{.ID}}/approve">
+                        <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
+                        <button type="submit" class="btn-primary" style="font-size:.75rem;padding:.15rem .4rem">Approve</button>
+                    </form>
+                    <form method="POST" action="/admin/users/{{.ID}}/reject"
+                        onsubmit="return confirm('Reject user {{.Username}}? This will delete the account.')">
+                        <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
+                        <button type="submit" class="btn-danger" style="font-size:.75rem;padding:.15rem .4rem">Reject</button>
+                    </form>
+                    {{else}}
                     <form method="POST" action="/admin/users/{{.ID}}/toggle-admin">
                         <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
                         <button type="submit" class="btn-secondary" style="font-size:.75rem;padding:.15rem .4rem">{{if .IsAdmin}}Demote{{else}}Promote{{end}}</button>
@@ -65,6 +82,7 @@
                         <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
                         <button type="submit" class="btn-danger">Delete</button>
                     </form>
+                    {{end}}
                 </div>
                 {{end}}
                 {{if $.Content.QuotaMode | eq "user"}}

@@ -25,6 +25,7 @@ func AdminHandler(deps *UIDeps) *adminHandler {
 
 type adminDashboardContent struct {
 	UserCount          int64
+	PendingApproval    int64
 	RegistrationMode   string
 	BaseURL            string
 	BlobDSN            string
@@ -38,8 +39,10 @@ type adminDashboardContent struct {
 }
 
 type adminUsersContent struct {
-	QuotaMode string
-	Users     []*userRow
+	QuotaMode        string
+	PendingCount     int64
+	RegistrationMode string
+	Users            []*userRow
 }
 
 type adminSettingsContent struct {
@@ -70,17 +73,19 @@ type adminSettingRow struct {
 }
 
 type userRow struct {
-	ID           int64
-	Username     string
-	IsAdmin      bool
-	Disabled     bool
-	CreatedAt    string
-	LastLoginAt  string
-	LastLoginIP  string
-	IsSelf       bool
-	StorageUsed  string
-	StorageQuota string // human-readable, empty if no quota
-	SessionCount int64
+	ID              int64
+	Username        string
+	IsAdmin         bool
+	Disabled        bool
+	Approved        bool
+	PendingApproval bool
+	CreatedAt       string
+	LastLoginAt     string
+	LastLoginIP     string
+	IsSelf          bool
+	StorageUsed     string
+	StorageQuota    string // human-readable, empty if no quota
+	SessionCount    int64
 }
 
 type topUserRow struct {
@@ -166,6 +171,9 @@ func (h *adminHandler) ShowDashboard(w http.ResponseWriter, r *http.Request) {
 	openReports, _ := db.CountOpenAbuseReports(ctx, h.deps.DB)
 	content.OpenAbuseReports = openReports
 
+	pendingCount, _ := db.CountPendingUsers(ctx, h.deps.DB)
+	content.PendingApproval = pendingCount
+
 	h.deps.Renderer.Render(w, "admin_dashboard", h.deps.adminPageData(w, r, "Admin — Gosilo", "overview", content))
 }
 
@@ -184,12 +192,14 @@ func (h *adminHandler) ShowUsers(w http.ResponseWriter, r *http.Request) {
 	rows := make([]*userRow, len(users))
 	for i, u := range users {
 		row := &userRow{
-			ID:        u.ID,
-			Username:  u.Username,
-			IsAdmin:   u.IsAdmin,
-			Disabled:  u.Disabled,
-			CreatedAt: u.CreatedAt,
-			IsSelf:    u.ID == currentUser.ID,
+			ID:              u.ID,
+			Username:        u.Username,
+			IsAdmin:         u.IsAdmin,
+			Disabled:        u.Disabled,
+			Approved:        u.Approved,
+			PendingApproval: !u.Approved && !u.Disabled,
+			CreatedAt:       u.CreatedAt,
+			IsSelf:          u.ID == currentUser.ID,
 		}
 		if u.LastLoginAt != nil {
 			row.LastLoginAt = *u.LastLoginAt
@@ -219,9 +229,12 @@ func (h *adminHandler) ShowUsers(w http.ResponseWriter, r *http.Request) {
 		rows[i] = row
 	}
 
+	pendingCount, _ := db.CountPendingUsers(ctx, h.deps.DB)
 	content := &adminUsersContent{
-		QuotaMode: snap.QuotaMode,
-		Users:     rows,
+		QuotaMode:        snap.QuotaMode,
+		PendingCount:     pendingCount,
+		RegistrationMode: snap.RegistrationMode,
+		Users:            rows,
 	}
 
 	h.deps.Renderer.Render(w, "admin_users", h.deps.adminPageData(w, r, "Users — Admin", "users", content))
@@ -426,7 +439,7 @@ func (h *adminHandler) CreateUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	newUser, err := h.deps.Auth.CreateUser(r.Context(), username, password, isAdmin)
+	newUser, err := h.deps.Auth.CreateUser(r.Context(), username, password, isAdmin, true)
 	if err != nil {
 		slog.Error("failed to create user", "error", err)
 		ui.SetFlashError(w, "Failed to create user. Username may already exist.")
@@ -441,6 +454,58 @@ func (h *adminHandler) CreateUser(w http.ResponseWriter, r *http.Request) {
 	h.audit(r, "user.created", "user", fmt.Sprintf("%d", newUser.ID), username)
 
 	ui.SetFlash(w, fmt.Sprintf("User %q created.", username))
+	http.Redirect(w, r, "/admin/users", http.StatusSeeOther)
+}
+
+func (h *adminHandler) ApproveUser(w http.ResponseWriter, r *http.Request) {
+	idStr := r.PathValue("id")
+	id, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		http.Error(w, "Invalid user ID", http.StatusBadRequest)
+		return
+	}
+
+	target, _ := h.deps.Auth.GetUser(r.Context(), id)
+	if err := h.deps.Auth.SetApproved(r.Context(), id, true); err != nil {
+		slog.Error("failed to approve user", "error", err)
+		ui.SetFlashError(w, "Failed to approve user.")
+		http.Redirect(w, r, "/admin/users", http.StatusSeeOther)
+		return
+	}
+
+	targetName := idStr
+	if target != nil {
+		targetName = target.Username
+	}
+	h.audit(r, "user.approved", "user", idStr, targetName)
+
+	ui.SetFlash(w, fmt.Sprintf("User %s approved.", targetName))
+	http.Redirect(w, r, "/admin/users", http.StatusSeeOther)
+}
+
+func (h *adminHandler) RejectUser(w http.ResponseWriter, r *http.Request) {
+	idStr := r.PathValue("id")
+	id, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		http.Error(w, "Invalid user ID", http.StatusBadRequest)
+		return
+	}
+
+	target, _ := h.deps.Auth.GetUser(r.Context(), id)
+	if err := h.deps.Auth.DeleteUser(r.Context(), id); err != nil {
+		slog.Error("failed to reject user", "error", err)
+		ui.SetFlashError(w, "Failed to reject user.")
+		http.Redirect(w, r, "/admin/users", http.StatusSeeOther)
+		return
+	}
+
+	targetName := idStr
+	if target != nil {
+		targetName = target.Username
+	}
+	h.audit(r, "user.rejected", "user", idStr, targetName)
+
+	ui.SetFlash(w, fmt.Sprintf("User %s rejected.", targetName))
 	http.Redirect(w, r, "/admin/users", http.StatusSeeOther)
 }
 

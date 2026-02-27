@@ -30,6 +30,7 @@ func testDB(t *testing.T) *sql.DB {
 		is_admin INTEGER NOT NULL DEFAULT 0,
 		storage_quota INTEGER NOT NULL DEFAULT 0,
 		disabled INTEGER NOT NULL DEFAULT 0,
+		approved INTEGER NOT NULL DEFAULT 1,
 		created_at TEXT NOT NULL DEFAULT (datetime('now')),
 		last_login_at TEXT,
 		last_login_ip TEXT,

@@ -81,7 +81,7 @@ func (h *setupHandler) DoSetup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user, err := h.deps.Auth.CreateUser(r.Context(), username, password, true)
+	user, err := h.deps.Auth.CreateUser(r.Context(), username, password, true, true)
 	if err != nil {
 		slog.Error("failed to create admin user", "error", err)
 		renderErr("Failed to create user. Username may already be taken.")

@@ -50,7 +50,7 @@ func AuthLoader(authSvc auth.Service, secureCookies bool) func(http.Handler) htt
 				return
 			}
 
-			if user.Disabled {
+			if user.Disabled || !user.Approved {
 				auth.ClearSessionCookie(w, secureCookies)
 				next.ServeHTTP(w, r)
 				return

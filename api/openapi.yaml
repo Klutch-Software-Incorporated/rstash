@@ -74,6 +74,8 @@ components:
           type: boolean
         disabled:
           type: boolean
+        approved:
+          type: boolean
         storage_quota:
           type: integer
           format: int64
@@ -544,6 +546,81 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorEnvelope"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          description: User not found
+
+  /json/user/approve:
+    post:
+      operationId: UserApprove
+      tags: [User Management]
+      summary: Approve a pending user
+      description: |
+        Approves a user whose account is pending approval, allowing them to log in.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [username]
+              properties:
+                username:
+                  type: string
+            example:
+              username: alice
+      responses:
+        "200":
+          description: User approved
+          content:
+            application/json:
+              example:
+                ok: true
+                payload:
+                  username: alice
+                  approved: true
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          description: User not found
+
+  /json/user/reject:
+    post:
+      operationId: UserReject
+      tags: [User Management]
+      summary: Reject a pending user
+      description: |
+        Rejects a pending user by deleting their account.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [username]
+              properties:
+                username:
+                  type: string
+            example:
+              username: alice
+      responses:
+        "200":
+          description: User rejected
+          content:
+            application/json:
+              example:
+                ok: true
+                payload:
+                  status: rejected
         "401":
           $ref: "#/components/responses/Unauthorized"
         "403":

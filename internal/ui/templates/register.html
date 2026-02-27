@@ -7,7 +7,19 @@
             <div role="alert" class="alert-warning" style="text-align:center">
                 Registration is currently closed.
             </div>
+        {{else if and .ApprovalMode .Success}}
+            <div role="alert" class="alert-info" style="text-align:center">
+                Registration successful! Your account is pending admin approval.<br>
+                You will be able to log in once an administrator approves your account.
+            </div>
+            <p style="text-align:center"><a href="/login">Back to login</a></p>
         {{else}}
+            {{if .ApprovalMode}}
+            <div role="alert" class="alert-info" style="text-align:center;margin-bottom:1rem">
+                Registrations require admin approval before you can log in.
+            </div>
+            {{end}}
+
             {{if .Error}}
                 <div role="alert" class="alert-error">
                     {{.Error}}

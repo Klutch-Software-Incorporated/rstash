@@ -11,7 +11,7 @@ import (
 )
 
 // CreateUser inserts a new user with a bcrypt-hashed password.
-func CreateUser(ctx context.Context, q Querier, username, password string, isAdmin bool) (*model.User, error) {
+func CreateUser(ctx context.Context, q Querier, username, password string, isAdmin, approved bool) (*model.User, error) {
 	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 	if err != nil {
 		return nil, fmt.Errorf("hash password: %w", err)
@@ -19,10 +19,10 @@ func CreateUser(ctx context.Context, q Querier, username, password string, isAdm
 
 	var u model.User
 	err = q.QueryRowContext(ctx,
-		`INSERT INTO users (username, password_hash, is_admin) VALUES (?, ?, ?)
-		 RETURNING id, username, password_hash, is_admin, storage_quota, disabled, created_at, last_login_at, last_login_ip, tos_accepted_at, privacy_accepted_at`,
-		username, string(hash), isAdmin,
-	).Scan(&u.ID, &u.Username, &u.PasswordHash, &u.IsAdmin, &u.StorageQuota, &u.Disabled, &u.CreatedAt, &u.LastLoginAt, &u.LastLoginIP, &u.TOSAcceptedAt, &u.PrivacyAcceptedAt)
+		`INSERT INTO users (username, password_hash, is_admin, approved) VALUES (?, ?, ?, ?)
+		 RETURNING id, username, password_hash, is_admin, storage_quota, disabled, approved, created_at, last_login_at, last_login_ip, tos_accepted_at, privacy_accepted_at`,
+		username, string(hash), isAdmin, approved,
+	).Scan(&u.ID, &u.Username, &u.PasswordHash, &u.IsAdmin, &u.StorageQuota, &u.Disabled, &u.Approved, &u.CreatedAt, &u.LastLoginAt, &u.LastLoginIP, &u.TOSAcceptedAt, &u.PrivacyAcceptedAt)
 	if err != nil {
 		return nil, fmt.Errorf("create user: %w", err)
 	}
@@ -33,9 +33,9 @@ func CreateUser(ctx context.Context, q Querier, username, password string, isAdm
 func GetUserByUsername(ctx context.Context, q Querier, username string) (*model.User, error) {
 	var u model.User
 	err := q.QueryRowContext(ctx,
-		"SELECT id, username, password_hash, is_admin, storage_quota, disabled, created_at, last_login_at, last_login_ip, tos_accepted_at, privacy_accepted_at FROM users WHERE username = ?",
+		"SELECT id, username, password_hash, is_admin, storage_quota, disabled, approved, created_at, last_login_at, last_login_ip, tos_accepted_at, privacy_accepted_at FROM users WHERE username = ?",
 		username,
-	).Scan(&u.ID, &u.Username, &u.PasswordHash, &u.IsAdmin, &u.StorageQuota, &u.Disabled, &u.CreatedAt, &u.LastLoginAt, &u.LastLoginIP, &u.TOSAcceptedAt, &u.PrivacyAcceptedAt)
+	).Scan(&u.ID, &u.Username, &u.PasswordHash, &u.IsAdmin, &u.StorageQuota, &u.Disabled, &u.Approved, &u.CreatedAt, &u.LastLoginAt, &u.LastLoginIP, &u.TOSAcceptedAt, &u.PrivacyAcceptedAt)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -49,9 +49,9 @@ func GetUserByUsername(ctx context.Context, q Querier, username string) (*model.
 func GetUserByID(ctx context.Context, q Querier, id int64) (*model.User, error) {
 	var u model.User
 	err := q.QueryRowContext(ctx,
-		"SELECT id, username, password_hash, is_admin, storage_quota, disabled, created_at, last_login_at, last_login_ip, tos_accepted_at, privacy_accepted_at FROM users WHERE id = ?",
+		"SELECT id, username, password_hash, is_admin, storage_quota, disabled, approved, created_at, last_login_at, last_login_ip, tos_accepted_at, privacy_accepted_at FROM users WHERE id = ?",
 		id,
-	).Scan(&u.ID, &u.Username, &u.PasswordHash, &u.IsAdmin, &u.StorageQuota, &u.Disabled, &u.CreatedAt, &u.LastLoginAt, &u.LastLoginIP, &u.TOSAcceptedAt, &u.PrivacyAcceptedAt)
+	).Scan(&u.ID, &u.Username, &u.PasswordHash, &u.IsAdmin, &u.StorageQuota, &u.Disabled, &u.Approved, &u.CreatedAt, &u.LastLoginAt, &u.LastLoginIP, &u.TOSAcceptedAt, &u.PrivacyAcceptedAt)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -69,7 +69,7 @@ func CheckPassword(user *model.User, password string) bool {
 // ListUsers returns all users ordered by id, excluding the _system sentinel.
 func ListUsers(ctx context.Context, q Querier) ([]*model.User, error) {
 	rows, err := q.QueryContext(ctx,
-		"SELECT id, username, password_hash, is_admin, storage_quota, disabled, created_at, last_login_at, last_login_ip, tos_accepted_at, privacy_accepted_at FROM users WHERE id > 0 ORDER BY id")
+		"SELECT id, username, password_hash, is_admin, storage_quota, disabled, approved, created_at, last_login_at, last_login_ip, tos_accepted_at, privacy_accepted_at FROM users WHERE id > 0 ORDER BY id")
 	if err != nil {
 		return nil, fmt.Errorf("list users: %w", err)
 	}
@@ -78,7 +78,7 @@ func ListUsers(ctx context.Context, q Querier) ([]*model.User, error) {
 	var users []*model.User
 	for rows.Next() {
 		var u model.User
-		if err := rows.Scan(&u.ID, &u.Username, &u.PasswordHash, &u.IsAdmin, &u.StorageQuota, &u.Disabled, &u.CreatedAt, &u.LastLoginAt, &u.LastLoginIP, &u.TOSAcceptedAt, &u.PrivacyAcceptedAt); err != nil {
+		if err := rows.Scan(&u.ID, &u.Username, &u.PasswordHash, &u.IsAdmin, &u.StorageQuota, &u.Disabled, &u.Approved, &u.CreatedAt, &u.LastLoginAt, &u.LastLoginIP, &u.TOSAcceptedAt, &u.PrivacyAcceptedAt); err != nil {
 			return nil, fmt.Errorf("scan user: %w", err)
 		}
 		users = append(users, &u)
@@ -135,6 +135,38 @@ func UpdateUserAdmin(ctx context.Context, q Querier, userID int64, isAdmin bool)
 		return fmt.Errorf("update user admin: %w", err)
 	}
 	return nil
+}
+
+// UpdateUserApproved sets the approved flag for a user.
+func UpdateUserApproved(ctx context.Context, q Querier, userID int64, approved bool) error {
+	_, err := q.ExecContext(ctx, "UPDATE users SET approved = ? WHERE id = ?", approved, userID)
+	if err != nil {
+		return fmt.Errorf("update user approved: %w", err)
+	}
+	return nil
+}
+
+// CountPendingUsers returns the number of unapproved users.
+func CountPendingUsers(ctx context.Context, q Querier) (int64, error) {
+	var count int64
+	err := q.QueryRowContext(ctx, "SELECT COUNT(*) FROM users WHERE id > 0 AND approved = 0").Scan(&count)
+	if err != nil {
+		return 0, fmt.Errorf("count pending users: %w", err)
+	}
+	return count, nil
+}
+
+// ApproveAllPending approves all pending users and returns the count affected.
+func ApproveAllPending(ctx context.Context, q Querier) (int64, error) {
+	result, err := q.ExecContext(ctx, "UPDATE users SET approved = 1 WHERE approved = 0 AND id > 0")
+	if err != nil {
+		return 0, fmt.Errorf("approve all pending: %w", err)
+	}
+	n, err := result.RowsAffected()
+	if err != nil {
+		return 0, fmt.Errorf("approve all pending rows affected: %w", err)
+	}
+	return n, nil
 }
 
 // UpdateUserDisabled toggles the disabled flag for a user.

@@ -22,11 +22,13 @@ func RegisterHandler(deps *UIDeps) *registerHandler {
 }
 
 type registerContent struct {
-	Username   string
-	Closed     bool
-	Error      string
-	TOSUrl     string // non-empty if TOS is active
-	PrivacyUrl string // non-empty if Privacy Policy is active
+	Username     string
+	Closed       bool
+	ApprovalMode bool
+	Success      bool
+	Error        string
+	TOSUrl       string // non-empty if TOS is active
+	PrivacyUrl   string // non-empty if Privacy Policy is active
 }
 
 func (h *registerHandler) ShowRegister(w http.ResponseWriter, r *http.Request) {
@@ -37,7 +39,8 @@ func (h *registerHandler) ShowRegister(w http.ResponseWriter, r *http.Request) {
 
 	snap := h.deps.Settings.Load()
 	content := &registerContent{
-		Closed: snap.RegistrationMode == "closed",
+		Closed:       snap.RegistrationMode == "closed",
+		ApprovalMode: snap.RegistrationMode == "approval",
 	}
 	content.TOSUrl, content.PrivacyUrl = h.legalURLs(snap)
 
@@ -47,7 +50,7 @@ func (h *registerHandler) ShowRegister(w http.ResponseWriter, r *http.Request) {
 func (h *registerHandler) DoRegister(w http.ResponseWriter, r *http.Request) {
 	snap := h.deps.Settings.Load()
 
-	if snap.RegistrationMode == "closed" {
+	if snap.RegistrationMode != "open" && snap.RegistrationMode != "approval" {
 		http.Error(w, "Registration is closed", http.StatusForbidden)
 		return
 	}
@@ -98,8 +101,9 @@ func (h *registerHandler) DoRegister(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Create user.
-	user, err := h.deps.Auth.CreateUser(r.Context(), username, password, false)
+	// Create user — in approval mode, the account is not yet approved.
+	approved := snap.RegistrationMode == "open"
+	user, err := h.deps.Auth.CreateUser(r.Context(), username, password, false, approved)
 	if err != nil {
 		slog.Error("failed to create user", "error", err)
 		renderErr("Failed to create user. Username may already be taken.")
@@ -116,6 +120,18 @@ func (h *registerHandler) DoRegister(w http.ResponseWriter, r *http.Request) {
 		if err := db.AcceptPrivacy(r.Context(), h.deps.DB, user.ID); err != nil {
 			slog.Error("failed to record Privacy acceptance", "error", err)
 		}
+	}
+
+	if !approved {
+		// Approval mode: show success message, don't create a session.
+		db.Audit(r.Context(), h.deps.DB, user.ID, "user.registered_pending", "user", fmt.Sprintf("%d", user.ID), username)
+		h.deps.Renderer.Render(w, "register", h.deps.pageData(w, r, "Register — Gosilo", &registerContent{
+			ApprovalMode: true,
+			Success:      true,
+			TOSUrl:       tosUrl,
+			PrivacyUrl:   privacyUrl,
+		}))
+		return
 	}
 
 	// Create session.

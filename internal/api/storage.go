@@ -78,8 +78,8 @@ func Storage(database *sql.DB, svc *storage.Service, maxUploadSize func() int64)
 			return
 		}
 
-		// Reject disabled accounts.
-		if needsAuth && user.Disabled {
+		// Reject disabled or unapproved accounts.
+		if needsAuth && (user.Disabled || !user.Approved) {
 			http.Error(w, "account disabled", http.StatusForbidden)
 			return
 		}

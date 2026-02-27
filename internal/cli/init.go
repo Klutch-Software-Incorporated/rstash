@@ -144,7 +144,7 @@ func runInit(cmd *cobra.Command, args []string) error {
 
 	// Create admin user.
 	localAuth := auth.NewLocalService(database)
-	_, err = localAuth.CreateUser(context.Background(), username, password, true)
+	_, err = localAuth.CreateUser(context.Background(), username, password, true, true)
 	if err != nil {
 		return fmt.Errorf("create admin user: %w", err)
 	}

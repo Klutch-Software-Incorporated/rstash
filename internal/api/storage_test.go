@@ -44,7 +44,7 @@ func testSetup(t *testing.T) (*httptest.Server, *testEnv) {
 
 	// Create a test user.
 	ctx := context.Background()
-	user, err := db.CreateUser(ctx, database, "testuser", "password", false)
+	user, err := db.CreateUser(ctx, database, "testuser", "password", false, true)
 	if err != nil {
 		t.Fatalf("create user: %v", err)
 	}

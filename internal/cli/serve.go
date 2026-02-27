@@ -97,6 +97,20 @@ func runServe(cmd *cobra.Command, args []string) error {
 		levelVar.Set(parseLogLevel(s.LogLevel))
 	})
 
+	// Auto-approve pending users when switching to "open" registration mode.
+	prevRegMode := runtimeSettings.Load().RegistrationMode
+	runtimeSettings.OnChange(func(s *settings.Snapshot) {
+		if prevRegMode != "open" && s.RegistrationMode == "open" {
+			n, err := db.ApproveAllPending(context.Background(), database)
+			if err != nil {
+				slog.Error("failed to auto-approve pending users", "error", err)
+			} else if n > 0 {
+				slog.Info("auto-approved pending users on mode switch to open", "count", n)
+			}
+		}
+		prevRegMode = s.RegistrationMode
+	})
+
 	// Initialize blob storage from DSN.
 	blobScheme, blobPath, _ := config.ParseDSN(cfg.BlobDSN) // already validated
 	var blobs blob.Store

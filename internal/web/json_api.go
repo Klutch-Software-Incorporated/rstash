@@ -3,6 +3,7 @@ package web
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -56,6 +57,10 @@ func (h *jsonApiHandler) Login(w http.ResponseWriter, r *http.Request) {
 
 	user, err := h.deps.Auth.Authenticate(r.Context(), req.Username, req.Password)
 	if err != nil {
+		if errors.Is(err, auth.ErrAccountPendingApproval) {
+			jsonErr(w, http.StatusForbidden, "account is pending approval")
+			return
+		}
 		jsonErr(w, http.StatusUnauthorized, "invalid credentials")
 		return
 	}
@@ -113,6 +118,7 @@ func (h *jsonApiHandler) UserList(w http.ResponseWriter, r *http.Request) {
 		Username          string  `json:"username"`
 		IsAdmin           bool    `json:"is_admin"`
 		Disabled          bool    `json:"disabled"`
+		Approved          bool    `json:"approved"`
 		StorageQuota      int64   `json:"storage_quota"`
 		CreatedAt         string  `json:"created_at"`
 		LastLoginAt       *string `json:"last_login_at"`
@@ -127,6 +133,7 @@ func (h *jsonApiHandler) UserList(w http.ResponseWriter, r *http.Request) {
 			Username:          u.Username,
 			IsAdmin:           u.IsAdmin,
 			Disabled:          u.Disabled,
+			Approved:          u.Approved,
 			StorageQuota:      u.StorageQuota,
 			CreatedAt:         u.CreatedAt,
 			LastLoginAt:       u.LastLoginAt,
@@ -158,7 +165,7 @@ func (h *jsonApiHandler) UserAdd(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	newUser, err := h.deps.Auth.CreateUser(r.Context(), req.Username, req.Password, req.IsAdmin)
+	newUser, err := h.deps.Auth.CreateUser(r.Context(), req.Username, req.Password, req.IsAdmin, true)
 	if err != nil {
 		jsonErr(w, http.StatusConflict, "failed to create user (username may already exist)")
 		return
@@ -318,6 +325,60 @@ func (h *jsonApiHandler) UserDisable(w http.ResponseWriter, r *http.Request) {
 	}
 
 	jsonOK(w, map[string]any{"username": user.Username, "disabled": newDisabled})
+}
+
+// UserApprove handles POST /json/user/approve.
+func (h *jsonApiHandler) UserApprove(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Username string `json:"username"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		jsonErr(w, http.StatusBadRequest, "invalid JSON body")
+		return
+	}
+
+	user, err := h.deps.Auth.GetUserByUsername(r.Context(), req.Username)
+	if err != nil || user == nil {
+		jsonErr(w, http.StatusNotFound, "user not found")
+		return
+	}
+
+	if err := h.deps.Auth.SetApproved(r.Context(), user.ID, true); err != nil {
+		slog.Error("json api: failed to approve user", "error", err)
+		jsonErr(w, http.StatusInternalServerError, "failed to approve user")
+		return
+	}
+
+	actor := currentUserFromContext(r)
+	db.Audit(r.Context(), h.deps.DB, actor.ID, "user.approved", "user", fmt.Sprintf("%d", user.ID), user.Username)
+	jsonOK(w, map[string]any{"username": user.Username, "approved": true})
+}
+
+// UserReject handles POST /json/user/reject.
+func (h *jsonApiHandler) UserReject(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Username string `json:"username"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		jsonErr(w, http.StatusBadRequest, "invalid JSON body")
+		return
+	}
+
+	user, err := h.deps.Auth.GetUserByUsername(r.Context(), req.Username)
+	if err != nil || user == nil {
+		jsonErr(w, http.StatusNotFound, "user not found")
+		return
+	}
+
+	if err := h.deps.Auth.DeleteUser(r.Context(), user.ID); err != nil {
+		slog.Error("json api: failed to reject user", "error", err)
+		jsonErr(w, http.StatusInternalServerError, "failed to reject user")
+		return
+	}
+
+	actor := currentUserFromContext(r)
+	db.Audit(r.Context(), h.deps.DB, actor.ID, "user.rejected", "user", fmt.Sprintf("%d", user.ID), user.Username)
+	jsonOK(w, map[string]string{"status": "rejected"})
 }
 
 // --- Config endpoints ---
@@ -547,7 +608,7 @@ func (h *jsonApiHandler) jsonApiMiddleware(next http.Handler) http.Handler {
 			sess, err := h.deps.Auth.GetSession(r.Context(), cookie.Value)
 			if err == nil && sess != nil {
 				u, err := h.deps.Auth.GetUser(r.Context(), sess.UserID)
-				if err == nil && u != nil && !u.Disabled {
+				if err == nil && u != nil && !u.Disabled && u.Approved {
 					user = u
 				}
 			}
@@ -559,7 +620,7 @@ func (h *jsonApiHandler) jsonApiMiddleware(next http.Handler) http.Handler {
 				sess, err := h.deps.Auth.GetSession(r.Context(), token)
 				if err == nil && sess != nil {
 					u, err := h.deps.Auth.GetUser(r.Context(), sess.UserID)
-					if err == nil && u != nil && !u.Disabled {
+					if err == nil && u != nil && !u.Disabled && u.Approved {
 						user = u
 					}
 				}

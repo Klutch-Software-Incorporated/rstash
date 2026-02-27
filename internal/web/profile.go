@@ -60,6 +60,7 @@ type profileTargetUser struct {
 	Username          string
 	IsAdmin           bool
 	Disabled          bool
+	Approved          bool
 	CreatedAt         string
 	LastLoginAt       string
 	LastLoginIP       string
@@ -197,6 +198,7 @@ func (h *profileHandler) ShowDashboard(w http.ResponseWriter, r *http.Request) {
 			Username:  target.Username,
 			IsAdmin:   target.IsAdmin,
 			Disabled:  target.Disabled,
+			Approved:  target.Approved,
 			CreatedAt: target.CreatedAt,
 		}
 		if target.LastLoginAt != nil {
@@ -343,6 +345,7 @@ func (h *profileHandler) ShowSettings(w http.ResponseWriter, r *http.Request) {
 			Username:  target.Username,
 			IsAdmin:   target.IsAdmin,
 			Disabled:  target.Disabled,
+			Approved:  target.Approved,
 			CreatedAt: target.CreatedAt,
 		}
 		if target.LastLoginAt != nil {
@@ -913,6 +916,26 @@ func (h *profileHandler) ToggleDisabled(w http.ResponseWriter, r *http.Request) 
 		ui.SetFlash(w, fmt.Sprintf("%s has been enabled.", target.Username))
 	}
 	http.Redirect(w, r, urlPrefix(r)+"/settings", http.StatusSeeOther)
+}
+
+func (h *profileHandler) ApproveUser(w http.ResponseWriter, r *http.Request) {
+	if IsSelf(r) || !CurrentUser(r).IsAdmin {
+		http.Error(w, "Forbidden", http.StatusForbidden)
+		return
+	}
+
+	target := TargetUser(r)
+	if err := h.deps.Auth.SetApproved(r.Context(), target.ID, true); err != nil {
+		slog.Error("failed to approve user", "error", err)
+		ui.SetFlashError(w, "Failed to approve user.")
+		http.Redirect(w, r, urlPrefix(r)+"/", http.StatusSeeOther)
+		return
+	}
+
+	idStr := strconv.FormatInt(target.ID, 10)
+	h.audit(r, "user.approved", "user", idStr, target.Username)
+	ui.SetFlash(w, fmt.Sprintf("%s has been approved.", target.Username))
+	http.Redirect(w, r, urlPrefix(r)+"/", http.StatusSeeOther)
 }
 
 func (h *profileHandler) DeleteUser(w http.ResponseWriter, r *http.Request) {

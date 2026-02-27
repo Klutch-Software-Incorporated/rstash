@@ -104,6 +104,8 @@ func FullRoutes(deps *UIDeps) http.Handler {
 	mux.HandleFunc("POST /admin/users/{id}/quota", AdminGuard(RequireCSRF(adminHandler.SetUserQuota)))
 	mux.HandleFunc("POST /admin/users/{id}/toggle-admin", AdminGuard(RequireCSRF(adminHandler.ToggleAdmin)))
 	mux.HandleFunc("POST /admin/users/{id}/toggle-disabled", AdminGuard(RequireCSRF(adminHandler.ToggleDisabled)))
+	mux.HandleFunc("POST /admin/users/{id}/approve", AdminGuard(RequireCSRF(adminHandler.ApproveUser)))
+	mux.HandleFunc("POST /admin/users/{id}/reject", AdminGuard(RequireCSRF(adminHandler.RejectUser)))
 	mux.HandleFunc("POST /admin/settings", AdminGuard(RequireCSRF(adminHandler.UpdateSettings)))
 	mux.HandleFunc("POST /admin/settings/{key}/reset", AdminGuard(RequireCSRF(adminHandler.ResetSetting)))
 	mux.HandleFunc("GET /admin/abuse", AdminGuard(abuseH.ShowAbuseReports))
@@ -227,6 +229,8 @@ func profileRouter(deps *UIDeps) http.Handler {
 		// --- POST routes: admin actions on profile ---
 		case method == "POST" && sub == "/admin/toggle-admin":
 			scope(RequireCSRF(ph.ToggleAdmin))(w, r)
+		case method == "POST" && sub == "/admin/approve":
+			scope(RequireCSRF(ph.ApproveUser))(w, r)
 		case method == "POST" && sub == "/admin/toggle-disabled":
 			scope(RequireCSRF(ph.ToggleDisabled))(w, r)
 		case method == "POST" && sub == "/admin/delete":

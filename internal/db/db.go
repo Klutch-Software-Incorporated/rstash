@@ -175,6 +175,7 @@ func runMigrations(database *sql.DB) error {
 		"ALTER TABLE users ADD COLUMN last_login_ip TEXT",
 		"ALTER TABLE users ADD COLUMN tos_accepted_at TEXT",
 		"ALTER TABLE users ADD COLUMN privacy_accepted_at TEXT",
+		"ALTER TABLE users ADD COLUMN approved INTEGER NOT NULL DEFAULT 1",
 	}
 	for _, m := range migrations {
 		if _, err := database.Exec(m); err != nil {

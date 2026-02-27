@@ -78,7 +78,7 @@ func handleAuthorizationCode(w http.ResponseWriter, r *http.Request, database *s
 		tokenError(w, "server_error", "internal error", http.StatusInternalServerError)
 		return
 	}
-	if acUser == nil || acUser.Disabled {
+	if acUser == nil || acUser.Disabled || !acUser.Approved {
 		tokenError(w, "invalid_grant", "user account is disabled", http.StatusBadRequest)
 		return
 	}
@@ -153,7 +153,7 @@ func handleRefreshToken(w http.ResponseWriter, r *http.Request, database *sql.DB
 		tokenError(w, "server_error", "internal error", http.StatusInternalServerError)
 		return
 	}
-	if rtUser == nil || rtUser.Disabled {
+	if rtUser == nil || rtUser.Disabled || !rtUser.Approved {
 		_ = db.DeleteRefreshToken(r.Context(), database, refreshToken)
 		tokenError(w, "invalid_grant", "user account is disabled", http.StatusBadRequest)
 		return

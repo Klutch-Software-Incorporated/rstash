@@ -95,11 +95,23 @@ is provided. The operation is recorded in the audit log.`,
 	RunE:    runUserDelete,
 }
 
+var userApproveCmd = &cobra.Command{
+	Use:   "approve <username>",
+	Short: "Approve a pending user",
+	Long: `Approve a user account that is pending approval. This allows the user to log in.
+Use --reject to delete the pending user instead of approving them.`,
+	Example: `  gosilo user approve alice
+  gosilo user approve alice --reject`,
+	Args: cobra.ExactArgs(1),
+	RunE: runUserApprove,
+}
+
 var (
-	userAddAdmin    bool
+	userAddAdmin     bool
 	userPasswordFlag string // --password for non-interactive use
 	userDisableFlag  bool   // --enable flag for re-enable
 	userDeleteForce  bool
+	userRejectFlag   bool   // --reject flag for user approve command
 )
 
 func init() {
@@ -108,8 +120,9 @@ func init() {
 	userPasswdCmd.Flags().StringVar(&userPasswordFlag, "password", "", "set password non-interactively")
 	userDisableCmd.Flags().BoolVar(&userDisableFlag, "enable", false, "re-enable the user instead of disabling")
 	userDeleteCmd.Flags().BoolVar(&userDeleteForce, "force", false, "skip confirmation prompt")
+	userApproveCmd.Flags().BoolVar(&userRejectFlag, "reject", false, "reject (delete) the pending user instead of approving")
 
-	userCmd.AddCommand(userAddCmd, userListCmd, userPasswdCmd, userPromoteCmd, userDisableCmd, userDeleteCmd)
+	userCmd.AddCommand(userAddCmd, userListCmd, userPasswdCmd, userPromoteCmd, userDisableCmd, userDeleteCmd, userApproveCmd)
 	rootCmd.AddCommand(userCmd)
 }
 
@@ -152,7 +165,7 @@ func runUserAdd(cmd *cobra.Command, args []string) error {
 	defer cleanup()
 
 	ctx := context.Background()
-	user, err := svc.CreateUser(ctx, username, password, userAddAdmin)
+	user, err := svc.CreateUser(ctx, username, password, userAddAdmin, true)
 	if err != nil {
 		return fmt.Errorf("create user: %w", err)
 	}
@@ -184,6 +197,7 @@ func runUserList(cmd *cobra.Command, args []string) error {
 			Username          string  `json:"username"`
 			IsAdmin           bool    `json:"is_admin"`
 			Disabled          bool    `json:"disabled"`
+			Approved          bool    `json:"approved"`
 			CreatedAt         string  `json:"created_at"`
 			TOSAcceptedAt     *string `json:"tos_accepted_at,omitempty"`
 			PrivacyAcceptedAt *string `json:"privacy_accepted_at,omitempty"`
@@ -195,6 +209,7 @@ func runUserList(cmd *cobra.Command, args []string) error {
 				Username:          u.Username,
 				IsAdmin:           u.IsAdmin,
 				Disabled:          u.Disabled,
+				Approved:          u.Approved,
 				CreatedAt:         u.CreatedAt,
 				TOSAcceptedAt:     u.TOSAcceptedAt,
 				PrivacyAcceptedAt: u.PrivacyAcceptedAt,
@@ -204,10 +219,10 @@ func runUserList(cmd *cobra.Command, args []string) error {
 	}
 
 	tw := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-	fmt.Fprintln(tw, "ID\tUsername\tAdmin\tDisabled\tCreated")
-	fmt.Fprintln(tw, "--\t--------\t-----\t--------\t-------")
+	fmt.Fprintln(tw, "ID\tUsername\tAdmin\tDisabled\tApproved\tCreated")
+	fmt.Fprintln(tw, "--\t--------\t-----\t--------\t--------\t-------")
 	for _, u := range users {
-		fmt.Fprintf(tw, "%d\t%s\t%v\t%v\t%s\n", u.ID, u.Username, u.IsAdmin, u.Disabled, u.CreatedAt)
+		fmt.Fprintf(tw, "%d\t%s\t%v\t%v\t%v\t%s\n", u.ID, u.Username, u.IsAdmin, u.Disabled, u.Approved, u.CreatedAt)
 	}
 	return tw.Flush()
 }
@@ -358,5 +373,42 @@ func runUserDelete(cmd *cobra.Command, args []string) error {
 
 	db.Audit(ctx, database, db.SystemActorID, "user.deleted", "user", fmt.Sprintf("%d", user.ID), username)
 	fmt.Fprintf(os.Stderr, "User %q deleted.\n", username)
+	return nil
+}
+
+func runUserApprove(cmd *cobra.Command, args []string) error {
+	username := args[0]
+
+	svc, database, cleanup, err := openAuthService()
+	if err != nil {
+		return err
+	}
+	defer cleanup()
+
+	ctx := context.Background()
+	user, err := svc.GetUserByUsername(ctx, username)
+	if err != nil {
+		return fmt.Errorf("get user: %w", err)
+	}
+	if user == nil {
+		return fmt.Errorf("user %q not found", username)
+	}
+
+	idStr := fmt.Sprintf("%d", user.ID)
+
+	if userRejectFlag {
+		if err := svc.DeleteUser(ctx, user.ID); err != nil {
+			return fmt.Errorf("delete user: %w", err)
+		}
+		db.Audit(ctx, database, db.SystemActorID, "user.rejected", "user", idStr, username)
+		fmt.Fprintf(os.Stderr, "User %q rejected (deleted).\n", username)
+		return nil
+	}
+
+	if err := svc.SetApproved(ctx, user.ID, true); err != nil {
+		return fmt.Errorf("approve user: %w", err)
+	}
+	db.Audit(ctx, database, db.SystemActorID, "user.approved", "user", idStr, username)
+	fmt.Fprintf(os.Stderr, "User %q approved.\n", username)
 	return nil
 }

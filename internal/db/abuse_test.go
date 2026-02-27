@@ -98,7 +98,7 @@ func TestUpdateAbuseReportStatus(t *testing.T) {
 	database := testDB(t)
 	ctx := context.Background()
 
-	admin, err := db.CreateUser(ctx, database, "admin", "password", true)
+	admin, err := db.CreateUser(ctx, database, "admin", "password", true, true)
 	if err != nil {
 		t.Fatalf("create admin: %v", err)
 	}
@@ -159,7 +159,7 @@ func TestCountOpenAbuseReports(t *testing.T) {
 	}
 
 	// Review one — count should drop.
-	admin, _ := db.CreateUser(ctx, database, "admin", "password", true)
+	admin, _ := db.CreateUser(ctx, database, "admin", "password", true, true)
 	_ = db.UpdateAbuseReportStatus(ctx, database, r1.ID, "reviewed", admin.ID, "ok")
 
 	count, err = db.CountOpenAbuseReports(ctx, database)

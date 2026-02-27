@@ -27,7 +27,7 @@ func revokeTestServer(t *testing.T) (*httptest.Server, *revokeTestEnv) {
 	t.Cleanup(ts.Close)
 
 	ctx := context.Background()
-	user, err := db.CreateUser(ctx, database, "revokeuser", "password", false)
+	user, err := db.CreateUser(ctx, database, "revokeuser", "password", false, true)
 	if err != nil {
 		t.Fatalf("create user: %v", err)
 	}

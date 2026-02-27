@@ -11,7 +11,7 @@ func TestCreateAndGetSession(t *testing.T) {
 	database := testDB(t)
 	ctx := context.Background()
 
-	user, err := db.CreateUser(ctx, database, "sessuser", "password123", false)
+	user, err := db.CreateUser(ctx, database, "sessuser", "password123", false, true)
 	if err != nil {
 		t.Fatalf("create user: %v", err)
 	}
@@ -60,7 +60,7 @@ func TestDeleteSession(t *testing.T) {
 	database := testDB(t)
 	ctx := context.Background()
 
-	user, _ := db.CreateUser(ctx, database, "delsessuser", "password123", false)
+	user, _ := db.CreateUser(ctx, database, "delsessuser", "password123", false, true)
 	sess, _ := db.CreateSession(ctx, database, user.ID)
 
 	if err := db.DeleteSession(ctx, database, sess.Token); err != nil {
@@ -80,7 +80,7 @@ func TestDeleteUserSessions(t *testing.T) {
 	database := testDB(t)
 	ctx := context.Background()
 
-	user, _ := db.CreateUser(ctx, database, "multisessuser", "password123", false)
+	user, _ := db.CreateUser(ctx, database, "multisessuser", "password123", false, true)
 	db.CreateSession(ctx, database, user.ID)
 	db.CreateSession(ctx, database, user.ID)
 
@@ -93,7 +93,7 @@ func TestExpiredSessionReturnsNil(t *testing.T) {
 	database := testDB(t)
 	ctx := context.Background()
 
-	user, _ := db.CreateUser(ctx, database, "expuser", "password123", false)
+	user, _ := db.CreateUser(ctx, database, "expuser", "password123", false, true)
 	sess, _ := db.CreateSession(ctx, database, user.ID)
 
 	// Manually expire the session.

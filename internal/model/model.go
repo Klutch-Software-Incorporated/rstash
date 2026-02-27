@@ -7,6 +7,7 @@ type User struct {
 	IsAdmin      bool
 	StorageQuota int64 // 0 = use server default
 	Disabled     bool
+	Approved     bool
 	CreatedAt    string
 	LastLoginAt        *string // NULL until first login
 	LastLoginIP        *string // NULL until first login

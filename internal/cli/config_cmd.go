@@ -189,6 +189,15 @@ func runConfigSet(cmd *cobra.Command, args []string) error {
 
 	db.Audit(ctx, database, db.SystemActorID, "settings.updated", "setting", key, value)
 	fmt.Fprintf(os.Stderr, "Set %s = %s\n", key, value)
+
+	// Auto-approve pending users when switching to "open" registration mode.
+	if key == "registration_mode" && value == "open" {
+		n, _ := db.ApproveAllPending(ctx, database)
+		if n > 0 {
+			fmt.Fprintf(os.Stderr, "Auto-approved %d pending user(s).\n", n)
+		}
+	}
+
 	return nil
 }
 

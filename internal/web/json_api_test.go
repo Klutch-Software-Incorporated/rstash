@@ -64,7 +64,7 @@ func jsonApiSetup(t *testing.T) (*httptest.Server, *web.UIDeps, string) {
 	t.Cleanup(ts.Close)
 
 	// Create an admin user.
-	_, err = db.CreateUser(context.Background(), database, "admin", "adminpass123", true)
+	_, err = db.CreateUser(context.Background(), database, "admin", "adminpass123", true, true)
 	if err != nil {
 		t.Fatalf("create admin: %v", err)
 	}
@@ -257,7 +257,7 @@ func TestJSONApi_LoginNonAdminForbidden(t *testing.T) {
 	ts, deps, _ := jsonApiSetup(t)
 
 	// Create a non-admin user.
-	_, err := db.CreateUser(context.Background(), deps.DB, "regular", "password123", false)
+	_, err := db.CreateUser(context.Background(), deps.DB, "regular", "password123", false, true)
 	if err != nil {
 		t.Fatalf("create user: %v", err)
 	}
@@ -390,7 +390,7 @@ func TestJSONApi_UserPasswd(t *testing.T) {
 	ts, deps, token := jsonApiSetup(t)
 
 	// Create a target user.
-	_, err := db.CreateUser(context.Background(), deps.DB, "pwduser", "oldpass1234", false)
+	_, err := db.CreateUser(context.Background(), deps.DB, "pwduser", "oldpass1234", false, true)
 	if err != nil {
 		t.Fatalf("create user: %v", err)
 	}
@@ -432,7 +432,7 @@ func TestJSONApi_UserPasswd(t *testing.T) {
 func TestJSONApi_UserPromote(t *testing.T) {
 	ts, deps, token := jsonApiSetup(t)
 
-	_, err := db.CreateUser(context.Background(), deps.DB, "promuser", "password123", false)
+	_, err := db.CreateUser(context.Background(), deps.DB, "promuser", "password123", false, true)
 	if err != nil {
 		t.Fatalf("create user: %v", err)
 	}
@@ -465,7 +465,7 @@ func TestJSONApi_UserPromote(t *testing.T) {
 func TestJSONApi_UserDisable(t *testing.T) {
 	ts, deps, token := jsonApiSetup(t)
 
-	_, err := db.CreateUser(context.Background(), deps.DB, "disuser", "password123", false)
+	_, err := db.CreateUser(context.Background(), deps.DB, "disuser", "password123", false, true)
 	if err != nil {
 		t.Fatalf("create user: %v", err)
 	}
