@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	"gosilo/internal/auth"
-	"gosilo/internal/db"
 	"gosilo/internal/settings"
 	"gosilo/internal/ui"
 )
@@ -112,19 +111,19 @@ func (h *registerHandler) DoRegister(w http.ResponseWriter, r *http.Request) {
 
 	// Record TOS and Privacy Policy acceptance.
 	if tosActive {
-		if err := db.AcceptTOS(r.Context(), h.deps.DB, user.ID); err != nil {
+		if err := h.deps.Repo.AcceptTOS(r.Context(), user.ID); err != nil {
 			slog.Error("failed to record TOS acceptance", "error", err)
 		}
 	}
 	if privacyActive {
-		if err := db.AcceptPrivacy(r.Context(), h.deps.DB, user.ID); err != nil {
+		if err := h.deps.Repo.AcceptPrivacy(r.Context(), user.ID); err != nil {
 			slog.Error("failed to record Privacy acceptance", "error", err)
 		}
 	}
 
 	if !approved {
 		// Approval mode: show success message, don't create a session.
-		db.Audit(r.Context(), h.deps.DB, user.ID, "user.registered_pending", "user", fmt.Sprintf("%d", user.ID), username)
+		h.deps.Repo.Audit(r.Context(), user.ID, "user.registered_pending", "user", fmt.Sprintf("%d", user.ID), username)
 		h.deps.Renderer.Render(w, "register", h.deps.pageData(w, r, "Register — Gosilo", &registerContent{
 			ApprovalMode: true,
 			Success:      true,
@@ -142,7 +141,7 @@ func (h *registerHandler) DoRegister(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	db.Audit(r.Context(), h.deps.DB, user.ID, "user.registered", "user", fmt.Sprintf("%d", user.ID), username)
+	h.deps.Repo.Audit(r.Context(), user.ID, "user.registered", "user", fmt.Sprintf("%d", user.ID), username)
 	auth.SetSessionCookie(w, sess.Token, h.deps.SecureCookies)
 	ui.SetFlash(w, "Account created successfully.")
 	http.Redirect(w, r, "/", http.StatusSeeOther)

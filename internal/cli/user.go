@@ -2,11 +2,11 @@ package cli
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
 	"fmt"
 	"os"
 	"text/tabwriter"
+	"time"
 
 	"gosilo/internal/auth"
 	"gosilo/internal/db"
@@ -126,14 +126,14 @@ func init() {
 	rootCmd.AddCommand(userCmd)
 }
 
-func openAuthService() (*auth.LocalService, *sql.DB, func(), error) {
+func openAuthService() (*auth.LocalService, *db.Repository, func(), error) {
 	dsn := resolvedDBDSN("sqlite:gosilo.db")
-	database, err := db.Open(dsn)
+	repo, err := db.OpenRepository(dsn)
 	if err != nil {
 		return nil, nil, nil, &SystemError{fmt.Errorf("open database: %w", err)}
 	}
-	svc := auth.NewLocalService(database)
-	return svc, database, func() { database.Close() }, nil
+	svc := auth.NewLocalService(repo)
+	return svc, repo, func() { repo.Close() }, nil
 }
 
 func runUserAdd(cmd *cobra.Command, args []string) error {
@@ -158,7 +158,7 @@ func runUserAdd(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("password must be at least 8 characters")
 	}
 
-	svc, database, cleanup, err := openAuthService()
+	svc, repo, cleanup, err := openAuthService()
 	if err != nil {
 		return err
 	}
@@ -171,10 +171,10 @@ func runUserAdd(cmd *cobra.Command, args []string) error {
 	}
 
 	// Auto-accept TOS/Privacy for CLI-created users.
-	_ = db.AcceptTOS(ctx, database, user.ID)
-	_ = db.AcceptPrivacy(ctx, database, user.ID)
+	_ = repo.AcceptTOS(ctx, user.ID)
+	_ = repo.AcceptPrivacy(ctx, user.ID)
 
-	db.Audit(ctx, database, db.SystemActorID, "user.created", "user", fmt.Sprintf("%d", user.ID), username)
+	repo.Audit(ctx, db.SystemActorID, "user.created", "user", fmt.Sprintf("%d", user.ID), username)
 	fmt.Fprintf(os.Stderr, "User %q created (ID: %d, admin: %v)\n", user.Username, user.ID, user.IsAdmin)
 	return nil
 }
@@ -204,16 +204,23 @@ func runUserList(cmd *cobra.Command, args []string) error {
 		}
 		out := make([]userJSON, len(users))
 		for i, u := range users {
-			out[i] = userJSON{
-				ID:                u.ID,
-				Username:          u.Username,
-				IsAdmin:           u.IsAdmin,
-				Disabled:          u.Disabled,
-				Approved:          u.Approved,
-				CreatedAt:         u.CreatedAt,
-				TOSAcceptedAt:     u.TOSAcceptedAt,
-				PrivacyAcceptedAt: u.PrivacyAcceptedAt,
+			uj := userJSON{
+				ID:        u.ID,
+				Username:  u.Username,
+				IsAdmin:   u.IsAdmin,
+				Disabled:  u.Disabled,
+				Approved:  u.Approved,
+				CreatedAt: u.CreatedAt.Format(time.RFC3339),
 			}
+			if u.TOSAcceptedAt != nil {
+				s := u.TOSAcceptedAt.Format(time.RFC3339)
+				uj.TOSAcceptedAt = &s
+			}
+			if u.PrivacyAcceptedAt != nil {
+				s := u.PrivacyAcceptedAt.Format(time.RFC3339)
+				uj.PrivacyAcceptedAt = &s
+			}
+			out[i] = uj
 		}
 		return json.NewEncoder(os.Stdout).Encode(out)
 	}
@@ -222,7 +229,7 @@ func runUserList(cmd *cobra.Command, args []string) error {
 	fmt.Fprintln(tw, "ID\tUsername\tAdmin\tDisabled\tApproved\tCreated")
 	fmt.Fprintln(tw, "--\t--------\t-----\t--------\t--------\t-------")
 	for _, u := range users {
-		fmt.Fprintf(tw, "%d\t%s\t%v\t%v\t%v\t%s\n", u.ID, u.Username, u.IsAdmin, u.Disabled, u.Approved, u.CreatedAt)
+		fmt.Fprintf(tw, "%d\t%s\t%v\t%v\t%v\t%s\n", u.ID, u.Username, u.IsAdmin, u.Disabled, u.Approved, u.CreatedAt.Format("2006-01-02 15:04:05"))
 	}
 	return tw.Flush()
 }
@@ -230,7 +237,7 @@ func runUserList(cmd *cobra.Command, args []string) error {
 func runUserPasswd(cmd *cobra.Command, args []string) error {
 	username := args[0]
 
-	svc, database, cleanup, err := openAuthService()
+	svc, repo, cleanup, err := openAuthService()
 	if err != nil {
 		return err
 	}
@@ -268,7 +275,7 @@ func runUserPasswd(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("update password: %w", err)
 	}
 
-	db.Audit(ctx, database, db.SystemActorID, "user.password_changed", "user", fmt.Sprintf("%d", user.ID), username)
+	repo.Audit(ctx, db.SystemActorID, "user.password_changed", "user", fmt.Sprintf("%d", user.ID), username)
 	fmt.Fprintf(os.Stderr, "Password updated for %q.\n", username)
 	return nil
 }
@@ -276,7 +283,7 @@ func runUserPasswd(cmd *cobra.Command, args []string) error {
 func runUserPromote(cmd *cobra.Command, args []string) error {
 	username := args[0]
 
-	svc, database, cleanup, err := openAuthService()
+	svc, repo, cleanup, err := openAuthService()
 	if err != nil {
 		return err
 	}
@@ -295,7 +302,7 @@ func runUserPromote(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("promote user: %w", err)
 	}
 
-	db.Audit(ctx, database, db.SystemActorID, "user.promoted", "user", fmt.Sprintf("%d", user.ID), username)
+	repo.Audit(ctx, db.SystemActorID, "user.promoted", "user", fmt.Sprintf("%d", user.ID), username)
 	fmt.Fprintf(os.Stderr, "%q is now an admin.\n", username)
 	return nil
 }
@@ -304,7 +311,7 @@ func runUserDisable(cmd *cobra.Command, args []string) error {
 	username := args[0]
 	disable := !userDisableFlag // default: disable; --enable reverses
 
-	svc, database, cleanup, err := openAuthService()
+	svc, repo, cleanup, err := openAuthService()
 	if err != nil {
 		return err
 	}
@@ -327,12 +334,12 @@ func runUserDisable(cmd *cobra.Command, args []string) error {
 	if disable {
 		// Terminate sessions and revoke all tokens when disabling.
 		_ = svc.TerminateAllSessions(ctx, user.ID)
-		_ = db.DeleteOAuthTokensByUserID(ctx, database, user.ID)
-		_ = db.DeleteRefreshTokensByUserID(ctx, database, user.ID)
-		db.Audit(ctx, database, db.SystemActorID, "user.disabled", "user", idStr, username)
+		_ = repo.DeleteOAuthTokensByUserID(ctx, user.ID)
+		_ = repo.DeleteRefreshTokensByUserID(ctx, user.ID)
+		repo.Audit(ctx, db.SystemActorID, "user.disabled", "user", idStr, username)
 		fmt.Fprintf(os.Stderr, "%q has been disabled.\n", username)
 	} else {
-		db.Audit(ctx, database, db.SystemActorID, "user.enabled", "user", idStr, username)
+		repo.Audit(ctx, db.SystemActorID, "user.enabled", "user", idStr, username)
 		fmt.Fprintf(os.Stderr, "%q has been enabled.\n", username)
 	}
 	return nil
@@ -341,7 +348,7 @@ func runUserDisable(cmd *cobra.Command, args []string) error {
 func runUserDelete(cmd *cobra.Command, args []string) error {
 	username := args[0]
 
-	svc, database, cleanup, err := openAuthService()
+	svc, repo, cleanup, err := openAuthService()
 	if err != nil {
 		return err
 	}
@@ -371,7 +378,7 @@ func runUserDelete(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("delete user: %w", err)
 	}
 
-	db.Audit(ctx, database, db.SystemActorID, "user.deleted", "user", fmt.Sprintf("%d", user.ID), username)
+	repo.Audit(ctx, db.SystemActorID, "user.deleted", "user", fmt.Sprintf("%d", user.ID), username)
 	fmt.Fprintf(os.Stderr, "User %q deleted.\n", username)
 	return nil
 }
@@ -379,7 +386,7 @@ func runUserDelete(cmd *cobra.Command, args []string) error {
 func runUserApprove(cmd *cobra.Command, args []string) error {
 	username := args[0]
 
-	svc, database, cleanup, err := openAuthService()
+	svc, repo, cleanup, err := openAuthService()
 	if err != nil {
 		return err
 	}
@@ -400,7 +407,7 @@ func runUserApprove(cmd *cobra.Command, args []string) error {
 		if err := svc.DeleteUser(ctx, user.ID); err != nil {
 			return fmt.Errorf("delete user: %w", err)
 		}
-		db.Audit(ctx, database, db.SystemActorID, "user.rejected", "user", idStr, username)
+		repo.Audit(ctx, db.SystemActorID, "user.rejected", "user", idStr, username)
 		fmt.Fprintf(os.Stderr, "User %q rejected (deleted).\n", username)
 		return nil
 	}
@@ -408,7 +415,7 @@ func runUserApprove(cmd *cobra.Command, args []string) error {
 	if err := svc.SetApproved(ctx, user.ID, true); err != nil {
 		return fmt.Errorf("approve user: %w", err)
 	}
-	db.Audit(ctx, database, db.SystemActorID, "user.approved", "user", idStr, username)
+	repo.Audit(ctx, db.SystemActorID, "user.approved", "user", idStr, username)
 	fmt.Fprintf(os.Stderr, "User %q approved.\n", username)
 	return nil
 }

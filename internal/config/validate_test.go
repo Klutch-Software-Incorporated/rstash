@@ -96,8 +96,14 @@ func TestValidate_BaseURL_TrailingSlash(t *testing.T) {
 }
 
 func TestValidate_DatabaseDSN(t *testing.T) {
-	// Valid sqlite DSNs.
-	for _, dsn := range []string{"sqlite:gosilo.db", "sqlite::memory:"} {
+	// Valid DSNs for all supported databases.
+	for _, dsn := range []string{
+		"sqlite:gosilo.db",
+		"sqlite::memory:",
+		"postgres:host=localhost dbname=gosilo",
+		"mysql:user:pass@tcp(localhost:3306)/gosilo",
+		"mssql:sqlserver://sa:pass@localhost:1433?database=gosilo",
+	} {
 		cfg := validConfig()
 		cfg.DatabaseDSN = dsn
 		if err := cfg.Validate(); err != nil {
@@ -105,12 +111,12 @@ func TestValidate_DatabaseDSN(t *testing.T) {
 		}
 	}
 
-	// Invalid scheme.
+	// Unsupported scheme.
 	cfg := validConfig()
-	cfg.DatabaseDSN = "postgres:host=localhost"
+	cfg.DatabaseDSN = "redis:localhost:6379"
 	err := cfg.Validate()
 	if err == nil {
-		t.Fatal("expected error for non-sqlite database DSN")
+		t.Fatal("expected error for unsupported database DSN scheme")
 	}
 	if !strings.Contains(err.Error(), "GOSILO_DB") {
 		t.Fatalf("error should mention GOSILO_DB, got: %v", err)
@@ -118,7 +124,7 @@ func TestValidate_DatabaseDSN(t *testing.T) {
 }
 
 func TestValidate_BlobDSN(t *testing.T) {
-	for _, dsn := range []string{"sqlite:blobs.db", "fs:/tmp/blobs"} {
+	for _, dsn := range []string{"sqlite:blobs.db", "fs:/tmp/blobs", "s3:mybucket"} {
 		cfg := validConfig()
 		cfg.BlobDSN = dsn
 		if err := cfg.Validate(); err != nil {
@@ -127,7 +133,7 @@ func TestValidate_BlobDSN(t *testing.T) {
 	}
 
 	cfg := validConfig()
-	cfg.BlobDSN = "s3:mybucket"
+	cfg.BlobDSN = "redis:localhost:6379"
 	err := cfg.Validate()
 	if err == nil {
 		t.Fatal("expected error for unsupported blob backend scheme")
@@ -202,8 +208,8 @@ func TestValidate_MultipleErrors(t *testing.T) {
 	cfg := &Config{
 		Addr:        "bad",
 		BaseURL:     "ftp://x.com",
-		DatabaseDSN: "postgres:host=localhost",
-		BlobDSN:     "s3:mybucket",
+		DatabaseDSN: "redis:localhost",
+		BlobDSN:     "redis:localhost",
 		LogLevel:    "trace",
 		WebMode:     "full",
 	}

@@ -2,7 +2,6 @@ package api
 
 import (
 	"crypto/sha256"
-	"database/sql"
 	"encoding/base64"
 	"encoding/json"
 	"log/slog"
@@ -17,7 +16,7 @@ import (
 // and the refresh_token grant type.
 // tokenLifetimeFunc returns the current token_lifetime setting string.
 // refreshFunc returns whether refresh tokens are enabled and their lifetime string.
-func OAuthToken(database *sql.DB, tokenLifetimeFunc func() string, refreshFunc func() (enabled bool, lifetime string)) http.Handler {
+func OAuthToken(repo *db.Repository, tokenLifetimeFunc func() string, refreshFunc func() (enabled bool, lifetime string)) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
 			tokenError(w, "invalid_request", "method must be POST", http.StatusBadRequest)
@@ -28,16 +27,16 @@ func OAuthToken(database *sql.DB, tokenLifetimeFunc func() string, refreshFunc f
 
 		switch grantType {
 		case "authorization_code":
-			handleAuthorizationCode(w, r, database, tokenLifetimeFunc, refreshFunc)
+			handleAuthorizationCode(w, r, repo, tokenLifetimeFunc, refreshFunc)
 		case "refresh_token":
-			handleRefreshToken(w, r, database, tokenLifetimeFunc, refreshFunc)
+			handleRefreshToken(w, r, repo, tokenLifetimeFunc, refreshFunc)
 		default:
 			tokenError(w, "unsupported_grant_type", "supported grant types: authorization_code, refresh_token", http.StatusBadRequest)
 		}
 	})
 }
 
-func handleAuthorizationCode(w http.ResponseWriter, r *http.Request, database *sql.DB, tokenLifetimeFunc func() string, refreshFunc func() (bool, string)) {
+func handleAuthorizationCode(w http.ResponseWriter, r *http.Request, repo *db.Repository, tokenLifetimeFunc func() string, refreshFunc func() (bool, string)) {
 	code := r.FormValue("code")
 	codeVerifier := r.FormValue("code_verifier")
 	redirectURI := r.FormValue("redirect_uri")
@@ -48,7 +47,7 @@ func handleAuthorizationCode(w http.ResponseWriter, r *http.Request, database *s
 	}
 
 	// Look up the authorization code.
-	ac, err := db.GetAuthorizationCode(r.Context(), database, code)
+	ac, err := repo.GetAuthorizationCode(r.Context(), code)
 	if err != nil {
 		slog.Error("get authorization code", "error", err)
 		tokenError(w, "server_error", "internal error", http.StatusInternalServerError)
@@ -72,7 +71,7 @@ func handleAuthorizationCode(w http.ResponseWriter, r *http.Request, database *s
 	}
 
 	// Reject if user account is disabled.
-	acUser, err := db.GetUserByID(r.Context(), database, ac.UserID)
+	acUser, err := repo.GetUserByID(r.Context(), ac.UserID)
 	if err != nil {
 		slog.Error("get user for auth code", "error", err)
 		tokenError(w, "server_error", "internal error", http.StatusInternalServerError)
@@ -84,7 +83,7 @@ func handleAuthorizationCode(w http.ResponseWriter, r *http.Request, database *s
 	}
 
 	// Mark code as used.
-	if err := db.UseAuthorizationCode(r.Context(), database, code); err != nil {
+	if err := repo.UseAuthorizationCode(r.Context(), code); err != nil {
 		slog.Error("use authorization code", "error", err)
 		tokenError(w, "server_error", "internal error", http.StatusInternalServerError)
 		return
@@ -96,7 +95,7 @@ func handleAuthorizationCode(w http.ResponseWriter, r *http.Request, database *s
 
 	// Create the access token.
 	scopes := strings.Fields(ac.Scopes)
-	token, err := db.CreateOAuthToken(r.Context(), database, ac.UserID, ac.ClientID, scopes, lifetime)
+	token, err := repo.CreateOAuthToken(r.Context(), ac.UserID, ac.ClientID, scopes, lifetime)
 	if err != nil {
 		slog.Error("create oauth token", "error", err)
 		tokenError(w, "server_error", "internal error", http.StatusInternalServerError)
@@ -116,7 +115,7 @@ func handleAuthorizationCode(w http.ResponseWriter, r *http.Request, database *s
 	// Issue refresh token if enabled.
 	if refreshEnabled, refreshLifetimeStr := refreshFunc(); refreshEnabled {
 		refreshLifetime, _ := config.ParseTokenLifetime(refreshLifetimeStr)
-		rt, err := db.CreateRefreshToken(r.Context(), database, ac.UserID, ac.ClientID, scopes, token.Token, refreshLifetime)
+		rt, err := repo.CreateRefreshToken(r.Context(), ac.UserID, ac.ClientID, scopes, token.Token, refreshLifetime)
 		if err != nil {
 			slog.Error("create refresh token", "error", err)
 		} else {
@@ -127,7 +126,7 @@ func handleAuthorizationCode(w http.ResponseWriter, r *http.Request, database *s
 	json.NewEncoder(w).Encode(resp)
 }
 
-func handleRefreshToken(w http.ResponseWriter, r *http.Request, database *sql.DB, tokenLifetimeFunc func() string, refreshFunc func() (bool, string)) {
+func handleRefreshToken(w http.ResponseWriter, r *http.Request, repo *db.Repository, tokenLifetimeFunc func() string, refreshFunc func() (bool, string)) {
 	refreshToken := r.FormValue("refresh_token")
 	if refreshToken == "" {
 		tokenError(w, "invalid_request", "refresh_token is required", http.StatusBadRequest)
@@ -135,7 +134,7 @@ func handleRefreshToken(w http.ResponseWriter, r *http.Request, database *sql.DB
 	}
 
 	// Look up the refresh token.
-	rt, err := db.GetRefreshToken(r.Context(), database, refreshToken)
+	rt, err := repo.GetRefreshToken(r.Context(), refreshToken)
 	if err != nil {
 		slog.Error("get refresh token", "error", err)
 		tokenError(w, "server_error", "internal error", http.StatusInternalServerError)
@@ -147,27 +146,27 @@ func handleRefreshToken(w http.ResponseWriter, r *http.Request, database *sql.DB
 	}
 
 	// Reject if user account is disabled, and revoke the refresh token.
-	rtUser, err := db.GetUserByID(r.Context(), database, rt.UserID)
+	rtUser, err := repo.GetUserByID(r.Context(), rt.UserID)
 	if err != nil {
 		slog.Error("get user for refresh token", "error", err)
 		tokenError(w, "server_error", "internal error", http.StatusInternalServerError)
 		return
 	}
 	if rtUser == nil || rtUser.Disabled || !rtUser.Approved {
-		_ = db.DeleteRefreshToken(r.Context(), database, refreshToken)
+		_ = repo.DeleteRefreshToken(r.Context(), refreshToken)
 		tokenError(w, "invalid_grant", "user account is disabled", http.StatusBadRequest)
 		return
 	}
 
 	// Delete old access token and old refresh token (rotation).
-	_ = db.DeleteOAuthToken(r.Context(), database, rt.AccessToken)
-	_ = db.DeleteRefreshToken(r.Context(), database, refreshToken)
+	_ = repo.DeleteOAuthToken(r.Context(), rt.AccessToken)
+	_ = repo.DeleteRefreshToken(r.Context(), refreshToken)
 
 	// Create new access token.
 	lifetimeStr := tokenLifetimeFunc()
 	lifetime, _ := config.ParseTokenLifetime(lifetimeStr)
 
-	newToken, err := db.CreateOAuthToken(r.Context(), database, rt.UserID, rt.ClientID, rt.Scopes, lifetime)
+	newToken, err := repo.CreateOAuthToken(r.Context(), rt.UserID, rt.ClientID, strings.Fields(rt.Scopes), lifetime)
 	if err != nil {
 		slog.Error("create oauth token on refresh", "error", err)
 		tokenError(w, "server_error", "internal error", http.StatusInternalServerError)
@@ -187,7 +186,7 @@ func handleRefreshToken(w http.ResponseWriter, r *http.Request, database *sql.DB
 	// Issue new refresh token if still enabled (rotation).
 	if refreshEnabled, refreshLifetimeStr := refreshFunc(); refreshEnabled {
 		refreshLifetime, _ := config.ParseTokenLifetime(refreshLifetimeStr)
-		newRT, err := db.CreateRefreshToken(r.Context(), database, rt.UserID, rt.ClientID, rt.Scopes, newToken.Token, refreshLifetime)
+		newRT, err := repo.CreateRefreshToken(r.Context(), rt.UserID, rt.ClientID, strings.Fields(rt.Scopes), newToken.Token, refreshLifetime)
 		if err != nil {
 			slog.Error("create refresh token on refresh", "error", err)
 		} else {

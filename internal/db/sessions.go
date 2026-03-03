@@ -2,15 +2,17 @@ package db
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
+	"time"
 
 	"gosilo/internal/model"
+
+	"gorm.io/gorm"
 )
 
 // CreateSession generates a new session token and CSRF token for the given user,
-// with a 7-day expiry. The ip parameter records the client IP that created the session.
-func CreateSession(ctx context.Context, q Querier, userID int64, ip string) (*model.Session, error) {
+// with a 7-day expiry.
+func (r *Repository) CreateSession(ctx context.Context, userID int64, ip string) (*model.Session, error) {
 	token, err := RandomHex(32)
 	if err != nil {
 		return nil, fmt.Errorf("generate session token: %w", err)
@@ -20,30 +22,27 @@ func CreateSession(ctx context.Context, q Querier, userID int64, ip string) (*mo
 		return nil, fmt.Errorf("generate csrf token: %w", err)
 	}
 
-	var s model.Session
-	err = q.QueryRowContext(ctx,
-		`INSERT INTO sessions (token, user_id, csrf_token, expires_at, ip)
-		 VALUES (?, ?, ?, datetime('now', '+7 days'), ?)
-		 RETURNING token, user_id, csrf_token, created_at, expires_at, ip`,
-		token, userID, csrf, ip,
-	).Scan(&s.Token, &s.UserID, &s.CSRFToken, &s.CreatedAt, &s.ExpiresAt, &s.IP)
-	if err != nil {
+	now := time.Now().UTC()
+	s := model.Session{
+		Token:     token,
+		UserID:    userID,
+		CSRFToken: csrf,
+		CreatedAt: now,
+		ExpiresAt: now.Add(7 * 24 * time.Hour),
+		IP:        &ip,
+	}
+	if err := r.db.WithContext(ctx).Create(&s).Error; err != nil {
 		return nil, fmt.Errorf("create session: %w", err)
 	}
 	return &s, nil
 }
 
-// GetSessionByToken returns the session with the given token, or nil if not found
-// or expired.
-func GetSessionByToken(ctx context.Context, q Querier, token string) (*model.Session, error) {
+// GetSessionByToken returns the session with the given token, or nil if not found or expired.
+func (r *Repository) GetSessionByToken(ctx context.Context, token string) (*model.Session, error) {
 	var s model.Session
-	err := q.QueryRowContext(ctx,
-		`SELECT token, user_id, csrf_token, created_at, expires_at, ip
-		 FROM sessions
-		 WHERE token = ? AND expires_at > datetime('now')`,
-		token,
-	).Scan(&s.Token, &s.UserID, &s.CSRFToken, &s.CreatedAt, &s.ExpiresAt, &s.IP)
-	if err == sql.ErrNoRows {
+	now := time.Now().UTC()
+	err := r.db.WithContext(ctx).Where("token = ? AND expires_at > ?", token, now).First(&s).Error
+	if err == gorm.ErrRecordNotFound {
 		return nil, nil
 	}
 	if err != nil {
@@ -53,73 +52,59 @@ func GetSessionByToken(ctx context.Context, q Querier, token string) (*model.Ses
 }
 
 // DeleteSession removes a session by token.
-func DeleteSession(ctx context.Context, q Querier, token string) error {
-	_, err := q.ExecContext(ctx, "DELETE FROM sessions WHERE token = ?", token)
-	if err != nil {
+func (r *Repository) DeleteSession(ctx context.Context, token string) error {
+	if err := r.db.WithContext(ctx).Where("token = ?", token).Delete(&model.Session{}).Error; err != nil {
 		return fmt.Errorf("delete session: %w", err)
 	}
 	return nil
 }
 
 // DeleteExpiredSessions removes all expired sessions.
-func DeleteExpiredSessions(ctx context.Context, q Querier) error {
-	_, err := q.ExecContext(ctx, "DELETE FROM sessions WHERE expires_at <= datetime('now')")
-	if err != nil {
+func (r *Repository) DeleteExpiredSessions(ctx context.Context) error {
+	now := time.Now().UTC()
+	if err := r.db.WithContext(ctx).Where("expires_at <= ?", now).Delete(&model.Session{}).Error; err != nil {
 		return fmt.Errorf("delete expired sessions: %w", err)
 	}
 	return nil
 }
 
 // DeleteUserSessionsExcept removes all sessions for a user except the given token.
-func DeleteUserSessionsExcept(ctx context.Context, q Querier, userID int64, exceptToken string) error {
-	_, err := q.ExecContext(ctx, "DELETE FROM sessions WHERE user_id = ? AND token != ?", userID, exceptToken)
-	if err != nil {
+func (r *Repository) DeleteUserSessionsExcept(ctx context.Context, userID int64, exceptToken string) error {
+	if err := r.db.WithContext(ctx).Where("user_id = ? AND token != ?", userID, exceptToken).Delete(&model.Session{}).Error; err != nil {
 		return fmt.Errorf("delete user sessions except: %w", err)
 	}
 	return nil
 }
 
 // DeleteUserSessions removes all sessions for a given user.
-func DeleteUserSessions(ctx context.Context, q Querier, userID int64) error {
-	_, err := q.ExecContext(ctx, "DELETE FROM sessions WHERE user_id = ?", userID)
-	if err != nil {
+func (r *Repository) DeleteUserSessions(ctx context.Context, userID int64) error {
+	if err := r.db.WithContext(ctx).Where("user_id = ?", userID).Delete(&model.Session{}).Error; err != nil {
 		return fmt.Errorf("delete user sessions: %w", err)
 	}
 	return nil
 }
 
 // ListUserSessions returns active (non-expired) sessions for a user.
-func ListUserSessions(ctx context.Context, q Querier, userID int64) ([]*model.Session, error) {
-	rows, err := q.QueryContext(ctx,
-		`SELECT token, user_id, csrf_token, created_at, expires_at, ip
-		 FROM sessions
-		 WHERE user_id = ? AND expires_at > datetime('now')
-		 ORDER BY created_at DESC`,
-		userID,
-	)
+func (r *Repository) ListUserSessions(ctx context.Context, userID int64) ([]*model.Session, error) {
+	now := time.Now().UTC()
+	var sessions []*model.Session
+	err := r.db.WithContext(ctx).
+		Where("user_id = ? AND expires_at > ?", userID, now).
+		Order("created_at DESC").
+		Find(&sessions).Error
 	if err != nil {
 		return nil, fmt.Errorf("list user sessions: %w", err)
 	}
-	defer rows.Close()
-
-	var sessions []*model.Session
-	for rows.Next() {
-		var s model.Session
-		if err := rows.Scan(&s.Token, &s.UserID, &s.CSRFToken, &s.CreatedAt, &s.ExpiresAt, &s.IP); err != nil {
-			return nil, fmt.Errorf("scan session: %w", err)
-		}
-		sessions = append(sessions, &s)
-	}
-	return sessions, rows.Err()
+	return sessions, nil
 }
 
 // CountUserSessions returns the count of active (non-expired) sessions for a user.
-func CountUserSessions(ctx context.Context, q Querier, userID int64) (int64, error) {
+func (r *Repository) CountUserSessions(ctx context.Context, userID int64) (int64, error) {
+	now := time.Now().UTC()
 	var count int64
-	err := q.QueryRowContext(ctx,
-		"SELECT COUNT(*) FROM sessions WHERE user_id = ? AND expires_at > datetime('now')",
-		userID,
-	).Scan(&count)
+	err := r.db.WithContext(ctx).Model(&model.Session{}).
+		Where("user_id = ? AND expires_at > ?", userID, now).
+		Count(&count).Error
 	if err != nil {
 		return 0, fmt.Errorf("count user sessions: %w", err)
 	}
@@ -127,11 +112,12 @@ func CountUserSessions(ctx context.Context, q Querier, userID int64) (int64, err
 }
 
 // CountActiveSessions returns the count of all non-expired sessions.
-func CountActiveSessions(ctx context.Context, q Querier) (int64, error) {
+func (r *Repository) CountActiveSessions(ctx context.Context) (int64, error) {
+	now := time.Now().UTC()
 	var count int64
-	err := q.QueryRowContext(ctx,
-		"SELECT COUNT(*) FROM sessions WHERE expires_at > datetime('now')",
-	).Scan(&count)
+	err := r.db.WithContext(ctx).Model(&model.Session{}).
+		Where("expires_at > ?", now).
+		Count(&count).Error
 	if err != nil {
 		return 0, fmt.Errorf("count active sessions: %w", err)
 	}
@@ -139,41 +125,28 @@ func CountActiveSessions(ctx context.Context, q Querier) (int64, error) {
 }
 
 // ActiveUserCount returns the count of distinct users with sessions created since `since`.
-func ActiveUserCount(ctx context.Context, q Querier, since string) (int64, error) {
+func (r *Repository) ActiveUserCount(ctx context.Context, since time.Time) (int64, error) {
 	var count int64
-	err := q.QueryRowContext(ctx,
-		"SELECT COUNT(DISTINCT user_id) FROM sessions WHERE created_at >= ?",
-		since,
-	).Scan(&count)
+	err := r.db.WithContext(ctx).Model(&model.Session{}).
+		Where("created_at >= ?", since).
+		Distinct("user_id").
+		Count(&count).Error
 	if err != nil {
 		return 0, fmt.Errorf("active user count: %w", err)
 	}
 	return count, nil
 }
 
-// GetRecentUserSessions returns recent sessions for a user, ordered by creation
-// time descending.
-func GetRecentUserSessions(ctx context.Context, q Querier, userID int64, limit int) ([]*model.Session, error) {
-	rows, err := q.QueryContext(ctx,
-		`SELECT token, user_id, csrf_token, created_at, expires_at, ip
-		 FROM sessions
-		 WHERE user_id = ?
-		 ORDER BY created_at DESC
-		 LIMIT ?`,
-		userID, limit,
-	)
+// GetRecentUserSessions returns recent sessions for a user, ordered by creation time descending.
+func (r *Repository) GetRecentUserSessions(ctx context.Context, userID int64, limit int) ([]*model.Session, error) {
+	var sessions []*model.Session
+	err := r.db.WithContext(ctx).
+		Where("user_id = ?", userID).
+		Order("created_at DESC").
+		Limit(limit).
+		Find(&sessions).Error
 	if err != nil {
 		return nil, fmt.Errorf("get recent user sessions: %w", err)
 	}
-	defer rows.Close()
-
-	var sessions []*model.Session
-	for rows.Next() {
-		var s model.Session
-		if err := rows.Scan(&s.Token, &s.UserID, &s.CSRFToken, &s.CreatedAt, &s.ExpiresAt, &s.IP); err != nil {
-			return nil, fmt.Errorf("scan session: %w", err)
-		}
-		sessions = append(sessions, &s)
-	}
-	return sessions, rows.Err()
+	return sessions, nil
 }

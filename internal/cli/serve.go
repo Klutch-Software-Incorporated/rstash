@@ -83,14 +83,14 @@ func runServe(cmd *cobra.Command, args []string) error {
 	slog.SetDefault(slog.New(slog.NewTextHandler(logWriter, &slog.HandlerOptions{Level: &levelVar})))
 
 	// Open and migrate the metadata database.
-	database, err := db.Open(cfg.DatabaseDSN)
+	repo, err := db.OpenRepository(cfg.DatabaseDSN)
 	if err != nil {
 		return fmt.Errorf("failed to open database: %w", err)
 	}
-	defer database.Close()
+	defer repo.Close()
 
 	// Initialize runtime settings (DB overrides + env defaults).
-	runtimeSettings := settings.New(database, cfg)
+	runtimeSettings := settings.New(repo, cfg)
 
 	// Register onChange callback for dynamic log level.
 	runtimeSettings.OnChange(func(s *settings.Snapshot) {
@@ -101,7 +101,7 @@ func runServe(cmd *cobra.Command, args []string) error {
 	prevRegMode := runtimeSettings.Load().RegistrationMode
 	runtimeSettings.OnChange(func(s *settings.Snapshot) {
 		if prevRegMode != "open" && s.RegistrationMode == "open" {
-			n, err := db.ApproveAllPending(context.Background(), database)
+			n, err := repo.ApproveAllPending(context.Background())
 			if err != nil {
 				slog.Error("failed to auto-approve pending users", "error", err)
 			} else if n > 0 {
@@ -119,6 +119,15 @@ func runServe(cmd *cobra.Command, args []string) error {
 		blobs, err = blob.NewFSStore(blobPath)
 	case "sqlite":
 		blobs, err = blob.NewSQLiteStore(blobPath)
+	case "postgres", "mysql", "mssql":
+		// Use GORM-based blob store for non-SQLite databases.
+		blobGormDB, _, gormErr := db.OpenGORM(cfg.BlobDSN)
+		if gormErr != nil {
+			return fmt.Errorf("failed to open blob database: %w", gormErr)
+		}
+		blobs, err = blob.NewGORMStore(blobGormDB)
+	case "s3":
+		blobs, err = blob.NewS3Store(blobPath)
 	}
 	if err != nil {
 		return fmt.Errorf("failed to initialize blob store: %w", err)
@@ -131,7 +140,7 @@ func runServe(cmd *cobra.Command, args []string) error {
 		Mode:       snap.QuotaMode,
 		TotalLimit: snap.QuotaTotal,
 		UserLimit:  snap.QuotaUser,
-	}, database)
+	}, repo)
 
 	runtimeSettings.OnChange(func(s *settings.Snapshot) {
 		quotaChecker.UpdateConfig(storage.QuotaConfig{
@@ -142,7 +151,7 @@ func runServe(cmd *cobra.Command, args []string) error {
 	})
 
 	// Initialize storage service.
-	storageSvc := storage.NewService(database, blobs, quotaChecker)
+	storageSvc := storage.NewService(repo, blobs, quotaChecker)
 
 	// Initialize content scanner.
 	mimeScanner := storage.NewMIMEScanner(func() string {
@@ -151,7 +160,7 @@ func runServe(cmd *cobra.Command, args []string) error {
 	storageSvc.SetScanner(mimeScanner)
 
 	// Initialize auth service.
-	localAuth := auth.NewLocalService(database)
+	localAuth := auth.NewLocalService(repo)
 
 	// Initialize template renderer.
 	renderer := ui.NewRenderer()
@@ -172,7 +181,7 @@ func runServe(cmd *cobra.Command, args []string) error {
 	// UI dependencies (shared by UI handlers and OAuth).
 	uiDeps := &web.UIDeps{
 		Auth:          localAuth,
-		DB:            database,
+		Repo:          repo,
 		Renderer:      renderer,
 		Config:        cfg,
 		Storage:       storageSvc,
@@ -192,21 +201,21 @@ func runServe(cmd *cobra.Command, args []string) error {
 		case "off":
 			http.NotFound(w, r)
 		case "admin":
-			api.MetricsAuth(database, localAuth, secureCookies, metricsH).ServeHTTP(w, r)
+			api.MetricsAuth(localAuth, secureCookies, metricsH).ServeHTTP(w, r)
 		default: // "public"
 			metricsH.ServeHTTP(w, r)
 		}
 	})
 	mux.Handle("/.well-known/webfinger", api.CORS(api.WebFinger(cfg)))
-	mux.Handle("POST /oauth/token", api.CORS(api.OAuthToken(database,
+	mux.Handle("POST /oauth/token", api.CORS(api.OAuthToken(repo,
 		func() string { return runtimeSettings.Load().TokenLifetime },
 		func() (bool, string) {
 			snap := runtimeSettings.Load()
 			return snap.RefreshTokens == "enabled", snap.RefreshTokenLifetime
 		},
 	)))
-	mux.Handle("POST /oauth/revoke", api.CORS(api.OAuthRevoke(database)))
-	mux.Handle("/storage/{user}/{path...}", api.CORS(api.Storage(database, storageSvc, func() int64 {
+	mux.Handle("POST /oauth/revoke", api.CORS(api.OAuthRevoke(repo)))
+	mux.Handle("/storage/{user}/{path...}", api.CORS(api.Storage(repo, storageSvc, func() int64 {
 		return runtimeSettings.Load().MaxUploadSize
 	}, func() string {
 		return runtimeSettings.Load().PublicWrites
@@ -287,13 +296,13 @@ func runServe(cmd *cobra.Command, args []string) error {
 				if err := localAuth.CleanupExpiredSessions(context.Background()); err != nil {
 					slog.Error("failed to delete expired sessions", "error", err)
 				}
-				if err := db.DeleteExpiredOAuthTokens(context.Background(), database); err != nil {
+				if err := repo.DeleteExpiredOAuthTokens(context.Background()); err != nil {
 					slog.Error("failed to delete expired oauth tokens", "error", err)
 				}
-				if err := db.DeleteExpiredAuthorizationCodes(context.Background(), database); err != nil {
+				if err := repo.DeleteExpiredAuthorizationCodes(context.Background()); err != nil {
 					slog.Error("failed to delete expired authorization codes", "error", err)
 				}
-				if err := db.DeleteExpiredRefreshTokens(context.Background(), database); err != nil {
+				if err := repo.DeleteExpiredRefreshTokens(context.Background()); err != nil {
 					slog.Error("failed to delete expired refresh tokens", "error", err)
 				}
 			case <-ctx.Done():
@@ -315,7 +324,7 @@ func runServe(cmd *cobra.Command, args []string) error {
 
 		update := func() {
 			bgCtx := context.Background()
-			if total, err := db.GetTotalStorageUsed(bgCtx, database); err == nil {
+			if total, err := repo.GetTotalStorageUsed(bgCtx); err == nil {
 				metrics.StorageUsedBytes.Set(float64(total))
 			}
 			if diskPath != "" {
@@ -323,13 +332,13 @@ func runServe(cmd *cobra.Command, args []string) error {
 					metrics.StorageAvailableBytes.Set(float64(avail))
 				}
 			}
-			if count, err := db.UserCount(bgCtx, database); err == nil {
+			if count, err := repo.UserCount(bgCtx); err == nil {
 				metrics.UsersTotal.Set(float64(count))
 			}
-			if count, err := db.CountActiveSessions(bgCtx, database); err == nil {
+			if count, err := repo.CountActiveSessions(bgCtx); err == nil {
 				metrics.ActiveSessions.Set(float64(count))
 			}
-			if count, err := db.CountActiveOAuthTokens(bgCtx, database); err == nil {
+			if count, err := repo.CountActiveOAuthTokens(bgCtx); err == nil {
 				metrics.ActiveTokens.Set(float64(count))
 			}
 		}
@@ -358,7 +367,7 @@ func runServe(cmd *cobra.Command, args []string) error {
 			}
 			srv.TLSConfig = m.TLSConfig()
 
-			// HTTP server for ACME challenges + HTTP→HTTPS redirect.
+			// HTTP server for ACME challenges + HTTP->HTTPS redirect.
 			httpSrv := &http.Server{
 				Addr:    ":80",
 				Handler: m.HTTPHandler(nil), // nil = redirect to HTTPS

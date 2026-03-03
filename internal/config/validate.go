@@ -37,8 +37,13 @@ func (c *Config) Validate() error {
 	// DatabaseDSN
 	if dbScheme, _, err := ParseDSN(c.DatabaseDSN); err != nil {
 		errs = append(errs, fmt.Errorf("%s: %v", EnvDB, err))
-	} else if dbScheme != "sqlite" {
-		errs = append(errs, fmt.Errorf("%s: only sqlite is supported for metadata database — got %q", EnvDB, dbScheme))
+	} else {
+		switch dbScheme {
+		case "sqlite", "postgres", "mysql", "mssql":
+			// ok
+		default:
+			errs = append(errs, fmt.Errorf("%s: unsupported database scheme %q (supported: sqlite, postgres, mysql, mssql)", EnvDB, dbScheme))
+		}
 	}
 
 	// BlobDSN
@@ -46,10 +51,10 @@ func (c *Config) Validate() error {
 		errs = append(errs, fmt.Errorf("%s: %v", EnvBlob, err))
 	} else {
 		switch blobScheme {
-		case "sqlite", "fs":
+		case "sqlite", "fs", "postgres", "mysql", "mssql", "s3":
 			// ok
 		default:
-			errs = append(errs, fmt.Errorf("%s: unsupported blob backend scheme %q (supported: sqlite, fs)", EnvBlob, blobScheme))
+			errs = append(errs, fmt.Errorf("%s: unsupported blob backend scheme %q (supported: sqlite, fs, postgres, mysql, mssql, s3)", EnvBlob, blobScheme))
 		}
 	}
 

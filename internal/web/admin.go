@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"gosilo/internal/config"
-	"gosilo/internal/db"
 	"gosilo/internal/ui"
 )
 
@@ -127,7 +126,7 @@ func (h *adminHandler) ShowDashboard(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	totalUsed, err := db.GetTotalStorageUsed(ctx, h.deps.DB)
+	totalUsed, err := h.deps.Repo.GetTotalStorageUsed(ctx)
 	if err != nil {
 		slog.Error("failed to get total storage used", "error", err)
 		totalUsed = 0
@@ -149,13 +148,11 @@ func (h *adminHandler) ShowDashboard(w http.ResponseWriter, r *http.Request) {
 	}
 
 	now := time.Now().UTC()
-	since24h := now.Add(-24 * time.Hour).Format("2006-01-02 15:04:05")
-	since7d := now.Add(-7 * 24 * time.Hour).Format("2006-01-02 15:04:05")
 
-	content.ActiveUsers24h, _ = db.ActiveUserCount(ctx, h.deps.DB, since24h)
-	content.ActiveUsers7d, _ = db.ActiveUserCount(ctx, h.deps.DB, since7d)
+	content.ActiveUsers24h, _ = h.deps.Repo.ActiveUserCount(ctx, now.Add(-24*time.Hour))
+	content.ActiveUsers7d, _ = h.deps.Repo.ActiveUserCount(ctx, now.Add(-7*24*time.Hour))
 
-	topUsers, err := db.TopUsersByStorage(ctx, h.deps.DB, 5)
+	topUsers, err := h.deps.Repo.TopUsersByStorage(ctx, 5)
 	if err != nil {
 		slog.Error("failed to get top users by storage", "error", err)
 	} else {
@@ -169,13 +166,13 @@ func (h *adminHandler) ShowDashboard(w http.ResponseWriter, r *http.Request) {
 		content.TopUsers = topRows
 	}
 
-	openReports, _ := db.CountOpenAbuseReports(ctx, h.deps.DB)
+	openReports, _ := h.deps.Repo.CountOpenAbuseReports(ctx)
 	content.OpenAbuseReports = openReports
 
-	pendingCount, _ := db.CountPendingUsers(ctx, h.deps.DB)
+	pendingCount, _ := h.deps.Repo.CountPendingUsers(ctx)
 	content.PendingApproval = pendingCount
 
-	auditEntries, err := db.ListAuditEntries(ctx, h.deps.DB, 15, 0)
+	auditEntries, err := h.deps.Repo.ListAuditEntries(ctx, 15, 0)
 	if err != nil {
 		slog.Error("failed to list recent audit entries", "error", err)
 	} else {
@@ -187,7 +184,7 @@ func (h *adminHandler) ShowDashboard(w http.ResponseWriter, r *http.Request) {
 				TargetType:   e.TargetType,
 				TargetID:     e.TargetID,
 				Details:      e.Details,
-				CreatedAt:    e.CreatedAt,
+				CreatedAt:    e.CreatedAt.Format("2006-01-02 15:04:05"),
 			}
 		}
 		content.RecentAudit = aRows
@@ -217,11 +214,11 @@ func (h *adminHandler) ShowUsers(w http.ResponseWriter, r *http.Request) {
 			Disabled:        u.Disabled,
 			Approved:        u.Approved,
 			PendingApproval: !u.Approved && !u.Disabled,
-			CreatedAt:       u.CreatedAt,
+			CreatedAt:       u.CreatedAt.Format("2006-01-02 15:04:05"),
 			IsSelf:          u.ID == currentUser.ID,
 		}
 		if u.LastLoginAt != nil {
-			row.LastLoginAt = *u.LastLoginAt
+			row.LastLoginAt = (*u.LastLoginAt).Format("2006-01-02 15:04:05")
 		}
 		if u.LastLoginIP != nil {
 			row.LastLoginIP = *u.LastLoginIP
@@ -232,7 +229,7 @@ func (h *adminHandler) ShowUsers(w http.ResponseWriter, r *http.Request) {
 		} else {
 			row.SessionCount = sessCount
 		}
-		stats, err := db.GetUserStorageStats(ctx, h.deps.DB, u.ID)
+		stats, err := h.deps.Repo.GetUserStorageStats(ctx, u.ID)
 		if err != nil {
 			slog.Error("failed to get user storage stats", "user_id", u.ID, "error", err)
 		} else {
@@ -248,7 +245,7 @@ func (h *adminHandler) ShowUsers(w http.ResponseWriter, r *http.Request) {
 		rows[i] = row
 	}
 
-	pendingCount, _ := db.CountPendingUsers(ctx, h.deps.DB)
+	pendingCount, _ := h.deps.Repo.CountPendingUsers(ctx)
 	content := &adminUsersContent{
 		QuotaMode:        snap.QuotaMode,
 		PendingCount:     pendingCount,
@@ -325,7 +322,7 @@ func (h *adminHandler) ShowSettings(w http.ResponseWriter, r *http.Request) {
 // ShowAudit handles GET /admin/audit — audit log.
 func (h *adminHandler) ShowAudit(w http.ResponseWriter, r *http.Request) {
 
-	auditEntries, err := db.ListAuditEntries(r.Context(), h.deps.DB, 25, 0)
+	auditEntries, err := h.deps.Repo.ListAuditEntries(r.Context(), 25, 0)
 	if err != nil {
 		slog.Error("failed to list audit entries", "error", err)
 	}
@@ -338,7 +335,7 @@ func (h *adminHandler) ShowAudit(w http.ResponseWriter, r *http.Request) {
 			TargetType:   e.TargetType,
 			TargetID:     e.TargetID,
 			Details:      e.Details,
-			CreatedAt:    e.CreatedAt,
+			CreatedAt:    e.CreatedAt.Format("2006-01-02 15:04:05"),
 		}
 	}
 
@@ -423,7 +420,7 @@ func (h *adminHandler) SetUserQuota(w http.ResponseWriter, r *http.Request) {
 		quotaBytes = parsed
 	}
 
-	if err := db.UpdateUserQuota(r.Context(), h.deps.DB, id, quotaBytes); err != nil {
+	if err := h.deps.Repo.UpdateUserQuota(r.Context(), id, quotaBytes); err != nil {
 		slog.Error("failed to update user quota", "error", err)
 		ui.SetFlashError(w, "Failed to update quota.")
 		http.Redirect(w, r, "/admin/users", http.StatusSeeOther)
@@ -467,8 +464,8 @@ func (h *adminHandler) CreateUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Auto-accept TOS/Privacy for admin-created users.
-	_ = db.AcceptTOS(r.Context(), h.deps.DB, newUser.ID)
-	_ = db.AcceptPrivacy(r.Context(), h.deps.DB, newUser.ID)
+	_ = h.deps.Repo.AcceptTOS(r.Context(), newUser.ID)
+	_ = h.deps.Repo.AcceptPrivacy(r.Context(), newUser.ID)
 
 	h.audit(r, "user.created", "user", fmt.Sprintf("%d", newUser.ID), username)
 
@@ -604,10 +601,10 @@ func (h *adminHandler) ToggleDisabled(w http.ResponseWriter, r *http.Request) {
 		if err := h.deps.Auth.TerminateAllSessions(r.Context(), id); err != nil {
 			slog.Error("failed to terminate sessions on disable", "error", err)
 		}
-		if err := db.DeleteOAuthTokensByUserID(r.Context(), h.deps.DB, id); err != nil {
+		if err := h.deps.Repo.DeleteOAuthTokensByUserID(r.Context(), id); err != nil {
 			slog.Error("failed to revoke oauth tokens on disable", "error", err)
 		}
-		if err := db.DeleteRefreshTokensByUserID(r.Context(), h.deps.DB, id); err != nil {
+		if err := h.deps.Repo.DeleteRefreshTokensByUserID(r.Context(), id); err != nil {
 			slog.Error("failed to revoke refresh tokens on disable", "error", err)
 		}
 		h.audit(r, "user.disabled", "user", idStr, user.Username)
@@ -742,7 +739,7 @@ func (h *adminHandler) audit(r *http.Request, action, targetType, targetID, deta
 	if user == nil {
 		return
 	}
-	if err := db.InsertAuditEntry(r.Context(), h.deps.DB, user.ID, action, targetType, targetID, details); err != nil {
+	if err := h.deps.Repo.InsertAuditEntry(r.Context(), user.ID, action, targetType, targetID, details); err != nil {
 		slog.Error("failed to write audit log", "error", err, "action", action)
 	}
 }

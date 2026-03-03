@@ -40,18 +40,18 @@ func TestRouteGroup(t *testing.T) {
 }
 
 func TestMetricsAuth_NoSession(t *testing.T) {
-	database, err := db.Open(":memory:")
+	repo, err := db.OpenRepository("sqlite::memory:")
 	if err != nil {
 		t.Fatalf("open db: %v", err)
 	}
-	defer database.Close()
+	defer repo.Close()
 
-	authSvc := auth.NewLocalService(database)
+	authSvc := auth.NewLocalService(repo)
 	inner := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	})
 
-	handler := api.MetricsAuth(database, authSvc, false, inner)
+	handler := api.MetricsAuth(authSvc, false, inner)
 	req := httptest.NewRequest("GET", "/metrics", nil)
 	rr := httptest.NewRecorder()
 	handler.ServeHTTP(rr, req)
@@ -62,20 +62,20 @@ func TestMetricsAuth_NoSession(t *testing.T) {
 }
 
 func TestMetricsAuth_AdminSession(t *testing.T) {
-	database, err := db.Open(":memory:")
+	repo, err := db.OpenRepository("sqlite::memory:")
 	if err != nil {
 		t.Fatalf("open db: %v", err)
 	}
-	defer database.Close()
+	defer repo.Close()
 
-	authSvc := auth.NewLocalService(database)
+	authSvc := auth.NewLocalService(repo)
 
 	// Create admin user and session.
-	user, err := db.CreateUser(context.Background(), database, "admin", "password123", true, true)
+	user, err := repo.CreateUser(context.Background(), "admin", "password123", true, true)
 	if err != nil {
 		t.Fatalf("create user: %v", err)
 	}
-	sess, err := db.CreateSession(context.Background(), database, user.ID, "")
+	sess, err := repo.CreateSession(context.Background(), user.ID, "")
 	if err != nil {
 		t.Fatalf("create session: %v", err)
 	}
@@ -86,7 +86,7 @@ func TestMetricsAuth_AdminSession(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 	})
 
-	handler := api.MetricsAuth(database, authSvc, false, inner)
+	handler := api.MetricsAuth(authSvc, false, inner)
 	req := httptest.NewRequest("GET", "/metrics", nil)
 	req.AddCookie(&http.Cookie{Name: auth.SessionCookieName, Value: sess.Token})
 	rr := httptest.NewRecorder()
@@ -101,20 +101,20 @@ func TestMetricsAuth_AdminSession(t *testing.T) {
 }
 
 func TestMetricsAuth_NonAdminSession(t *testing.T) {
-	database, err := db.Open(":memory:")
+	repo, err := db.OpenRepository("sqlite::memory:")
 	if err != nil {
 		t.Fatalf("open db: %v", err)
 	}
-	defer database.Close()
+	defer repo.Close()
 
-	authSvc := auth.NewLocalService(database)
+	authSvc := auth.NewLocalService(repo)
 
 	// Create non-admin user and session.
-	user, err := db.CreateUser(context.Background(), database, "regular", "password123", false, true)
+	user, err := repo.CreateUser(context.Background(), "regular", "password123", false, true)
 	if err != nil {
 		t.Fatalf("create user: %v", err)
 	}
-	sess, err := db.CreateSession(context.Background(), database, user.ID, "")
+	sess, err := repo.CreateSession(context.Background(), user.ID, "")
 	if err != nil {
 		t.Fatalf("create session: %v", err)
 	}
@@ -123,7 +123,7 @@ func TestMetricsAuth_NonAdminSession(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 	})
 
-	handler := api.MetricsAuth(database, authSvc, false, inner)
+	handler := api.MetricsAuth(authSvc, false, inner)
 	req := httptest.NewRequest("GET", "/metrics", nil)
 	req.AddCookie(&http.Cookie{Name: auth.SessionCookieName, Value: sess.Token})
 	rr := httptest.NewRecorder()

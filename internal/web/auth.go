@@ -53,7 +53,7 @@ func (h *authHandler) DoLogin(w http.ResponseWriter, r *http.Request) {
 	user, err := h.deps.Auth.Authenticate(r.Context(), username, password)
 	if err != nil {
 		if errors.Is(err, auth.ErrInvalidCredentials) {
-			db.Audit(r.Context(), h.deps.DB, db.SystemActorID, "auth.login_failed", "user", username, "invalid credentials")
+			h.deps.Repo.Audit(r.Context(), db.SystemActorID, "auth.login_failed", "user", username, "invalid credentials")
 			renderErr("Invalid username or password.")
 		} else if errors.Is(err, auth.ErrAccountPendingApproval) {
 			renderErr("Your account is pending approval.")
@@ -73,11 +73,11 @@ func (h *authHandler) DoLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := db.UpdateUserLastLogin(r.Context(), h.deps.DB, user.ID, ClientIP(r)); err != nil {
+	if err := h.deps.Repo.UpdateUserLastLogin(r.Context(), user.ID, ClientIP(r)); err != nil {
 		slog.Error("failed to update last login", "error", err)
 	}
 
-	db.Audit(r.Context(), h.deps.DB, user.ID, "auth.login", "user", fmt.Sprintf("%d", user.ID), username)
+	h.deps.Repo.Audit(r.Context(), user.ID, "auth.login", "user", fmt.Sprintf("%d", user.ID), username)
 	auth.SetSessionCookie(w, sess.Token, h.deps.SecureCookies)
 
 	// Redirect to the originally requested page, or home.
@@ -98,7 +98,7 @@ func (h *authHandler) DoLogout(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if user != nil {
-		db.Audit(r.Context(), h.deps.DB, user.ID, "auth.logout", "user", fmt.Sprintf("%d", user.ID), user.Username)
+		h.deps.Repo.Audit(r.Context(), user.ID, "auth.logout", "user", fmt.Sprintf("%d", user.ID), user.Username)
 	}
 
 	auth.ClearSessionCookie(w, h.deps.SecureCookies)

@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	"gosilo/internal/auth"
-	"gosilo/internal/db"
 	"gosilo/internal/ui"
 )
 
@@ -89,8 +88,8 @@ func (h *setupHandler) DoSetup(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Auto-accept TOS/Privacy for the initial admin (operator-created).
-	_ = db.AcceptTOS(r.Context(), h.deps.DB, user.ID)
-	_ = db.AcceptPrivacy(r.Context(), h.deps.DB, user.ID)
+	_ = h.deps.Repo.AcceptTOS(r.Context(), user.ID)
+	_ = h.deps.Repo.AcceptPrivacy(r.Context(), user.ID)
 
 	// Create session.
 	sess, err := h.deps.Auth.CreateSession(r.Context(), user.ID, ClientIP(r))
@@ -100,7 +99,7 @@ func (h *setupHandler) DoSetup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	db.Audit(r.Context(), h.deps.DB, user.ID, "setup.completed", "user", fmt.Sprintf("%d", user.ID), username)
+	h.deps.Repo.Audit(r.Context(), user.ID, "setup.completed", "user", fmt.Sprintf("%d", user.ID), username)
 	auth.SetSessionCookie(w, sess.Token, h.deps.SecureCookies)
 	ui.SetFlash(w, "Welcome to Gosilo! Your admin account has been created.")
 	http.Redirect(w, r, "/admin", http.StatusSeeOther)

@@ -9,7 +9,6 @@ import (
 
 	"gosilo/internal/api"
 	"gosilo/internal/config"
-	"gosilo/internal/db"
 	"gosilo/internal/ui"
 )
 
@@ -254,7 +253,7 @@ func (h *oauthHandler) DoAuthorize(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Upsert client.
-	_, err = db.UpsertOAuthClient(r.Context(), h.deps.DB, origin, redirectURI)
+	_, err = h.deps.Repo.UpsertOAuthClient(r.Context(), origin, redirectURI)
 	if err != nil {
 		slog.Error("upsert oauth client", "error", err)
 		http.Error(w, "internal error", http.StatusInternalServerError)
@@ -270,14 +269,14 @@ func (h *oauthHandler) DoAuthorize(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		ac, err := db.CreateAuthorizationCode(r.Context(), h.deps.DB, user.ID, origin, redirectURI, scopeStr, codeChallenge, codeChallengeMethod)
+		ac, err := h.deps.Repo.CreateAuthorizationCode(r.Context(), user.ID, origin, redirectURI, scopeStr, codeChallenge, codeChallengeMethod)
 		if err != nil {
 			slog.Error("create authorization code", "error", err)
 			http.Error(w, "internal error", http.StatusInternalServerError)
 			return
 		}
 
-		db.Audit(r.Context(), h.deps.DB, user.ID, "oauth.token_granted", "oauth_client", origin, fmt.Sprintf("code flow, scopes: %s", scopeStr))
+		h.deps.Repo.Audit(r.Context(), user.ID, "oauth.token_granted", "oauth_client", origin, fmt.Sprintf("code flow, scopes: %s", scopeStr))
 
 		q := redirectBase.Query()
 		q.Set("code", ac.Code)
@@ -291,14 +290,14 @@ func (h *oauthHandler) DoAuthorize(w http.ResponseWriter, r *http.Request) {
 		lifetimeStr := h.deps.Settings.Load().TokenLifetime
 		lifetime, _ := config.ParseTokenLifetime(lifetimeStr)
 
-		token, err := db.CreateOAuthToken(r.Context(), h.deps.DB, user.ID, origin, validScopes, lifetime)
+		token, err := h.deps.Repo.CreateOAuthToken(r.Context(), user.ID, origin, validScopes, lifetime)
 		if err != nil {
 			slog.Error("create oauth token", "error", err)
 			http.Error(w, "internal error", http.StatusInternalServerError)
 			return
 		}
 
-		db.Audit(r.Context(), h.deps.DB, user.ID, "oauth.token_granted", "oauth_client", origin, fmt.Sprintf("implicit flow, scopes: %s", scopeStr))
+		h.deps.Repo.Audit(r.Context(), user.ID, "oauth.token_granted", "oauth_client", origin, fmt.Sprintf("implicit flow, scopes: %s", scopeStr))
 
 		fragment := "access_token=" + url.QueryEscape(token.Token) + "&token_type=bearer"
 		if lifetime > 0 {

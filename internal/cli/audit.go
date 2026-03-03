@@ -57,13 +57,13 @@ func init() {
 
 func runAuditTail(cmd *cobra.Command, args []string) error {
 	dsn := resolvedDBDSN("sqlite:gosilo.db")
-	database, err := db.Open(dsn)
+	repo, err := db.OpenRepository(dsn)
 	if err != nil {
 		return &SystemError{fmt.Errorf("open database: %w", err)}
 	}
-	defer database.Close()
+	defer repo.Close()
 
-	entries, err := db.ListAuditEntries(context.Background(), database, auditTailN, 0)
+	entries, err := repo.ListAuditEntries(context.Background(), auditTailN, 0)
 	if err != nil {
 		return fmt.Errorf("list audit entries: %w", err)
 	}
@@ -88,7 +88,7 @@ func runAuditTail(cmd *cobra.Command, args []string) error {
 		}
 		out := make([]auditJSON, len(entries))
 		for i, e := range entries {
-			out[i] = auditJSON{e.CreatedAt, e.ActorUsername, e.Action, e.TargetType, e.TargetID, e.Details}
+			out[i] = auditJSON{e.CreatedAt.Format("2006-01-02 15:04:05"), e.ActorUsername, e.Action, e.TargetType, e.TargetID, e.Details}
 		}
 		return json.NewEncoder(os.Stdout).Encode(out)
 	}
@@ -98,20 +98,20 @@ func runAuditTail(cmd *cobra.Command, args []string) error {
 	fmt.Fprintln(tw, "----\t-----\t------\t------\t-------")
 	for _, e := range entries {
 		fmt.Fprintf(tw, "%s\t%s\t%s\t%s:%s\t%s\n",
-			e.CreatedAt, e.ActorUsername, e.Action, e.TargetType, e.TargetID, e.Details)
+			e.CreatedAt.Format("2006-01-02 15:04:05"), e.ActorUsername, e.Action, e.TargetType, e.TargetID, e.Details)
 	}
 	return tw.Flush()
 }
 
 func runAuditExport(cmd *cobra.Command, args []string) error {
 	dsn := resolvedDBDSN("sqlite:gosilo.db")
-	database, err := db.Open(dsn)
+	repo, err := db.OpenRepository(dsn)
 	if err != nil {
 		return &SystemError{fmt.Errorf("open database: %w", err)}
 	}
-	defer database.Close()
+	defer repo.Close()
 
-	entries, err := db.ListAuditEntries(context.Background(), database, -1, 0)
+	entries, err := repo.ListAuditEntries(context.Background(), -1, 0)
 	if err != nil {
 		return fmt.Errorf("list audit entries: %w", err)
 	}

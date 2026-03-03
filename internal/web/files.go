@@ -12,7 +12,6 @@ import (
 	"sort"
 	"strings"
 
-	"gosilo/internal/db"
 	"gosilo/internal/storage"
 	"gosilo/internal/ui"
 )
@@ -122,7 +121,7 @@ func (h *filesHandler) browseFolder(w http.ResponseWriter, r *http.Request, user
 			ETag:      item.ETag,
 		}
 		if isFolder {
-			subtreeSize, err := db.GetSubtreeSize(r.Context(), h.deps.DB, userID, storagePath+name)
+			subtreeSize, err := h.deps.Repo.GetSubtreeSize(r.Context(), userID, storagePath+name)
 			if err != nil {
 				slog.Error("failed to get subtree size", "error", err, "path", storagePath+name)
 			} else {
@@ -411,7 +410,7 @@ func (h *filesHandler) Search(w http.ResponseWriter, r *http.Request) {
 	var results []*searchResultRow
 
 	if query != "" {
-		nodes, err := db.SearchUserNodes(r.Context(), h.deps.DB, user.ID, query, 50)
+		nodes, err := h.deps.Repo.SearchUserNodes(r.Context(), user.ID, query, 50)
 		if err != nil {
 			slog.Error("failed to search nodes", "error", err)
 		} else {

@@ -2,59 +2,63 @@ package db
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
+	"time"
+
+	"gosilo/internal/model"
+
+	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 // GetSetting returns the value for the given key, or "" if not found.
-func GetSetting(ctx context.Context, q Querier, key string) (string, error) {
-	var value string
-	err := q.QueryRowContext(ctx, "SELECT value FROM settings WHERE key = ?", key).Scan(&value)
-	if err == sql.ErrNoRows {
+func (r *Repository) GetSetting(ctx context.Context, key string) (string, error) {
+	var s model.Setting
+	err := r.db.WithContext(ctx).First(&s, "key = ?", key).Error
+	if err == gorm.ErrRecordNotFound {
 		return "", nil
 	}
 	if err != nil {
 		return "", fmt.Errorf("get setting %q: %w", key, err)
 	}
-	return value, nil
+	return s.Value, nil
 }
 
 // SetSetting upserts a setting key-value pair.
-func SetSetting(ctx context.Context, q Querier, key, value string) error {
-	_, err := q.ExecContext(ctx,
-		`INSERT INTO settings (key, value, updated_at) VALUES (?, ?, datetime('now'))
-		 ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at`,
-		key, value)
-	if err != nil {
-		return fmt.Errorf("set setting %q: %w", key, err)
+func (r *Repository) SetSetting(ctx context.Context, key, value string) error {
+	now := time.Now().UTC()
+	s := model.Setting{
+		Key:       key,
+		Value:     value,
+		UpdatedAt: now,
+	}
+	result := r.db.WithContext(ctx).Clauses(clause.OnConflict{
+		Columns:   []clause.Column{{Name: "key"}},
+		DoUpdates: clause.AssignmentColumns([]string{"value", "updated_at"}),
+	}).Create(&s)
+	if result.Error != nil {
+		return fmt.Errorf("set setting %q: %w", key, result.Error)
 	}
 	return nil
 }
 
 // DeleteSetting removes a setting by key.
-func DeleteSetting(ctx context.Context, q Querier, key string) error {
-	_, err := q.ExecContext(ctx, "DELETE FROM settings WHERE key = ?", key)
-	if err != nil {
+func (r *Repository) DeleteSetting(ctx context.Context, key string) error {
+	if err := r.db.WithContext(ctx).Where("key = ?", key).Delete(&model.Setting{}).Error; err != nil {
 		return fmt.Errorf("delete setting %q: %w", key, err)
 	}
 	return nil
 }
 
 // ListSettings returns all settings as a map.
-func ListSettings(ctx context.Context, q Querier) (map[string]string, error) {
-	rows, err := q.QueryContext(ctx, "SELECT key, value FROM settings")
-	if err != nil {
+func (r *Repository) ListSettings(ctx context.Context) (map[string]string, error) {
+	var settings []model.Setting
+	if err := r.db.WithContext(ctx).Find(&settings).Error; err != nil {
 		return nil, fmt.Errorf("list settings: %w", err)
 	}
-	defer rows.Close()
-
-	result := make(map[string]string)
-	for rows.Next() {
-		var key, value string
-		if err := rows.Scan(&key, &value); err != nil {
-			return nil, fmt.Errorf("scan setting: %w", err)
-		}
-		result[key] = value
+	result := make(map[string]string, len(settings))
+	for _, s := range settings {
+		result[s.Key] = s.Value
 	}
-	return result, rows.Err()
+	return result, nil
 }

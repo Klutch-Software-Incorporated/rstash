@@ -2,117 +2,88 @@ package db
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 	"strings"
+	"time"
 
 	"gosilo/internal/model"
+
+	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
-// nodeColumns is the SELECT column list shared by all node queries.
-const nodeColumns = `id, user_id, path, is_folder,
-        COALESCE(content_type, ''), COALESCE(content_length, 0),
-        etag, created_at, updated_at`
-
-// scanNode scans a single node row into a model.Node.
-func scanNode(s interface{ Scan(...any) error }) (*model.Node, error) {
-	var n model.Node
-	err := s.Scan(&n.ID, &n.UserID, &n.Path, &n.IsFolder,
-		&n.ContentType, &n.ContentLength,
-		&n.ETag, &n.CreatedAt, &n.UpdatedAt)
-	return &n, err
-}
-
-// scanNodes scans all rows into a slice of model.Node pointers.
-func scanNodes(rows *sql.Rows) ([]*model.Node, error) {
-	defer rows.Close()
-	var nodes []*model.Node
-	for rows.Next() {
-		n, err := scanNode(rows)
-		if err != nil {
-			return nil, fmt.Errorf("scan node: %w", err)
-		}
-		nodes = append(nodes, n)
-	}
-	return nodes, rows.Err()
-}
-
 // GetNode returns the node at the given path for the user, or nil if not found.
-func GetNode(ctx context.Context, q Querier, userID int64, path string) (*model.Node, error) {
-	row := q.QueryRowContext(ctx,
-		`SELECT `+nodeColumns+` FROM nodes WHERE user_id = ? AND path = ?`,
-		userID, path,
-	)
-	n, err := scanNode(row)
-	if err == sql.ErrNoRows {
+func (r *Repository) GetNode(ctx context.Context, userID int64, path string) (*model.Node, error) {
+	var n model.Node
+	err := r.db.WithContext(ctx).Where("user_id = ? AND path = ?", userID, path).First(&n).Error
+	if err == gorm.ErrRecordNotFound {
 		return nil, nil
 	}
 	if err != nil {
 		return nil, fmt.Errorf("get node: %w", err)
 	}
-	return n, nil
+	return &n, nil
 }
 
 // UpsertNode creates or updates a node, returning the resulting row.
-func UpsertNode(ctx context.Context, q Querier, userID int64, path string, isFolder bool, contentType string, contentLength int64, etag string) (*model.Node, error) {
-	row := q.QueryRowContext(ctx,
-		`INSERT INTO nodes (user_id, path, is_folder, content_type, content_length, etag)
-		 VALUES (?, ?, ?, ?, ?, ?)
-		 ON CONFLICT(user_id, path) DO UPDATE SET
-		     content_type = excluded.content_type,
-		     content_length = excluded.content_length,
-		     etag = excluded.etag,
-		     updated_at = datetime('now')
-		 RETURNING `+nodeColumns,
-		userID, path, isFolder, contentType, contentLength, etag,
-	)
-	n, err := scanNode(row)
-	if err != nil {
-		return nil, fmt.Errorf("upsert node: %w", err)
+func (r *Repository) UpsertNode(ctx context.Context, userID int64, path string, isFolder bool, contentType string, contentLength int64, etag string) (*model.Node, error) {
+	now := time.Now().UTC()
+	n := model.Node{
+		UserID:        userID,
+		Path:          path,
+		IsFolder:      isFolder,
+		ContentType:   contentType,
+		ContentLength: contentLength,
+		ETag:          etag,
+		CreatedAt:     now,
+		UpdatedAt:     now,
 	}
-	return n, nil
+
+	result := r.db.WithContext(ctx).Clauses(clause.OnConflict{
+		Columns: []clause.Column{{Name: "user_id"}, {Name: "path"}},
+		DoUpdates: clause.AssignmentColumns([]string{
+			"content_type", "content_length", "e_tag", "updated_at",
+		}),
+	}).Create(&n)
+	if result.Error != nil {
+		return nil, fmt.Errorf("upsert node: %w", result.Error)
+	}
+
+	// Re-read to get the actual row (with correct ID, timestamps).
+	var out model.Node
+	if err := r.db.WithContext(ctx).Where("user_id = ? AND path = ?", userID, path).First(&out).Error; err != nil {
+		return nil, fmt.Errorf("upsert node read-back: %w", err)
+	}
+	return &out, nil
 }
 
 // DeleteNode removes the node at the given path for the user.
-func DeleteNode(ctx context.Context, q Querier, userID int64, path string) error {
-	_, err := q.ExecContext(ctx,
-		"DELETE FROM nodes WHERE user_id = ? AND path = ?",
-		userID, path,
-	)
-	if err != nil {
+func (r *Repository) DeleteNode(ctx context.Context, userID int64, path string) error {
+	if err := r.db.WithContext(ctx).Where("user_id = ? AND path = ?", userID, path).Delete(&model.Node{}).Error; err != nil {
 		return fmt.Errorf("delete node: %w", err)
 	}
 	return nil
 }
 
 // ListChildren returns the direct children of a folder.
-func ListChildren(ctx context.Context, q Querier, userID int64, folderPath string) ([]*model.Node, error) {
-	rows, err := q.QueryContext(ctx,
-		`SELECT `+nodeColumns+`
-		 FROM nodes
-		 WHERE user_id = ? AND path LIKE ? AND path != ?`,
-		userID, folderPath+"%", folderPath,
-	)
+func (r *Repository) ListChildren(ctx context.Context, userID int64, folderPath string) ([]*model.Node, error) {
+	pattern := folderPath + "%"
+	var nodes []*model.Node
+	err := r.db.WithContext(ctx).Where("user_id = ? AND path LIKE ? AND path != ?", userID, pattern, folderPath).Find(&nodes).Error
 	if err != nil {
 		return nil, fmt.Errorf("list children: %w", err)
 	}
-	defer rows.Close()
 
-	var nodes []*model.Node
-	for rows.Next() {
-		n, err := scanNode(rows)
-		if err != nil {
-			return nil, fmt.Errorf("scan node: %w", err)
-		}
-		// Filter to direct children only: the remainder after folderPath
-		// must contain no "/" (document) or exactly one trailing "/" (subfolder).
+	// Filter to direct children only.
+	var result []*model.Node
+	for _, n := range nodes {
 		rest := strings.TrimPrefix(n.Path, folderPath)
 		slashIdx := strings.Index(rest, "/")
 		if slashIdx == -1 || slashIdx == len(rest)-1 {
-			nodes = append(nodes, n)
+			result = append(result, n)
 		}
 	}
-	return nodes, rows.Err()
+	return result, nil
 }
 
 // UserStorageStats holds aggregate storage metrics for a user.
@@ -122,13 +93,12 @@ type UserStorageStats struct {
 }
 
 // GetUserStorageStats returns total file count and storage used for a user.
-func GetUserStorageStats(ctx context.Context, q Querier, userID int64) (*UserStorageStats, error) {
+func (r *Repository) GetUserStorageStats(ctx context.Context, userID int64) (*UserStorageStats, error) {
 	var s UserStorageStats
-	err := q.QueryRowContext(ctx,
-		`SELECT COUNT(*), COALESCE(SUM(content_length), 0)
-		 FROM nodes WHERE user_id = ? AND is_folder = 0`,
-		userID,
-	).Scan(&s.FileCount, &s.TotalBytes)
+	err := r.db.WithContext(ctx).Model(&model.Node{}).
+		Where("user_id = ? AND is_folder = ?", userID, false).
+		Select("COUNT(*) AS file_count, COALESCE(SUM(content_length), 0) AS total_bytes").
+		Scan(&s).Error
 	if err != nil {
 		return nil, fmt.Errorf("get user storage stats: %w", err)
 	}
@@ -143,117 +113,123 @@ type ModuleStats struct {
 }
 
 // GetUserModuleStats returns per-top-level-folder (module) storage breakdown.
-func GetUserModuleStats(ctx context.Context, q Querier, userID int64) ([]*ModuleStats, error) {
-	rows, err := q.QueryContext(ctx,
-		`SELECT
-		    SUBSTR(path, 2, INSTR(SUBSTR(path, 2), '/') - 1) AS module,
-		    COUNT(*) AS file_count,
-		    COALESCE(SUM(content_length), 0) AS total_bytes
-		 FROM nodes
-		 WHERE user_id = ? AND is_folder = 0 AND path LIKE '/%/%'
-		 GROUP BY module
-		 ORDER BY total_bytes DESC`,
-		userID,
-	)
+// Computed in Go to avoid dialect-specific SUBSTR/INSTR.
+func (r *Repository) GetUserModuleStats(ctx context.Context, userID int64) ([]*ModuleStats, error) {
+	var nodes []*model.Node
+	pattern := "/%/%"
+	err := r.db.WithContext(ctx).Where("user_id = ? AND is_folder = ? AND path LIKE ?", userID, false, pattern).Find(&nodes).Error
 	if err != nil {
 		return nil, fmt.Errorf("get user module stats: %w", err)
 	}
-	defer rows.Close()
 
-	var modules []*ModuleStats
-	for rows.Next() {
-		var m ModuleStats
-		if err := rows.Scan(&m.Module, &m.FileCount, &m.TotalBytes); err != nil {
-			return nil, fmt.Errorf("scan module stats: %w", err)
+	moduleMap := make(map[string]*ModuleStats)
+	for _, n := range nodes {
+		// Extract module name from path like "/modulename/rest..."
+		trimmed := strings.TrimPrefix(n.Path, "/")
+		idx := strings.Index(trimmed, "/")
+		if idx < 0 {
+			continue
 		}
-		modules = append(modules, &m)
+		module := trimmed[:idx]
+		ms, ok := moduleMap[module]
+		if !ok {
+			ms = &ModuleStats{Module: module}
+			moduleMap[module] = ms
+		}
+		ms.FileCount++
+		ms.TotalBytes += n.ContentLength
 	}
-	return modules, rows.Err()
+
+	var result []*ModuleStats
+	for _, ms := range moduleMap {
+		result = append(result, ms)
+	}
+	// Sort by total_bytes descending.
+	for i := 0; i < len(result); i++ {
+		for j := i + 1; j < len(result); j++ {
+			if result[j].TotalBytes > result[i].TotalBytes {
+				result[i], result[j] = result[j], result[i]
+			}
+		}
+	}
+	return result, nil
 }
 
 // GetRecentUserNodes returns the most recently modified non-folder nodes for a user.
-func GetRecentUserNodes(ctx context.Context, q Querier, userID int64, limit int) ([]*model.Node, error) {
-	rows, err := q.QueryContext(ctx,
-		`SELECT `+nodeColumns+`
-		 FROM nodes
-		 WHERE user_id = ? AND is_folder = 0
-		 ORDER BY updated_at DESC
-		 LIMIT ?`,
-		userID, limit,
-	)
+func (r *Repository) GetRecentUserNodes(ctx context.Context, userID int64, limit int) ([]*model.Node, error) {
+	var nodes []*model.Node
+	err := r.db.WithContext(ctx).
+		Where("user_id = ? AND is_folder = ?", userID, false).
+		Order("updated_at DESC").
+		Limit(limit).
+		Find(&nodes).Error
 	if err != nil {
 		return nil, fmt.Errorf("get recent user nodes: %w", err)
 	}
-	return scanNodes(rows)
+	return nodes, nil
 }
 
 // GetLargestUserNodes returns the largest non-folder nodes for a user by content_length.
-func GetLargestUserNodes(ctx context.Context, q Querier, userID int64, limit int) ([]*model.Node, error) {
-	rows, err := q.QueryContext(ctx,
-		`SELECT `+nodeColumns+`
-		 FROM nodes
-		 WHERE user_id = ? AND is_folder = 0
-		 ORDER BY content_length DESC
-		 LIMIT ?`,
-		userID, limit,
-	)
+func (r *Repository) GetLargestUserNodes(ctx context.Context, userID int64, limit int) ([]*model.Node, error) {
+	var nodes []*model.Node
+	err := r.db.WithContext(ctx).
+		Where("user_id = ? AND is_folder = ?", userID, false).
+		Order("content_length DESC").
+		Limit(limit).
+		Find(&nodes).Error
 	if err != nil {
 		return nil, fmt.Errorf("get largest user nodes: %w", err)
 	}
-	return scanNodes(rows)
+	return nodes, nil
 }
 
 // GetSubtreeSize returns the total content_length of all non-folder descendants
 // under the given folder path.
-func GetSubtreeSize(ctx context.Context, q Querier, userID int64, folderPath string) (int64, error) {
-	var total int64
-	err := q.QueryRowContext(ctx,
-		`SELECT COALESCE(SUM(content_length), 0) FROM nodes
-		 WHERE user_id = ? AND path LIKE ? || '%' AND is_folder = 0 AND path != ?`,
-		userID, folderPath, folderPath,
-	).Scan(&total)
+func (r *Repository) GetSubtreeSize(ctx context.Context, userID int64, folderPath string) (int64, error) {
+	pattern := folderPath + "%"
+	var total *int64
+	err := r.db.WithContext(ctx).Model(&model.Node{}).
+		Where("user_id = ? AND path LIKE ? AND is_folder = ? AND path != ?", userID, pattern, false, folderPath).
+		Select("COALESCE(SUM(content_length), 0)").
+		Scan(&total).Error
 	if err != nil {
 		return 0, fmt.Errorf("get subtree size: %w", err)
 	}
-	return total, nil
+	if total == nil {
+		return 0, nil
+	}
+	return *total, nil
 }
 
 // ListDescendantFiles returns all non-folder nodes under a folder path (recursive).
-func ListDescendantFiles(ctx context.Context, q Querier, userID int64, folderPath string) ([]*model.Node, error) {
-	rows, err := q.QueryContext(ctx,
-		`SELECT `+nodeColumns+`
-		 FROM nodes
-		 WHERE user_id = ? AND path LIKE ? || '%' AND is_folder = 0 AND path != ?`,
-		userID, folderPath, folderPath,
-	)
+func (r *Repository) ListDescendantFiles(ctx context.Context, userID int64, folderPath string) ([]*model.Node, error) {
+	pattern := folderPath + "%"
+	var nodes []*model.Node
+	err := r.db.WithContext(ctx).
+		Where("user_id = ? AND path LIKE ? AND is_folder = ? AND path != ?", userID, pattern, false, folderPath).
+		Find(&nodes).Error
 	if err != nil {
 		return nil, fmt.Errorf("list descendant files: %w", err)
 	}
-	return scanNodes(rows)
+	return nodes, nil
 }
 
 // DeleteSubtree removes all nodes (files and folders) under a given folder path,
 // including the folder itself.
-func DeleteSubtree(ctx context.Context, q Querier, userID int64, folderPath string) error {
-	_, err := q.ExecContext(ctx,
-		"DELETE FROM nodes WHERE user_id = ? AND (path = ? OR path LIKE ? || '%')",
-		userID, folderPath, folderPath,
-	)
-	if err != nil {
+func (r *Repository) DeleteSubtree(ctx context.Context, userID int64, folderPath string) error {
+	pattern := folderPath + "%"
+	if err := r.db.WithContext(ctx).Where("user_id = ? AND (path = ? OR path LIKE ?)", userID, folderPath, pattern).Delete(&model.Node{}).Error; err != nil {
 		return fmt.Errorf("delete subtree: %w", err)
 	}
 	return nil
 }
 
 // globToLike converts a user search query with glob wildcards (* and ?)
-// into a SQL LIKE pattern. If no wildcards are present, wraps the query
-// in % for substring matching.
+// into a SQL LIKE pattern.
 func globToLike(query string) string {
 	hasWild := strings.ContainsAny(query, "*?")
-	// Escape SQL LIKE metacharacters.
 	r := strings.NewReplacer("%", `\%`, "_", `\_`)
 	pattern := r.Replace(query)
-	// Translate glob wildcards to SQL LIKE wildcards.
 	pattern = strings.ReplaceAll(pattern, "*", "%")
 	pattern = strings.ReplaceAll(pattern, "?", "_")
 	if !hasWild {
@@ -262,28 +238,23 @@ func globToLike(query string) string {
 	return pattern
 }
 
-// SearchUserNodes searches non-folder nodes by path, supporting glob
-// wildcards (* and ?). Plain queries without wildcards fall back to
-// substring matching.
-func SearchUserNodes(ctx context.Context, q Querier, userID int64, query string, limit int) ([]*model.Node, error) {
+// SearchUserNodes searches non-folder nodes by path, supporting glob wildcards.
+func (r *Repository) SearchUserNodes(ctx context.Context, userID int64, query string, limit int) ([]*model.Node, error) {
 	pattern := globToLike(query)
-	rows, err := q.QueryContext(ctx,
-		`SELECT `+nodeColumns+`
-		 FROM nodes
-		 WHERE user_id = ? AND is_folder = 0 AND path LIKE ? ESCAPE '\'
-		 ORDER BY updated_at DESC
-		 LIMIT ?`,
-		userID, pattern, limit,
-	)
+	var nodes []*model.Node
+	err := r.db.WithContext(ctx).
+		Where("user_id = ? AND is_folder = ? AND path LIKE ?", userID, false, pattern).
+		Order("updated_at DESC").
+		Limit(limit).
+		Find(&nodes).Error
 	if err != nil {
 		return nil, fmt.Errorf("search user nodes: %w", err)
 	}
-	return scanNodes(rows)
+	return nodes, nil
 }
 
 // AncestorPaths returns all ancestor folder paths from the immediate parent
 // up to and including the root "/".
-// Example: "/foo/bar/baz.txt" → ["/foo/bar/", "/foo/", "/"]
 func AncestorPaths(path string) []string {
 	var paths []string
 	for {

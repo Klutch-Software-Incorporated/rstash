@@ -1,7 +1,6 @@
 package api
 
 import (
-	"database/sql"
 	"net/http"
 	"strconv"
 	"time"
@@ -26,7 +25,7 @@ func MetricsMiddleware(next http.Handler) http.Handler {
 
 // MetricsAuth guards the /metrics endpoint, requiring an admin session cookie
 // or an admin bearer token.
-func MetricsAuth(database *sql.DB, authSvc auth.Service, secureCookies bool, next http.Handler) http.Handler {
+func MetricsAuth(authSvc auth.Service, secureCookies bool, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Try session cookie first.
 		if cookie, err := r.Cookie(auth.SessionCookieName); err == nil && cookie.Value != "" {

@@ -1,7 +1,6 @@
 package api
 
 import (
-	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -15,12 +14,12 @@ import (
 )
 
 // storageAudit logs a storage operation to the audit log.
-func storageAudit(r *http.Request, database *sql.DB, userID int64, action, path string) {
-	db.Audit(r.Context(), database, userID, action, "storage", path, "")
+func storageAudit(r *http.Request, repo *db.Repository, userID int64, action, path string) {
+	repo.Audit(r.Context(), userID, action, "storage", path, "")
 }
 
 // Storage handles GET/PUT/DELETE/HEAD requests on /storage/{user}/{path...}.
-func Storage(database *sql.DB, svc *storage.Service, maxUploadSize func() int64, publicWrites func() string) http.Handler {
+func Storage(repo *db.Repository, svc *storage.Service, maxUploadSize func() int64, publicWrites func() string) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		username := r.PathValue("user")
 		pathVal := r.PathValue("path")
@@ -53,7 +52,7 @@ func Storage(database *sql.DB, svc *storage.Service, maxUploadSize func() int64,
 				http.Error(w, "unauthorized", http.StatusUnauthorized)
 				return
 			}
-			oauthToken, err := db.GetOAuthToken(r.Context(), database, bearer)
+			oauthToken, err := repo.GetOAuthToken(r.Context(), bearer)
 			if err != nil {
 				slog.Error("lookup oauth token", "error", err)
 				http.Error(w, "internal error", http.StatusInternalServerError)
@@ -65,7 +64,7 @@ func Storage(database *sql.DB, svc *storage.Service, maxUploadSize func() int64,
 				return
 			}
 			isWrite := r.Method == http.MethodPut || r.Method == http.MethodDelete
-			if !CheckScope(oauthToken.Scopes, storagePath, isWrite) {
+			if !CheckScope(strings.Fields(oauthToken.Scopes), storagePath, isWrite) {
 				http.Error(w, "insufficient scope", http.StatusForbidden)
 				return
 			}
@@ -73,7 +72,7 @@ func Storage(database *sql.DB, svc *storage.Service, maxUploadSize func() int64,
 		}
 
 		// Look up user by username.
-		user, err := db.GetUserByUsername(r.Context(), database, username)
+		user, err := repo.GetUserByUsername(r.Context(), username)
 		if err != nil {
 			slog.Error("lookup user", "error", err)
 			http.Error(w, "internal error", http.StatusInternalServerError)
@@ -119,13 +118,13 @@ func Storage(database *sql.DB, svc *storage.Service, maxUploadSize func() int64,
 			r.Body = http.MaxBytesReader(w, r.Body, maxUploadSize())
 			putErr := handlePutDocumentErr(w, r, svc, user.ID, storagePath, cond)
 			if putErr != nil && errors.Is(putErr, storage.ErrContentRejected) {
-				storageAudit(r, database, user.ID, "storage.upload_rejected", storagePath)
+				storageAudit(r, repo, user.ID, "storage.upload_rejected", storagePath)
 			} else if putErr == nil {
-				storageAudit(r, database, user.ID, "storage.put", storagePath)
+				storageAudit(r, repo, user.ID, "storage.put", storagePath)
 			}
 		case http.MethodDelete:
 			handleDeleteDocument(w, r, svc, user.ID, storagePath, cond)
-			storageAudit(r, database, user.ID, "storage.delete", storagePath)
+			storageAudit(r, repo, user.ID, "storage.delete", storagePath)
 		default:
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		}

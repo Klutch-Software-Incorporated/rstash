@@ -59,14 +59,14 @@ func (h *abuseHandler) DoReport(w http.ResponseWriter, r *http.Request) {
 	}
 
 	ip := ClientIP(r)
-	report, err := db.CreateAbuseReport(r.Context(), h.deps.DB, email, path, reason, description, ip)
+	report, err := h.deps.Repo.CreateAbuseReport(r.Context(), email, path, reason, description, ip)
 	if err != nil {
 		slog.Error("failed to create abuse report", "error", err)
 		renderErr("Failed to submit report. Please try again.")
 		return
 	}
 
-	db.Audit(r.Context(), h.deps.DB, db.SystemActorID, "abuse.reported", "abuse_report", fmt.Sprintf("%d", report.ID), path)
+	h.deps.Repo.Audit(r.Context(), db.SystemActorID, "abuse.reported", "abuse_report", fmt.Sprintf("%d", report.ID), path)
 
 	http.Redirect(w, r, "/abuse/report?submitted=1", http.StatusSeeOther)
 }
@@ -91,12 +91,12 @@ func (h *abuseHandler) ShowAbuseReports(w http.ResponseWriter, r *http.Request) 
 		dbFilter = statusFilter
 	}
 
-	reports, err := db.ListAbuseReports(r.Context(), h.deps.DB, dbFilter, 50, 0)
+	reports, err := h.deps.Repo.ListAbuseReports(r.Context(), dbFilter, 50, 0)
 	if err != nil {
 		slog.Error("failed to list abuse reports", "error", err)
 	}
 
-	openCount, _ := db.CountOpenAbuseReports(r.Context(), h.deps.DB)
+	openCount, _ := h.deps.Repo.CountOpenAbuseReports(r.Context())
 
 	content := &adminAbuseContent{
 		Reports:      reports,
@@ -132,7 +132,7 @@ func (h *abuseHandler) ReviewAbuseReport(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	if err := db.UpdateAbuseReportStatus(r.Context(), h.deps.DB, id, status, currentUser.ID, note); err != nil {
+	if err := h.deps.Repo.UpdateAbuseReportStatus(r.Context(), id, status, currentUser.ID, note); err != nil {
 		slog.Error("failed to review abuse report", "error", err)
 		ui.SetFlashError(w, "Failed to update report.")
 		http.Redirect(w, r, "/admin/abuse", http.StatusSeeOther)

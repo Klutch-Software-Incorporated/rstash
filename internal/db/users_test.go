@@ -3,15 +3,13 @@ package db_test
 import (
 	"context"
 	"testing"
-
-	"gosilo/internal/db"
 )
 
 func TestUpdateUserLastLogin(t *testing.T) {
 	database := testDB(t)
 	ctx := context.Background()
 
-	user, err := db.CreateUser(ctx, database, "loginuser", "password", false, true)
+	user, err := database.CreateUser(ctx, "loginuser", "password", false, true)
 	if err != nil {
 		t.Fatalf("create user: %v", err)
 	}
@@ -25,12 +23,12 @@ func TestUpdateUserLastLogin(t *testing.T) {
 	}
 
 	// Update last login.
-	if err := db.UpdateUserLastLogin(ctx, database, user.ID, "192.168.1.1"); err != nil {
+	if err := database.UpdateUserLastLogin(ctx, user.ID, "192.168.1.1"); err != nil {
 		t.Fatalf("update last login: %v", err)
 	}
 
 	// Verify via GetUserByID.
-	updated, err := db.GetUserByID(ctx, database, user.ID)
+	updated, err := database.GetUserByID(ctx, user.ID)
 	if err != nil {
 		t.Fatalf("get user: %v", err)
 	}
@@ -46,13 +44,13 @@ func TestUserLastLoginNilByDefault(t *testing.T) {
 	database := testDB(t)
 	ctx := context.Background()
 
-	user, err := db.CreateUser(ctx, database, "nillogin", "password", false, true)
+	user, err := database.CreateUser(ctx, "nillogin", "password", false, true)
 	if err != nil {
 		t.Fatalf("create user: %v", err)
 	}
 
 	// Fetch again via GetUserByUsername.
-	fetched, err := db.GetUserByUsername(ctx, database, "nillogin")
+	fetched, err := database.GetUserByUsername(ctx, "nillogin")
 	if err != nil {
 		t.Fatalf("get user: %v", err)
 	}

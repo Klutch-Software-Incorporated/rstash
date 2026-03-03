@@ -3,15 +3,13 @@ package db_test
 import (
 	"context"
 	"testing"
-
-	"gosilo/internal/db"
 )
 
 func TestAcceptTOS(t *testing.T) {
 	database := testDB(t)
 	ctx := context.Background()
 
-	user, err := db.CreateUser(ctx, database, "alice", "password123", false, true)
+	user, err := database.CreateUser(ctx, "alice", "password123", false, true)
 	if err != nil {
 		t.Fatalf("create user: %v", err)
 	}
@@ -22,12 +20,12 @@ func TestAcceptTOS(t *testing.T) {
 	}
 
 	// Accept TOS.
-	if err := db.AcceptTOS(ctx, database, user.ID); err != nil {
+	if err := database.AcceptTOS(ctx, user.ID); err != nil {
 		t.Fatalf("accept TOS: %v", err)
 	}
 
 	// Verify.
-	updated, err := db.GetUserByID(ctx, database, user.ID)
+	updated, err := database.GetUserByID(ctx, user.ID)
 	if err != nil {
 		t.Fatalf("get user: %v", err)
 	}
@@ -40,7 +38,7 @@ func TestAcceptPrivacy(t *testing.T) {
 	database := testDB(t)
 	ctx := context.Background()
 
-	user, err := db.CreateUser(ctx, database, "bob", "password123", false, true)
+	user, err := database.CreateUser(ctx, "bob", "password123", false, true)
 	if err != nil {
 		t.Fatalf("create user: %v", err)
 	}
@@ -51,12 +49,12 @@ func TestAcceptPrivacy(t *testing.T) {
 	}
 
 	// Accept Privacy.
-	if err := db.AcceptPrivacy(ctx, database, user.ID); err != nil {
+	if err := database.AcceptPrivacy(ctx, user.ID); err != nil {
 		t.Fatalf("accept Privacy: %v", err)
 	}
 
 	// Verify.
-	updated, err := db.GetUserByID(ctx, database, user.ID)
+	updated, err := database.GetUserByID(ctx, user.ID)
 	if err != nil {
 		t.Fatalf("get user: %v", err)
 	}
@@ -69,15 +67,15 @@ func TestAcceptTOSAndPrivacy_BothSet(t *testing.T) {
 	database := testDB(t)
 	ctx := context.Background()
 
-	user, err := db.CreateUser(ctx, database, "carol", "password123", false, true)
+	user, err := database.CreateUser(ctx, "carol", "password123", false, true)
 	if err != nil {
 		t.Fatalf("create user: %v", err)
 	}
 
-	_ = db.AcceptTOS(ctx, database, user.ID)
-	_ = db.AcceptPrivacy(ctx, database, user.ID)
+	_ = database.AcceptTOS(ctx, user.ID)
+	_ = database.AcceptPrivacy(ctx, user.ID)
 
-	updated, err := db.GetUserByID(ctx, database, user.ID)
+	updated, err := database.GetUserByID(ctx, user.ID)
 	if err != nil {
 		t.Fatalf("get user: %v", err)
 	}

@@ -2,7 +2,6 @@ package settings
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 	"log/slog"
 	"strconv"
@@ -37,20 +36,20 @@ type Snapshot struct {
 	PrivacyContent       string
 }
 
-// Settings provides runtime-configurable settings backed by SQLite.
+// Settings provides runtime-configurable settings backed by the database.
 // Reads are lock-free via atomic pointer; writes go through the DB.
 type Settings struct {
 	current  atomic.Pointer[Snapshot]
-	db       *sql.DB
+	repo     *db.Repository
 	defaults *config.Config
 	mu       sync.Mutex // serializes writes
 	onChange []func(*Snapshot)
 }
 
 // New creates a Settings service and loads the initial snapshot from DB + env defaults.
-func New(database *sql.DB, defaults *config.Config) *Settings {
+func New(repo *db.Repository, defaults *config.Config) *Settings {
 	s := &Settings{
-		db:       database,
+		repo:     repo,
 		defaults: defaults,
 	}
 
@@ -73,7 +72,7 @@ func (s *Settings) Load() *Snapshot {
 
 // Get returns the raw DB value for a key, or "" if not overridden.
 func (s *Settings) Get(ctx context.Context, key string) (string, error) {
-	return db.GetSetting(ctx, s.db, key)
+	return s.repo.GetSetting(ctx, key)
 }
 
 // Set validates and writes a setting to the DB, then reloads the snapshot.
@@ -85,7 +84,7 @@ func (s *Settings) Set(ctx context.Context, key, value string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	if err := db.SetSetting(ctx, s.db, key, value); err != nil {
+	if err := s.repo.SetSetting(ctx, key, value); err != nil {
 		return err
 	}
 	return s.reloadLocked(ctx)
@@ -96,7 +95,7 @@ func (s *Settings) Delete(ctx context.Context, key string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	if err := db.DeleteSetting(ctx, s.db, key); err != nil {
+	if err := s.repo.DeleteSetting(ctx, key); err != nil {
 		return err
 	}
 	return s.reloadLocked(ctx)
@@ -111,7 +110,7 @@ func (s *Settings) Reload(ctx context.Context) error {
 }
 
 func (s *Settings) reloadLocked(ctx context.Context) error {
-	overrides, err := db.ListSettings(ctx, s.db)
+	overrides, err := s.repo.ListSettings(ctx)
 	if err != nil {
 		return fmt.Errorf("reload settings: %w", err)
 	}
@@ -135,7 +134,7 @@ func (s *Settings) OnChange(fn func(*Snapshot)) {
 
 // Overrides returns the raw DB overrides map (for admin UI display).
 func (s *Settings) Overrides(ctx context.Context) (map[string]string, error) {
-	return db.ListSettings(ctx, s.db)
+	return s.repo.ListSettings(ctx)
 }
 
 // ValueMap returns the current runtime-editable setting values as a

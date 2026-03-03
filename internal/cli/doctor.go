@@ -80,7 +80,7 @@ func runDoctor(cmd *cobra.Command, args []string) error {
 	}
 
 	// Check 2: database open.
-	database, err := db.Open(dsn)
+	repo, err := db.OpenRepository(dsn)
 	if err != nil {
 		add("Open database", "fail", err.Error())
 		if jsonFlag {
@@ -88,14 +88,24 @@ func runDoctor(cmd *cobra.Command, args []string) error {
 		}
 		return &SystemError{fmt.Errorf("cannot continue without database")}
 	}
-	defer database.Close()
+	defer repo.Close()
 	add("Open database", "ok", "")
+
+	// Extract the underlying *sql.DB for PRAGMA and raw SQL queries.
+	sqlDB, err := repo.GormDB().DB()
+	if err != nil {
+		add("Database driver", "fail", err.Error())
+		if jsonFlag {
+			return json.NewEncoder(os.Stdout).Encode(checks)
+		}
+		return &SystemError{fmt.Errorf("cannot get underlying database connection")}
+	}
 
 	ctx := context.Background()
 
 	// Check 3: SQLite integrity check.
 	var integrityResult string
-	if err := database.QueryRow("PRAGMA integrity_check").Scan(&integrityResult); err != nil {
+	if err := sqlDB.QueryRow("PRAGMA integrity_check").Scan(&integrityResult); err != nil {
 		add("Integrity check", "fail", err.Error())
 	} else if integrityResult != "ok" {
 		add("Integrity check", "fail", integrityResult)
@@ -105,7 +115,7 @@ func runDoctor(cmd *cobra.Command, args []string) error {
 
 	// Check 4: WAL mode verification.
 	var journalMode string
-	if err := database.QueryRow("PRAGMA journal_mode").Scan(&journalMode); err != nil {
+	if err := sqlDB.QueryRow("PRAGMA journal_mode").Scan(&journalMode); err != nil {
 		add("Journal mode", "fail", err.Error())
 	} else if journalMode != "wal" {
 		add("Journal mode", "warn", fmt.Sprintf("mode is %q (expected wal)", journalMode))
@@ -115,7 +125,7 @@ func runDoctor(cmd *cobra.Command, args []string) error {
 
 	// Check 5: foreign keys enabled.
 	var fkEnabled int
-	if err := database.QueryRow("PRAGMA foreign_keys").Scan(&fkEnabled); err != nil {
+	if err := sqlDB.QueryRow("PRAGMA foreign_keys").Scan(&fkEnabled); err != nil {
 		add("Foreign keys", "fail", err.Error())
 	} else if fkEnabled != 1 {
 		add("Foreign keys", "fail", "disabled")
@@ -129,7 +139,7 @@ func runDoctor(cmd *cobra.Command, args []string) error {
 		"sessions", "audit_log", "authorization_codes", "settings",
 		"abuse_reports",
 	}
-	rows, err := database.Query("SELECT name FROM sqlite_master WHERE type='table'")
+	rows, err := sqlDB.Query("SELECT name FROM sqlite_master WHERE type='table'")
 	if err != nil {
 		add("Schema", "fail", err.Error())
 	} else {
@@ -154,7 +164,7 @@ func runDoctor(cmd *cobra.Command, args []string) error {
 	}
 
 	// Check 7: user count.
-	count, err := db.UserCount(ctx, database)
+	count, err := repo.UserCount(ctx)
 	if err != nil {
 		add("User count", "fail", err.Error())
 	} else if count == 0 {
@@ -164,7 +174,7 @@ func runDoctor(cmd *cobra.Command, args []string) error {
 	}
 
 	// Check 8: storage stats.
-	totalUsed, err := db.GetTotalStorageUsed(ctx, database)
+	totalUsed, err := repo.GetTotalStorageUsed(ctx)
 	if err != nil {
 		add("Storage stats", "warn", err.Error())
 	} else {
@@ -173,7 +183,7 @@ func runDoctor(cmd *cobra.Command, args []string) error {
 
 	// Check 9: expired sessions and tokens pending cleanup.
 	var expiredSessions int64
-	if err := database.QueryRowContext(ctx,
+	if err := sqlDB.QueryRowContext(ctx,
 		"SELECT COUNT(*) FROM sessions WHERE expires_at < datetime('now')").Scan(&expiredSessions); err != nil {
 		add("Expired sessions", "warn", err.Error())
 	} else if expiredSessions > 0 {
@@ -183,7 +193,7 @@ func runDoctor(cmd *cobra.Command, args []string) error {
 	}
 
 	var expiredTokens int64
-	if err := database.QueryRowContext(ctx,
+	if err := sqlDB.QueryRowContext(ctx,
 		"SELECT COUNT(*) FROM oauth_tokens WHERE expires_at IS NOT NULL AND expires_at < datetime('now')").Scan(&expiredTokens); err != nil {
 		add("Expired tokens", "warn", err.Error())
 	} else if expiredTokens > 0 {
@@ -193,7 +203,7 @@ func runDoctor(cmd *cobra.Command, args []string) error {
 	}
 
 	// Check 10: settings consistency.
-	svc := settings.New(database, cfg)
+	svc := settings.New(repo, cfg)
 	snap := svc.Load()
 	settingsOK := true
 	if snap.QuotaMode == "user" && snap.QuotaUser == 0 {
@@ -274,6 +284,15 @@ func runDoctor(cmd *cobra.Command, args []string) error {
 			blobs, err = blob.NewFSStore(blobPath)
 		case "sqlite":
 			blobs, err = blob.NewSQLiteStore(blobPath)
+		case "postgres", "mysql", "mssql":
+			blobGormDB, _, gormErr := db.OpenGORM(cfg.BlobDSN)
+			if gormErr != nil {
+				err = gormErr
+			} else {
+				blobs, err = blob.NewGORMStore(blobGormDB)
+			}
+		case "s3":
+			blobs, err = blob.NewS3Store(blobPath)
 		default:
 			err = fmt.Errorf("unknown blob backend: %q", blobScheme)
 		}
@@ -300,3 +319,4 @@ func runDoctor(cmd *cobra.Command, args []string) error {
 	}
 	return nil
 }
+

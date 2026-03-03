@@ -3,20 +3,18 @@ package db_test
 import (
 	"context"
 	"testing"
-
-	"gosilo/internal/db"
 )
 
 func TestCreateAndGetSession(t *testing.T) {
 	database := testDB(t)
 	ctx := context.Background()
 
-	user, err := db.CreateUser(ctx, database, "sessuser", "password123", false, true)
+	user, err := database.CreateUser(ctx, "sessuser", "password123", false, true)
 	if err != nil {
 		t.Fatalf("create user: %v", err)
 	}
 
-	sess, err := db.CreateSession(ctx, database, user.ID, "")
+	sess, err := database.CreateSession(ctx, user.ID, "")
 	if err != nil {
 		t.Fatalf("create session: %v", err)
 	}
@@ -31,7 +29,7 @@ func TestCreateAndGetSession(t *testing.T) {
 	}
 
 	// Get it back.
-	got, err := db.GetSessionByToken(ctx, database, sess.Token)
+	got, err := database.GetSessionByToken(ctx, sess.Token)
 	if err != nil {
 		t.Fatalf("get session: %v", err)
 	}
@@ -47,7 +45,7 @@ func TestGetSessionByToken_NotFound(t *testing.T) {
 	database := testDB(t)
 	ctx := context.Background()
 
-	got, err := db.GetSessionByToken(ctx, database, "nonexistent")
+	got, err := database.GetSessionByToken(ctx, "nonexistent")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -60,14 +58,14 @@ func TestDeleteSession(t *testing.T) {
 	database := testDB(t)
 	ctx := context.Background()
 
-	user, _ := db.CreateUser(ctx, database, "delsessuser", "password123", false, true)
-	sess, _ := db.CreateSession(ctx, database, user.ID, "")
+	user, _ := database.CreateUser(ctx, "delsessuser", "password123", false, true)
+	sess, _ := database.CreateSession(ctx, user.ID, "")
 
-	if err := db.DeleteSession(ctx, database, sess.Token); err != nil {
+	if err := database.DeleteSession(ctx, sess.Token); err != nil {
 		t.Fatalf("delete session: %v", err)
 	}
 
-	got, err := db.GetSessionByToken(ctx, database, sess.Token)
+	got, err := database.GetSessionByToken(ctx, sess.Token)
 	if err != nil {
 		t.Fatalf("get session after delete: %v", err)
 	}
@@ -80,11 +78,11 @@ func TestDeleteUserSessions(t *testing.T) {
 	database := testDB(t)
 	ctx := context.Background()
 
-	user, _ := db.CreateUser(ctx, database, "multisessuser", "password123", false, true)
-	db.CreateSession(ctx, database, user.ID, "")
-	db.CreateSession(ctx, database, user.ID, "")
+	user, _ := database.CreateUser(ctx, "multisessuser", "password123", false, true)
+	database.CreateSession(ctx, user.ID, "")
+	database.CreateSession(ctx, user.ID, "")
 
-	if err := db.DeleteUserSessions(ctx, database, user.ID); err != nil {
+	if err := database.DeleteUserSessions(ctx, user.ID); err != nil {
 		t.Fatalf("delete user sessions: %v", err)
 	}
 }
@@ -93,13 +91,13 @@ func TestExpiredSessionReturnsNil(t *testing.T) {
 	database := testDB(t)
 	ctx := context.Background()
 
-	user, _ := db.CreateUser(ctx, database, "expuser", "password123", false, true)
-	sess, _ := db.CreateSession(ctx, database, user.ID, "")
+	user, _ := database.CreateUser(ctx, "expuser", "password123", false, true)
+	sess, _ := database.CreateSession(ctx, user.ID, "")
 
 	// Manually expire the session.
-	database.ExecContext(ctx, "UPDATE sessions SET expires_at = datetime('now', '-1 day') WHERE token = ?", sess.Token)
+	database.GormDB().Exec("UPDATE sessions SET expires_at = datetime('now', '-1 day') WHERE token = ?", sess.Token)
 
-	got, err := db.GetSessionByToken(ctx, database, sess.Token)
+	got, err := database.GetSessionByToken(ctx, sess.Token)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

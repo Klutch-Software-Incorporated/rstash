@@ -2,38 +2,42 @@ package db
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 	"strings"
 	"time"
 
 	"gosilo/internal/model"
+
+	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 // UpsertOAuthClient inserts or updates an OAuth client by ID.
-func UpsertOAuthClient(ctx context.Context, q Querier, id, redirectURI string) (*model.OAuthClient, error) {
-	var c model.OAuthClient
-	err := q.QueryRowContext(ctx,
-		`INSERT INTO oauth_clients (id, redirect_uri)
-		 VALUES (?, ?)
-		 ON CONFLICT(id) DO UPDATE SET redirect_uri = excluded.redirect_uri
-		 RETURNING id, redirect_uri, created_at`,
-		id, redirectURI,
-	).Scan(&c.ID, &c.RedirectURI, &c.CreatedAt)
-	if err != nil {
-		return nil, fmt.Errorf("upsert oauth client: %w", err)
+func (r *Repository) UpsertOAuthClient(ctx context.Context, id, redirectURI string) (*model.OAuthClient, error) {
+	c := model.OAuthClient{
+		ID:          id,
+		RedirectURI: redirectURI,
 	}
-	return &c, nil
+	result := r.db.WithContext(ctx).Clauses(clause.OnConflict{
+		Columns:   []clause.Column{{Name: "id"}},
+		DoUpdates: clause.AssignmentColumns([]string{"redirect_uri"}),
+	}).Create(&c)
+	if result.Error != nil {
+		return nil, fmt.Errorf("upsert oauth client: %w", result.Error)
+	}
+	// Re-read for accurate timestamps.
+	var out model.OAuthClient
+	if err := r.db.WithContext(ctx).First(&out, "id = ?", id).Error; err != nil {
+		return nil, fmt.Errorf("upsert oauth client read-back: %w", err)
+	}
+	return &out, nil
 }
 
 // GetOAuthClient returns an OAuth client by ID, or nil if not found.
-func GetOAuthClient(ctx context.Context, q Querier, id string) (*model.OAuthClient, error) {
+func (r *Repository) GetOAuthClient(ctx context.Context, id string) (*model.OAuthClient, error) {
 	var c model.OAuthClient
-	err := q.QueryRowContext(ctx,
-		`SELECT id, redirect_uri, created_at FROM oauth_clients WHERE id = ?`,
-		id,
-	).Scan(&c.ID, &c.RedirectURI, &c.CreatedAt)
-	if err == sql.ErrNoRows {
+	err := r.db.WithContext(ctx).First(&c, "id = ?", id).Error
+	if err == gorm.ErrRecordNotFound {
 		return nil, nil
 	}
 	if err != nil {
@@ -42,145 +46,107 @@ func GetOAuthClient(ctx context.Context, q Querier, id string) (*model.OAuthClie
 	return &c, nil
 }
 
-// CreateOAuthToken generates a new OAuth access token for the given user and client.
-// Scopes are stored as a space-separated string. lifetime sets the token
-// expiry (0 = no expiry, token lives until revoked).
-func CreateOAuthToken(ctx context.Context, q Querier, userID int64, clientID string, scopes []string, lifetime time.Duration) (*model.OAuthToken, error) {
+// CreateOAuthToken generates a new OAuth access token.
+func (r *Repository) CreateOAuthToken(ctx context.Context, userID int64, clientID string, scopes []string, lifetime time.Duration) (*model.OAuthToken, error) {
 	token, err := RandomHex(32)
 	if err != nil {
 		return nil, fmt.Errorf("generate oauth token: %w", err)
 	}
 
-	scopeStr := strings.Join(scopes, " ")
-
-	var query string
-	var args []any
+	now := time.Now().UTC()
+	t := model.OAuthToken{
+		Token:     token,
+		UserID:    userID,
+		ClientID:  clientID,
+		Scopes:    strings.Join(scopes, " "),
+		CreatedAt: now,
+	}
 	if lifetime > 0 {
-		secs := int64(lifetime.Seconds())
-		query = `INSERT INTO oauth_tokens (token, user_id, client_id, scopes, expires_at)
-		 VALUES (?, ?, ?, ?, datetime('now', '+' || ? || ' seconds'))
-		 RETURNING token, user_id, client_id, scopes, created_at, expires_at`
-		args = []any{token, userID, clientID, scopeStr, secs}
-	} else {
-		query = `INSERT INTO oauth_tokens (token, user_id, client_id, scopes)
-		 VALUES (?, ?, ?, ?)
-		 RETURNING token, user_id, client_id, scopes, created_at, expires_at`
-		args = []any{token, userID, clientID, scopeStr}
+		exp := now.Add(lifetime)
+		t.ExpiresAt = &exp
 	}
 
-	var t model.OAuthToken
-	var scopeOut string
-	err = q.QueryRowContext(ctx, query, args...).Scan(&t.Token, &t.UserID, &t.ClientID, &scopeOut, &t.CreatedAt, &t.ExpiresAt)
-	if err != nil {
+	if err := r.db.WithContext(ctx).Create(&t).Error; err != nil {
 		return nil, fmt.Errorf("create oauth token: %w", err)
 	}
-	t.Scopes = strings.Fields(scopeOut)
 	return &t, nil
 }
 
 // GetOAuthToken returns the token record, or nil if not found or expired.
-func GetOAuthToken(ctx context.Context, q Querier, token string) (*model.OAuthToken, error) {
+func (r *Repository) GetOAuthToken(ctx context.Context, token string) (*model.OAuthToken, error) {
 	var t model.OAuthToken
-	var scopeStr string
-	err := q.QueryRowContext(ctx,
-		`SELECT token, user_id, client_id, scopes, created_at, expires_at
-		 FROM oauth_tokens
-		 WHERE token = ? AND (expires_at IS NULL OR expires_at > datetime('now'))`,
-		token,
-	).Scan(&t.Token, &t.UserID, &t.ClientID, &scopeStr, &t.CreatedAt, &t.ExpiresAt)
-	if err == sql.ErrNoRows {
+	now := time.Now().UTC()
+	err := r.db.WithContext(ctx).
+		Where("token = ? AND (expires_at IS NULL OR expires_at > ?)", token, now).
+		First(&t).Error
+	if err == gorm.ErrRecordNotFound {
 		return nil, nil
 	}
 	if err != nil {
 		return nil, fmt.Errorf("get oauth token: %w", err)
 	}
-	t.Scopes = strings.Fields(scopeStr)
 	return &t, nil
 }
 
 // GetOAuthTokenUnfiltered returns the token record without checking expiry (for revocation).
-func GetOAuthTokenUnfiltered(ctx context.Context, q Querier, token string) (*model.OAuthToken, error) {
+func (r *Repository) GetOAuthTokenUnfiltered(ctx context.Context, token string) (*model.OAuthToken, error) {
 	var t model.OAuthToken
-	var scopeStr string
-	err := q.QueryRowContext(ctx,
-		`SELECT token, user_id, client_id, scopes, created_at, expires_at
-		 FROM oauth_tokens
-		 WHERE token = ?`,
-		token,
-	).Scan(&t.Token, &t.UserID, &t.ClientID, &scopeStr, &t.CreatedAt, &t.ExpiresAt)
-	if err == sql.ErrNoRows {
+	err := r.db.WithContext(ctx).First(&t, "token = ?", token).Error
+	if err == gorm.ErrRecordNotFound {
 		return nil, nil
 	}
 	if err != nil {
 		return nil, fmt.Errorf("get oauth token unfiltered: %w", err)
 	}
-	t.Scopes = strings.Fields(scopeStr)
 	return &t, nil
 }
 
 // ListOAuthTokensByUserID returns all non-expired tokens for the given user.
-func ListOAuthTokensByUserID(ctx context.Context, q Querier, userID int64) ([]*model.OAuthToken, error) {
-	rows, err := q.QueryContext(ctx,
-		`SELECT token, user_id, client_id, scopes, created_at, expires_at
-		 FROM oauth_tokens
-		 WHERE user_id = ? AND (expires_at IS NULL OR expires_at > datetime('now'))
-		 ORDER BY created_at DESC`,
-		userID,
-	)
+func (r *Repository) ListOAuthTokensByUserID(ctx context.Context, userID int64) ([]*model.OAuthToken, error) {
+	now := time.Now().UTC()
+	var tokens []*model.OAuthToken
+	err := r.db.WithContext(ctx).
+		Where("user_id = ? AND (expires_at IS NULL OR expires_at > ?)", userID, now).
+		Order("created_at DESC").
+		Find(&tokens).Error
 	if err != nil {
 		return nil, fmt.Errorf("list oauth tokens by user: %w", err)
 	}
-	defer rows.Close()
-
-	var tokens []*model.OAuthToken
-	for rows.Next() {
-		var t model.OAuthToken
-		var scopeStr string
-		if err := rows.Scan(&t.Token, &t.UserID, &t.ClientID, &scopeStr, &t.CreatedAt, &t.ExpiresAt); err != nil {
-			return nil, fmt.Errorf("scan oauth token: %w", err)
-		}
-		t.Scopes = strings.Fields(scopeStr)
-		tokens = append(tokens, &t)
-	}
-	return tokens, rows.Err()
+	return tokens, nil
 }
 
 // DeleteOAuthToken revokes a token.
-func DeleteOAuthToken(ctx context.Context, q Querier, token string) error {
-	_, err := q.ExecContext(ctx, "DELETE FROM oauth_tokens WHERE token = ?", token)
-	if err != nil {
+func (r *Repository) DeleteOAuthToken(ctx context.Context, token string) error {
+	if err := r.db.WithContext(ctx).Where("token = ?", token).Delete(&model.OAuthToken{}).Error; err != nil {
 		return fmt.Errorf("delete oauth token: %w", err)
 	}
 	return nil
 }
 
 // DeleteOAuthTokensByUserID deletes all OAuth tokens for a user.
-func DeleteOAuthTokensByUserID(ctx context.Context, q Querier, userID int64) error {
-	_, err := q.ExecContext(ctx, "DELETE FROM oauth_tokens WHERE user_id = ?", userID)
-	if err != nil {
+func (r *Repository) DeleteOAuthTokensByUserID(ctx context.Context, userID int64) error {
+	if err := r.db.WithContext(ctx).Where("user_id = ?", userID).Delete(&model.OAuthToken{}).Error; err != nil {
 		return fmt.Errorf("delete oauth tokens by user id: %w", err)
 	}
 	return nil
 }
 
 // DeleteExpiredOAuthTokens removes all expired tokens.
-func DeleteExpiredOAuthTokens(ctx context.Context, q Querier) error {
-	_, err := q.ExecContext(ctx, "DELETE FROM oauth_tokens WHERE expires_at IS NOT NULL AND expires_at <= datetime('now')")
-	if err != nil {
+func (r *Repository) DeleteExpiredOAuthTokens(ctx context.Context) error {
+	now := time.Now().UTC()
+	if err := r.db.WithContext(ctx).Where("expires_at IS NOT NULL AND expires_at <= ?", now).Delete(&model.OAuthToken{}).Error; err != nil {
 		return fmt.Errorf("delete expired oauth tokens: %w", err)
 	}
 	return nil
 }
 
-// CountUserOAuthTokens returns the count of active (non-expired) OAuth tokens
-// for a user.
-func CountUserOAuthTokens(ctx context.Context, q Querier, userID int64) (int64, error) {
+// CountUserOAuthTokens returns the count of active (non-expired) OAuth tokens for a user.
+func (r *Repository) CountUserOAuthTokens(ctx context.Context, userID int64) (int64, error) {
+	now := time.Now().UTC()
 	var count int64
-	err := q.QueryRowContext(ctx,
-		`SELECT COUNT(*) FROM oauth_tokens
-		 WHERE user_id = ? AND (expires_at IS NULL OR expires_at > datetime('now'))`,
-		userID,
-	).Scan(&count)
+	err := r.db.WithContext(ctx).Model(&model.OAuthToken{}).
+		Where("user_id = ? AND (expires_at IS NULL OR expires_at > ?)", userID, now).
+		Count(&count).Error
 	if err != nil {
 		return 0, fmt.Errorf("count user oauth tokens: %w", err)
 	}
@@ -188,101 +154,86 @@ func CountUserOAuthTokens(ctx context.Context, q Querier, userID int64) (int64, 
 }
 
 // CountActiveOAuthTokens returns the count of all non-expired OAuth tokens.
-func CountActiveOAuthTokens(ctx context.Context, q Querier) (int64, error) {
+func (r *Repository) CountActiveOAuthTokens(ctx context.Context) (int64, error) {
+	now := time.Now().UTC()
 	var count int64
-	err := q.QueryRowContext(ctx,
-		"SELECT COUNT(*) FROM oauth_tokens WHERE expires_at IS NULL OR expires_at > datetime('now')",
-	).Scan(&count)
+	err := r.db.WithContext(ctx).Model(&model.OAuthToken{}).
+		Where("expires_at IS NULL OR expires_at > ?", now).
+		Count(&count).Error
 	if err != nil {
 		return 0, fmt.Errorf("count active oauth tokens: %w", err)
 	}
 	return count, nil
 }
 
-// GetRecentUserOAuthTokens returns recently created OAuth tokens for a user,
-// ordered by creation time descending.
-func GetRecentUserOAuthTokens(ctx context.Context, q Querier, userID int64, limit int) ([]*model.OAuthToken, error) {
-	rows, err := q.QueryContext(ctx,
-		`SELECT token, user_id, client_id, scopes, created_at, expires_at
-		 FROM oauth_tokens
-		 WHERE user_id = ?
-		 ORDER BY created_at DESC
-		 LIMIT ?`,
-		userID, limit,
-	)
+// GetRecentUserOAuthTokens returns recently created OAuth tokens for a user.
+func (r *Repository) GetRecentUserOAuthTokens(ctx context.Context, userID int64, limit int) ([]*model.OAuthToken, error) {
+	var tokens []*model.OAuthToken
+	err := r.db.WithContext(ctx).
+		Where("user_id = ?", userID).
+		Order("created_at DESC").
+		Limit(limit).
+		Find(&tokens).Error
 	if err != nil {
 		return nil, fmt.Errorf("get recent user oauth tokens: %w", err)
 	}
-	defer rows.Close()
-
-	var tokens []*model.OAuthToken
-	for rows.Next() {
-		var t model.OAuthToken
-		var scopeStr string
-		if err := rows.Scan(&t.Token, &t.UserID, &t.ClientID, &scopeStr, &t.CreatedAt, &t.ExpiresAt); err != nil {
-			return nil, fmt.Errorf("scan oauth token: %w", err)
-		}
-		t.Scopes = strings.Fields(scopeStr)
-		tokens = append(tokens, &t)
-	}
-	return tokens, rows.Err()
+	return tokens, nil
 }
 
 // CreateAuthorizationCode generates a new authorization code for the OAuth code flow.
-func CreateAuthorizationCode(ctx context.Context, q Querier, userID int64, clientID, redirectURI, scopes, codeChallenge, codeChallengeMethod string) (*model.AuthorizationCode, error) {
+func (r *Repository) CreateAuthorizationCode(ctx context.Context, userID int64, clientID, redirectURI, scopes, codeChallenge, codeChallengeMethod string) (*model.AuthorizationCode, error) {
 	code, err := RandomHex(32)
 	if err != nil {
 		return nil, fmt.Errorf("generate authorization code: %w", err)
 	}
 
-	var ac model.AuthorizationCode
-	var used int
-	err = q.QueryRowContext(ctx,
-		`INSERT INTO authorization_codes (code, user_id, client_id, redirect_uri, scopes, code_challenge, code_challenge_method)
-		 VALUES (?, ?, ?, ?, ?, ?, ?)
-		 RETURNING code, user_id, client_id, redirect_uri, scopes, code_challenge, code_challenge_method, created_at, expires_at, used`,
-		code, userID, clientID, redirectURI, scopes, codeChallenge, codeChallengeMethod,
-	).Scan(&ac.Code, &ac.UserID, &ac.ClientID, &ac.RedirectURI, &ac.Scopes, &ac.CodeChallenge, &ac.CodeChallengeMethod, &ac.CreatedAt, &ac.ExpiresAt, &used)
-	if err != nil {
+	now := time.Now().UTC()
+	ac := model.AuthorizationCode{
+		Code:                code,
+		UserID:              userID,
+		ClientID:            clientID,
+		RedirectURI:         redirectURI,
+		Scopes:              scopes,
+		CodeChallenge:       codeChallenge,
+		CodeChallengeMethod: codeChallengeMethod,
+		CreatedAt:           now,
+		ExpiresAt:           now.Add(10 * time.Minute),
+		Used:                false,
+	}
+	if err := r.db.WithContext(ctx).Create(&ac).Error; err != nil {
 		return nil, fmt.Errorf("create authorization code: %w", err)
 	}
-	ac.Used = used != 0
 	return &ac, nil
 }
 
 // GetAuthorizationCode returns the authorization code record, or nil if not found, expired, or already used.
-func GetAuthorizationCode(ctx context.Context, q Querier, code string) (*model.AuthorizationCode, error) {
+func (r *Repository) GetAuthorizationCode(ctx context.Context, code string) (*model.AuthorizationCode, error) {
 	var ac model.AuthorizationCode
-	var used int
-	err := q.QueryRowContext(ctx,
-		`SELECT code, user_id, client_id, redirect_uri, scopes, code_challenge, code_challenge_method, created_at, expires_at, used
-		 FROM authorization_codes
-		 WHERE code = ? AND used = 0 AND expires_at > datetime('now')`,
-		code,
-	).Scan(&ac.Code, &ac.UserID, &ac.ClientID, &ac.RedirectURI, &ac.Scopes, &ac.CodeChallenge, &ac.CodeChallengeMethod, &ac.CreatedAt, &ac.ExpiresAt, &used)
-	if err == sql.ErrNoRows {
+	now := time.Now().UTC()
+	err := r.db.WithContext(ctx).
+		Where("code = ? AND used = ? AND expires_at > ?", code, false, now).
+		First(&ac).Error
+	if err == gorm.ErrRecordNotFound {
 		return nil, nil
 	}
 	if err != nil {
 		return nil, fmt.Errorf("get authorization code: %w", err)
 	}
-	ac.Used = used != 0
 	return &ac, nil
 }
 
-// UseAuthorizationCode marks an authorization code as used (single-use enforcement).
-func UseAuthorizationCode(ctx context.Context, q Querier, code string) error {
-	_, err := q.ExecContext(ctx, "UPDATE authorization_codes SET used = 1 WHERE code = ?", code)
-	if err != nil {
+// UseAuthorizationCode marks an authorization code as used.
+func (r *Repository) UseAuthorizationCode(ctx context.Context, code string) error {
+	if err := r.db.WithContext(ctx).Model(&model.AuthorizationCode{}).Where("code = ?", code).Update("used", true).Error; err != nil {
 		return fmt.Errorf("use authorization code: %w", err)
 	}
 	return nil
 }
 
 // DeleteExpiredAuthorizationCodes removes expired or used authorization codes.
-func DeleteExpiredAuthorizationCodes(ctx context.Context, q Querier) error {
-	_, err := q.ExecContext(ctx, "DELETE FROM authorization_codes WHERE used = 1 OR expires_at <= datetime('now')")
-	if err != nil {
+func (r *Repository) DeleteExpiredAuthorizationCodes(ctx context.Context) error {
+	now := time.Now().UTC()
+	if err := r.db.WithContext(ctx).Where("used = ? OR expires_at <= ?", true, now).Delete(&model.AuthorizationCode{}).Error; err != nil {
 		return fmt.Errorf("delete expired authorization codes: %w", err)
 	}
 	return nil

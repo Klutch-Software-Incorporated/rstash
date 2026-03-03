@@ -3,7 +3,6 @@ package storage
 import (
 	"bytes"
 	"context"
-	"database/sql"
 	"errors"
 	"fmt"
 	"io"
@@ -60,10 +59,10 @@ type DeleteResult struct {
 
 // Service orchestrates storage operations (blob + node + ETags).
 type Service struct {
-	database *sql.DB
-	blobs    blob.Store
-	quota    *QuotaChecker
-	scanner  ContentScanner
+	repo    *db.Repository
+	blobs   blob.Store
+	quota   *QuotaChecker
+	scanner ContentScanner
 }
 
 // SetScanner sets the content scanner used to inspect uploads.
@@ -72,8 +71,8 @@ func (s *Service) SetScanner(sc ContentScanner) {
 }
 
 // NewService creates a new storage service.
-func NewService(database *sql.DB, blobs blob.Store, quota *QuotaChecker) *Service {
-	return &Service{database: database, blobs: blobs, quota: quota}
+func NewService(repo *db.Repository, blobs blob.Store, quota *QuotaChecker) *Service {
+	return &Service{repo: repo, blobs: blobs, quota: quota}
 }
 
 // PutDocument stores a document and propagates folder ETags up to root.
@@ -113,69 +112,71 @@ func (s *Service) PutDocument(ctx context.Context, userID int64, path string, co
 	}
 
 	// Now update metadata in a transaction.
-	tx, err := s.database.BeginTx(ctx, nil)
-	if err != nil {
-		return nil, fmt.Errorf("begin tx: %w", err)
-	}
-	defer tx.Rollback()
-
-	existing, err := db.GetNode(ctx, tx, userID, path)
-	if err != nil {
-		return nil, err
-	}
-
-	// Document/folder conflict: existing node at this path is a folder.
-	if existing != nil && existing.IsFolder {
-		return nil, ErrConflict
-	}
-
-	// If-Match: require existing ETag to match.
-	if cond.IfMatch != "" {
-		if existing == nil || existing.ETag != cond.IfMatch {
-			return nil, ErrPreconditionFailed
+	var putResult *PutResult
+	txErr := s.repo.Transaction(func(txRepo *db.Repository) error {
+		existing, err := txRepo.GetNode(ctx, userID, path)
+		if err != nil {
+			return err
 		}
-	}
 
-	// If-None-Match: "*" means "only if the document doesn't exist yet".
-	if cond.IfNoneMatch == "*" && existing != nil {
-		return nil, ErrPreconditionFailed
-	}
-
-	// Quota check: compute net delta and verify.
-	if s.quota != nil {
-		oldSize := int64(0)
-		if existing != nil {
-			oldSize = existing.ContentLength
+		// Document/folder conflict: existing node at this path is a folder.
+		if existing != nil && existing.IsFolder {
+			return ErrConflict
 		}
-		if err := s.quota.Check(ctx, tx, userID, int64(len(data))-oldSize); err != nil {
-			return nil, err
+
+		// If-Match: require existing ETag to match.
+		if cond.IfMatch != "" {
+			if existing == nil || existing.ETag != cond.IfMatch {
+				return ErrPreconditionFailed
+			}
 		}
-	}
 
-	isNew := existing == nil
-
-	if _, err := db.UpsertNode(ctx, tx, userID, path, false, contentType, int64(len(data)), etag); err != nil {
-		return nil, err
-	}
-
-	if err := s.propagateETags(ctx, tx, userID, path); err != nil {
-		return nil, err
-	}
-
-	if err := tx.Commit(); err != nil {
-		// Best-effort blob cleanup on metadata TX failure.
-		if cleanErr := s.blobs.Delete(ctx, userID, path); cleanErr != nil {
-			slog.Warn("failed to clean up orphaned blob after TX failure", "path", path, "error", cleanErr)
+		// If-None-Match: "*" means "only if the document doesn't exist yet".
+		if cond.IfNoneMatch == "*" && existing != nil {
+			return ErrPreconditionFailed
 		}
-		return nil, fmt.Errorf("commit: %w", err)
+
+		// Quota check: compute net delta and verify.
+		if s.quota != nil {
+			oldSize := int64(0)
+			if existing != nil {
+				oldSize = existing.ContentLength
+			}
+			if err := s.quota.Check(ctx, txRepo, userID, int64(len(data))-oldSize); err != nil {
+				return err
+			}
+		}
+
+		isNew := existing == nil
+
+		if _, err := txRepo.UpsertNode(ctx, userID, path, false, contentType, int64(len(data)), etag); err != nil {
+			return err
+		}
+
+		if err := propagateETags(ctx, txRepo, userID, path); err != nil {
+			return err
+		}
+
+		putResult = &PutResult{ETag: etag, IsNew: isNew}
+		return nil
+	})
+
+	if txErr != nil {
+		// Best-effort blob cleanup on metadata TX failure for non-service errors.
+		if !errors.Is(txErr, ErrConflict) && !errors.Is(txErr, ErrPreconditionFailed) {
+			if cleanErr := s.blobs.Delete(ctx, userID, path); cleanErr != nil {
+				slog.Warn("failed to clean up orphaned blob after TX failure", "path", path, "error", cleanErr)
+			}
+		}
+		return nil, txErr
 	}
 
-	return &PutResult{ETag: etag, IsNew: isNew}, nil
+	return putResult, nil
 }
 
 // GetDocument retrieves a document's content and metadata.
 func (s *Service) GetDocument(ctx context.Context, userID int64, path string, cond Conditions) (*GetResult, error) {
-	node, err := db.GetNode(ctx, s.database, userID, path)
+	node, err := s.repo.GetNode(ctx, userID, path)
 	if err != nil {
 		return nil, err
 	}
@@ -202,7 +203,7 @@ func (s *Service) GetDocument(ctx context.Context, userID int64, path string, co
 
 // HeadDocument returns document metadata without fetching the blob.
 func (s *Service) HeadDocument(ctx context.Context, userID int64, path string, cond Conditions) (*HeadResult, error) {
-	node, err := db.GetNode(ctx, s.database, userID, path)
+	node, err := s.repo.GetNode(ctx, userID, path)
 	if err != nil {
 		return nil, err
 	}
@@ -225,57 +226,58 @@ func (s *Service) HeadDocument(ctx context.Context, userID int64, path string, c
 // empty ancestor folders (except root "/").
 // Metadata is deleted in a TX first, then the blob is removed after commit.
 func (s *Service) DeleteDocument(ctx context.Context, userID int64, path string, cond Conditions) (*DeleteResult, error) {
-	tx, err := s.database.BeginTx(ctx, nil)
-	if err != nil {
-		return nil, fmt.Errorf("begin tx: %w", err)
-	}
-	defer tx.Rollback()
+	var deleteResult *DeleteResult
 
-	node, err := db.GetNode(ctx, tx, userID, path)
-	if err != nil {
-		return nil, err
-	}
-	if node == nil {
-		return nil, ErrNotFound
-	}
-
-	if cond.IfMatch != "" && node.ETag != cond.IfMatch {
-		return nil, ErrPreconditionFailed
-	}
-
-	deletedETag := node.ETag
-
-	if err := db.DeleteNode(ctx, tx, userID, path); err != nil {
-		return nil, err
-	}
-
-	// Propagate folder ETags and clean up empty ancestor folders.
-	ancestors := db.AncestorPaths(path)
-	for _, folderPath := range ancestors {
-		children, err := db.ListChildren(ctx, tx, userID, folderPath)
+	txErr := s.repo.Transaction(func(txRepo *db.Repository) error {
+		node, err := txRepo.GetNode(ctx, userID, path)
 		if err != nil {
-			return nil, err
+			return err
+		}
+		if node == nil {
+			return ErrNotFound
 		}
 
-		if len(children) == 0 && folderPath != "/" {
-			if err := db.DeleteNode(ctx, tx, userID, folderPath); err != nil {
-				return nil, err
+		if cond.IfMatch != "" && node.ETag != cond.IfMatch {
+			return ErrPreconditionFailed
+		}
+
+		deletedETag := node.ETag
+
+		if err := txRepo.DeleteNode(ctx, userID, path); err != nil {
+			return err
+		}
+
+		// Propagate folder ETags and clean up empty ancestor folders.
+		ancestors := db.AncestorPaths(path)
+		for _, folderPath := range ancestors {
+			children, err := txRepo.ListChildren(ctx, userID, folderPath)
+			if err != nil {
+				return err
 			}
-		} else {
-			childETags := make(map[string]string)
-			for _, child := range children {
-				name := strings.TrimPrefix(child.Path, folderPath)
-				childETags[name] = child.ETag
-			}
-			etag := FolderETag(childETags)
-			if _, err := db.UpsertNode(ctx, tx, userID, folderPath, true, "", 0, etag); err != nil {
-				return nil, err
+
+			if len(children) == 0 && folderPath != "/" {
+				if err := txRepo.DeleteNode(ctx, userID, folderPath); err != nil {
+					return err
+				}
+			} else {
+				childETags := make(map[string]string)
+				for _, child := range children {
+					name := strings.TrimPrefix(child.Path, folderPath)
+					childETags[name] = child.ETag
+				}
+				etag := FolderETag(childETags)
+				if _, err := txRepo.UpsertNode(ctx, userID, folderPath, true, "", 0, etag); err != nil {
+					return err
+				}
 			}
 		}
-	}
 
-	if err := tx.Commit(); err != nil {
-		return nil, fmt.Errorf("commit: %w", err)
+		deleteResult = &DeleteResult{ETag: deletedETag}
+		return nil
+	})
+
+	if txErr != nil {
+		return nil, txErr
 	}
 
 	// Delete blob after successful metadata commit (best-effort).
@@ -283,7 +285,7 @@ func (s *Service) DeleteDocument(ctx context.Context, userID int64, path string,
 		slog.Warn("failed to delete blob after metadata commit", "path", path, "error", err)
 	}
 
-	return &DeleteResult{ETag: deletedETag}, nil
+	return deleteResult, nil
 }
 
 // DeleteFolder recursively removes a folder and all its contents (files and
@@ -297,51 +299,51 @@ func (s *Service) DeleteFolder(ctx context.Context, userID int64, folderPath str
 		return 0, ErrConflict // cannot delete root
 	}
 
-	tx, err := s.database.BeginTx(ctx, nil)
-	if err != nil {
-		return 0, fmt.Errorf("begin tx: %w", err)
-	}
-	defer tx.Rollback()
+	var fileCount int
 
-	// Count files being deleted (for feedback).
-	files, err := db.ListDescendantFiles(ctx, tx, userID, folderPath)
-	if err != nil {
-		return 0, err
-	}
-	fileCount := len(files)
-
-	// Delete all nodes (files + folders) under this path, including the folder itself.
-	if err := db.DeleteSubtree(ctx, tx, userID, folderPath); err != nil {
-		return 0, err
-	}
-
-	// Propagate ETags and clean up empty ancestor folders.
-	ancestors := db.AncestorPaths(folderPath)
-	for _, ancestorPath := range ancestors {
-		children, err := db.ListChildren(ctx, tx, userID, ancestorPath)
+	txErr := s.repo.Transaction(func(txRepo *db.Repository) error {
+		// Count files being deleted (for feedback).
+		files, err := txRepo.ListDescendantFiles(ctx, userID, folderPath)
 		if err != nil {
-			return 0, err
+			return err
+		}
+		fileCount = len(files)
+
+		// Delete all nodes (files + folders) under this path, including the folder itself.
+		if err := txRepo.DeleteSubtree(ctx, userID, folderPath); err != nil {
+			return err
 		}
 
-		if len(children) == 0 && ancestorPath != "/" {
-			if err := db.DeleteNode(ctx, tx, userID, ancestorPath); err != nil {
-				return 0, err
+		// Propagate ETags and clean up empty ancestor folders.
+		ancestors := db.AncestorPaths(folderPath)
+		for _, ancestorPath := range ancestors {
+			children, err := txRepo.ListChildren(ctx, userID, ancestorPath)
+			if err != nil {
+				return err
 			}
-		} else {
-			childETags := make(map[string]string)
-			for _, child := range children {
-				name := strings.TrimPrefix(child.Path, ancestorPath)
-				childETags[name] = child.ETag
-			}
-			etag := FolderETag(childETags)
-			if _, err := db.UpsertNode(ctx, tx, userID, ancestorPath, true, "", 0, etag); err != nil {
-				return 0, err
+
+			if len(children) == 0 && ancestorPath != "/" {
+				if err := txRepo.DeleteNode(ctx, userID, ancestorPath); err != nil {
+					return err
+				}
+			} else {
+				childETags := make(map[string]string)
+				for _, child := range children {
+					name := strings.TrimPrefix(child.Path, ancestorPath)
+					childETags[name] = child.ETag
+				}
+				etag := FolderETag(childETags)
+				if _, err := txRepo.UpsertNode(ctx, userID, ancestorPath, true, "", 0, etag); err != nil {
+					return err
+				}
 			}
 		}
-	}
 
-	if err := tx.Commit(); err != nil {
-		return 0, fmt.Errorf("commit: %w", err)
+		return nil
+	})
+
+	if txErr != nil {
+		return 0, txErr
 	}
 
 	// Delete blobs after successful metadata commit (best-effort).
@@ -354,7 +356,7 @@ func (s *Service) DeleteFolder(ctx context.Context, userID int64, folderPath str
 
 // GetFolder returns a JSON-LD folder description listing direct children.
 func (s *Service) GetFolder(ctx context.Context, userID int64, path string, cond Conditions) (*api.FolderDescription, string, error) {
-	node, err := db.GetNode(ctx, s.database, userID, path)
+	node, err := s.repo.GetNode(ctx, userID, path)
 	if err != nil {
 		return nil, "", err
 	}
@@ -368,7 +370,7 @@ func (s *Service) GetFolder(ctx context.Context, userID int64, path string, cond
 		return nil, etag, ErrNotModified
 	}
 
-	children, err := db.ListChildren(ctx, s.database, userID, path)
+	children, err := s.repo.ListChildren(ctx, userID, path)
 	if err != nil {
 		return nil, "", err
 	}
@@ -412,41 +414,29 @@ func (s *Service) CreateFolder(ctx context.Context, userID int64, folderPath str
 		return ErrConflict
 	}
 
-	tx, err := s.database.BeginTx(ctx, nil)
-	if err != nil {
-		return fmt.Errorf("begin tx: %w", err)
-	}
-	defer tx.Rollback()
+	return s.repo.Transaction(func(txRepo *db.Repository) error {
+		existing, err := txRepo.GetNode(ctx, userID, folderPath)
+		if err != nil {
+			return err
+		}
+		if existing != nil {
+			return ErrConflict
+		}
 
-	existing, err := db.GetNode(ctx, tx, userID, folderPath)
-	if err != nil {
-		return err
-	}
-	if existing != nil {
-		return ErrConflict
-	}
+		etag := FolderETag(nil)
+		if _, err := txRepo.UpsertNode(ctx, userID, folderPath, true, "", 0, etag); err != nil {
+			return err
+		}
 
-	etag := FolderETag(nil)
-	if _, err := db.UpsertNode(ctx, tx, userID, folderPath, true, "", 0, etag); err != nil {
-		return err
-	}
-
-	if err := s.propagateETags(ctx, tx, userID, folderPath); err != nil {
-		return err
-	}
-
-	if err := tx.Commit(); err != nil {
-		return fmt.Errorf("commit: %w", err)
-	}
-
-	return nil
+		return propagateETags(ctx, txRepo, userID, folderPath)
+	})
 }
 
 // propagateETags recomputes folder ETags for all ancestors of path.
-func (s *Service) propagateETags(ctx context.Context, tx *sql.Tx, userID int64, path string) error {
+func propagateETags(ctx context.Context, repo *db.Repository, userID int64, path string) error {
 	ancestors := db.AncestorPaths(path)
 	for _, folderPath := range ancestors {
-		children, err := db.ListChildren(ctx, tx, userID, folderPath)
+		children, err := repo.ListChildren(ctx, userID, folderPath)
 		if err != nil {
 			return err
 		}
@@ -458,7 +448,7 @@ func (s *Service) propagateETags(ctx context.Context, tx *sql.Tx, userID int64, 
 		}
 
 		etag := FolderETag(childETags)
-		if _, err := db.UpsertNode(ctx, tx, userID, folderPath, true, "", 0, etag); err != nil {
+		if _, err := repo.UpsertNode(ctx, userID, folderPath, true, "", 0, etag); err != nil {
 			return err
 		}
 	}

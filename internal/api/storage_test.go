@@ -22,11 +22,11 @@ import (
 func testSetup(t *testing.T) (*httptest.Server, *testEnv) {
 	t.Helper()
 
-	database, err := db.Open(":memory:")
+	repo, err := db.OpenRepository("sqlite::memory:")
 	if err != nil {
 		t.Fatalf("open db: %v", err)
 	}
-	t.Cleanup(func() { database.Close() })
+	t.Cleanup(func() { repo.Close() })
 
 	blobs, err := blob.NewSQLiteStore(":memory:")
 	if err != nil {
@@ -34,56 +34,56 @@ func testSetup(t *testing.T) (*httptest.Server, *testEnv) {
 	}
 	t.Cleanup(func() { blobs.Close() })
 
-	quotaChecker := storage.NewQuotaChecker(storage.QuotaConfig{Mode: "off"}, database)
-	storageSvc := storage.NewService(database, blobs, quotaChecker)
+	quotaChecker := storage.NewQuotaChecker(storage.QuotaConfig{Mode: "off"}, repo)
+	storageSvc := storage.NewService(repo, blobs, quotaChecker)
 
 	mux := http.NewServeMux()
-	mux.Handle("/storage/{user}/{path...}", api.CORS(api.Storage(database, storageSvc, func() int64 { return 50 << 20 }, func() string { return "on" })))
+	mux.Handle("/storage/{user}/{path...}", api.CORS(api.Storage(repo, storageSvc, func() int64 { return 50 << 20 }, func() string { return "on" })))
 	ts := httptest.NewServer(mux)
 	t.Cleanup(ts.Close)
 
 	// Create a test user.
 	ctx := context.Background()
-	user, err := db.CreateUser(ctx, database, "testuser", "password", false, true)
+	user, err := repo.CreateUser(ctx, "testuser", "password", false, true)
 	if err != nil {
 		t.Fatalf("create user: %v", err)
 	}
 
 	// Register OAuth client (FK requirement).
-	_, err = db.UpsertOAuthClient(ctx, database, "https://example.com", "https://example.com/callback")
+	_, err = repo.UpsertOAuthClient(ctx, "https://example.com", "https://example.com/callback")
 	if err != nil {
 		t.Fatalf("upsert client: %v", err)
 	}
 
 	// Create an OAuth token with full access.
-	tok, err := db.CreateOAuthToken(ctx, database, user.ID, "https://example.com", []string{"*:rw"}, 0)
+	tok, err := repo.CreateOAuthToken(ctx, user.ID, "https://example.com", []string{"*:rw"}, 0)
 	if err != nil {
 		t.Fatalf("create token: %v", err)
 	}
 
 	// Create a read-only token.
-	roTok, err := db.CreateOAuthToken(ctx, database, user.ID, "https://example.com", []string{"*:r"}, 0)
+	roTok, err := repo.CreateOAuthToken(ctx, user.ID, "https://example.com", []string{"*:r"}, 0)
 	if err != nil {
 		t.Fatalf("create read-only token: %v", err)
 	}
 
 	// Create a scoped token (contacts only).
-	scopedTok, err := db.CreateOAuthToken(ctx, database, user.ID, "https://example.com", []string{"contacts:rw"}, 0)
+	scopedTok, err := repo.CreateOAuthToken(ctx, user.ID, "https://example.com", []string{"contacts:rw"}, 0)
 	if err != nil {
 		t.Fatalf("create scoped token: %v", err)
 	}
 
 	return ts, &testEnv{
-		DB:         database,
-		UserID:     user.ID,
-		Token:      tok.Token,
-		ROToken:    roTok.Token,
+		Repo:        repo,
+		UserID:      user.ID,
+		Token:       tok.Token,
+		ROToken:     roTok.Token,
 		ScopedToken: scopedTok.Token,
 	}
 }
 
 type testEnv struct {
-	DB          interface{}
+	Repo        *db.Repository
 	UserID      int64
 	Token       string
 	ROToken     string
@@ -816,8 +816,8 @@ func TestExpiredToken_Returns401(t *testing.T) {
 	ts, _ := testSetup(t)
 
 	// The token was created with 0 lifetime (no expiry), so create one with 1s expiry.
-	database, _ := db.Open(":memory:")
-	defer database.Close()
+	repo, _ := db.OpenRepository("sqlite::memory:")
+	defer repo.Close()
 	// We can't easily test this with the current setup since the token DB is separate.
 	// Instead, test that a completely nonexistent token returns 401.
 	client := ts.Client()
@@ -838,11 +838,11 @@ func TestExpiredToken_Returns401(t *testing.T) {
 func TestPublicWrites_Off_RejectsPUT(t *testing.T) {
 	t.Helper()
 
-	database, err := db.Open(":memory:")
+	repo, err := db.OpenRepository("sqlite::memory:")
 	if err != nil {
 		t.Fatalf("open db: %v", err)
 	}
-	t.Cleanup(func() { database.Close() })
+	t.Cleanup(func() { repo.Close() })
 
 	blobs, err := blob.NewSQLiteStore(":memory:")
 	if err != nil {
@@ -850,24 +850,24 @@ func TestPublicWrites_Off_RejectsPUT(t *testing.T) {
 	}
 	t.Cleanup(func() { blobs.Close() })
 
-	quotaChecker := storage.NewQuotaChecker(storage.QuotaConfig{Mode: "off"}, database)
-	storageSvc := storage.NewService(database, blobs, quotaChecker)
+	quotaChecker := storage.NewQuotaChecker(storage.QuotaConfig{Mode: "off"}, repo)
+	storageSvc := storage.NewService(repo, blobs, quotaChecker)
 
 	mux := http.NewServeMux()
-	mux.Handle("/storage/{user}/{path...}", api.CORS(api.Storage(database, storageSvc, func() int64 { return 50 << 20 }, func() string { return "off" })))
+	mux.Handle("/storage/{user}/{path...}", api.CORS(api.Storage(repo, storageSvc, func() int64 { return 50 << 20 }, func() string { return "off" })))
 	ts := httptest.NewServer(mux)
 	t.Cleanup(ts.Close)
 
 	ctx := context.Background()
-	user, err := db.CreateUser(ctx, database, "testuser", "password", false, true)
+	user, err := repo.CreateUser(ctx, "testuser", "password", false, true)
 	if err != nil {
 		t.Fatalf("create user: %v", err)
 	}
-	_, err = db.UpsertOAuthClient(ctx, database, "https://example.com", "https://example.com/callback")
+	_, err = repo.UpsertOAuthClient(ctx, "https://example.com", "https://example.com/callback")
 	if err != nil {
 		t.Fatalf("upsert client: %v", err)
 	}
-	tok, err := db.CreateOAuthToken(ctx, database, user.ID, "https://example.com", []string{"*:rw"}, 0)
+	tok, err := repo.CreateOAuthToken(ctx, user.ID, "https://example.com", []string{"*:rw"}, 0)
 	if err != nil {
 		t.Fatalf("create token: %v", err)
 	}

@@ -2,7 +2,6 @@ package storage
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"sync"
 
@@ -23,7 +22,7 @@ type QuotaConfig struct {
 type QuotaChecker struct {
 	mu     sync.Mutex // serializes write transactions with quota checks
 	config QuotaConfig
-	db     *sql.DB
+	repo   *db.Repository
 }
 
 // Lock serializes write transactions that include quota checks.
@@ -33,8 +32,8 @@ func (qc *QuotaChecker) Lock()   { qc.mu.Lock() }
 func (qc *QuotaChecker) Unlock() { qc.mu.Unlock() }
 
 // NewQuotaChecker creates a new QuotaChecker.
-func NewQuotaChecker(cfg QuotaConfig, database *sql.DB) *QuotaChecker {
-	return &QuotaChecker{config: cfg, db: database}
+func NewQuotaChecker(cfg QuotaConfig, repo *db.Repository) *QuotaChecker {
+	return &QuotaChecker{config: cfg, repo: repo}
 }
 
 // UpdateConfig replaces the quota configuration at runtime.
@@ -46,14 +45,14 @@ func (qc *QuotaChecker) UpdateConfig(cfg QuotaConfig) {
 
 // Check verifies that storing incomingBytes for userID would not exceed quotas.
 // incomingBytes should be the net delta (new size minus old size if overwriting).
-// Use a Querier (tx or db) for transactional consistency.
-func (qc *QuotaChecker) Check(ctx context.Context, q db.Querier, userID int64, incomingBytes int64) error {
+// Use the given repo (which may be a transaction-scoped repo) for consistency.
+func (qc *QuotaChecker) Check(ctx context.Context, repo *db.Repository, userID int64, incomingBytes int64) error {
 	switch qc.config.Mode {
 	case "off":
 		return nil
 
 	case "total":
-		total, err := db.GetTotalStorageUsed(ctx, q)
+		total, err := repo.GetTotalStorageUsed(ctx)
 		if err != nil {
 			return err
 		}
@@ -68,7 +67,7 @@ func (qc *QuotaChecker) Check(ctx context.Context, q db.Querier, userID int64, i
 			// Unlimited user.
 			return nil
 		}
-		stats, err := db.GetUserStorageStats(ctx, q, userID)
+		stats, err := repo.GetUserStorageStats(ctx, userID)
 		if err != nil {
 			return err
 		}
@@ -86,7 +85,7 @@ func (qc *QuotaChecker) Check(ctx context.Context, q db.Querier, userID int64, i
 // Otherwise, the server default (UserLimit) is returned.
 // A return value of 0 means unlimited.
 func (qc *QuotaChecker) GetUserQuota(ctx context.Context, userID int64) int64 {
-	user, err := db.GetUserByID(ctx, qc.db, userID)
+	user, err := qc.repo.GetUserByID(ctx, userID)
 	if err != nil || user == nil {
 		return qc.config.UserLimit
 	}

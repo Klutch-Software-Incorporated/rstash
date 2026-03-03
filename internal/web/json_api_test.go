@@ -22,11 +22,11 @@ import (
 func jsonApiSetup(t *testing.T) (*httptest.Server, *web.UIDeps, string) {
 	t.Helper()
 
-	database, err := db.Open(":memory:")
+	repo, err := db.OpenRepository("sqlite::memory:")
 	if err != nil {
 		t.Fatalf("open db: %v", err)
 	}
-	t.Cleanup(func() { database.Close() })
+	t.Cleanup(func() { repo.Close() })
 
 	cfg := &config.Config{
 		Addr:             ":8080",
@@ -38,13 +38,13 @@ func jsonApiSetup(t *testing.T) (*httptest.Server, *web.UIDeps, string) {
 		JSONApi:          "off",
 	}
 
-	localAuth := auth.NewLocalService(database)
-	runtimeSettings := settings.New(database, cfg)
+	localAuth := auth.NewLocalService(repo)
+	runtimeSettings := settings.New(repo, cfg)
 	renderer := ui.NewRenderer()
 
 	deps := &web.UIDeps{
 		Auth:     localAuth,
-		DB:       database,
+		Repo:     repo,
 		Renderer: renderer,
 		Config:   cfg,
 		Settings: runtimeSettings,
@@ -64,7 +64,7 @@ func jsonApiSetup(t *testing.T) (*httptest.Server, *web.UIDeps, string) {
 	t.Cleanup(ts.Close)
 
 	// Create an admin user.
-	_, err = db.CreateUser(context.Background(), database, "admin", "adminpass123", true, true)
+	_, err = repo.CreateUser(context.Background(), "admin", "adminpass123", true, true)
 	if err != nil {
 		t.Fatalf("create admin: %v", err)
 	}
@@ -137,11 +137,11 @@ func jsonGet(t *testing.T, ts *httptest.Server, path, token string) (*http.Respo
 // --- Tests ---
 
 func TestJSONApi_DisabledReturns404(t *testing.T) {
-	database, err := db.Open(":memory:")
+	repo, err := db.OpenRepository("sqlite::memory:")
 	if err != nil {
 		t.Fatalf("open db: %v", err)
 	}
-	defer database.Close()
+	defer repo.Close()
 
 	cfg := &config.Config{
 		Addr:        ":8080",
@@ -151,12 +151,12 @@ func TestJSONApi_DisabledReturns404(t *testing.T) {
 		LogLevel:    "error",
 		JSONApi:     "off",
 	}
-	localAuth := auth.NewLocalService(database)
-	runtimeSettings := settings.New(database, cfg)
+	localAuth := auth.NewLocalService(repo)
+	runtimeSettings := settings.New(repo, cfg)
 
 	deps := &web.UIDeps{
 		Auth:     localAuth,
-		DB:       database,
+		Repo:     repo,
 		Renderer: ui.NewRenderer(),
 		Config:   cfg,
 		Settings: runtimeSettings,
@@ -178,11 +178,11 @@ func TestJSONApi_DisabledReturns404(t *testing.T) {
 }
 
 func TestJSONApi_LoginReturns404WhenDisabled(t *testing.T) {
-	database, err := db.Open(":memory:")
+	repo, err := db.OpenRepository("sqlite::memory:")
 	if err != nil {
 		t.Fatalf("open db: %v", err)
 	}
-	defer database.Close()
+	defer repo.Close()
 
 	cfg := &config.Config{
 		Addr:        ":8080",
@@ -192,12 +192,12 @@ func TestJSONApi_LoginReturns404WhenDisabled(t *testing.T) {
 		LogLevel:    "error",
 		JSONApi:     "off",
 	}
-	localAuth := auth.NewLocalService(database)
-	runtimeSettings := settings.New(database, cfg)
+	localAuth := auth.NewLocalService(repo)
+	runtimeSettings := settings.New(repo, cfg)
 
 	deps := &web.UIDeps{
 		Auth:     localAuth,
-		DB:       database,
+		Repo:     repo,
 		Renderer: ui.NewRenderer(),
 		Config:   cfg,
 		Settings: runtimeSettings,
@@ -257,7 +257,7 @@ func TestJSONApi_LoginNonAdminForbidden(t *testing.T) {
 	ts, deps, _ := jsonApiSetup(t)
 
 	// Create a non-admin user.
-	_, err := db.CreateUser(context.Background(), deps.DB, "regular", "password123", false, true)
+	_, err := deps.Repo.CreateUser(context.Background(), "regular", "password123", false, true)
 	if err != nil {
 		t.Fatalf("create user: %v", err)
 	}
@@ -390,7 +390,7 @@ func TestJSONApi_UserPasswd(t *testing.T) {
 	ts, deps, token := jsonApiSetup(t)
 
 	// Create a target user.
-	_, err := db.CreateUser(context.Background(), deps.DB, "pwduser", "oldpass1234", false, true)
+	_, err := deps.Repo.CreateUser(context.Background(), "pwduser", "oldpass1234", false, true)
 	if err != nil {
 		t.Fatalf("create user: %v", err)
 	}
@@ -432,7 +432,7 @@ func TestJSONApi_UserPasswd(t *testing.T) {
 func TestJSONApi_UserPromote(t *testing.T) {
 	ts, deps, token := jsonApiSetup(t)
 
-	_, err := db.CreateUser(context.Background(), deps.DB, "promuser", "password123", false, true)
+	_, err := deps.Repo.CreateUser(context.Background(), "promuser", "password123", false, true)
 	if err != nil {
 		t.Fatalf("create user: %v", err)
 	}
@@ -465,7 +465,7 @@ func TestJSONApi_UserPromote(t *testing.T) {
 func TestJSONApi_UserDisable(t *testing.T) {
 	ts, deps, token := jsonApiSetup(t)
 
-	_, err := db.CreateUser(context.Background(), deps.DB, "disuser", "password123", false, true)
+	_, err := deps.Repo.CreateUser(context.Background(), "disuser", "password123", false, true)
 	if err != nil {
 		t.Fatalf("create user: %v", err)
 	}
@@ -643,11 +643,11 @@ func TestJSONApi_DocsPage(t *testing.T) {
 }
 
 func TestJSONApi_DocsDisabled(t *testing.T) {
-	database, err := db.Open(":memory:")
+	repo, err := db.OpenRepository("sqlite::memory:")
 	if err != nil {
 		t.Fatalf("open db: %v", err)
 	}
-	defer database.Close()
+	defer repo.Close()
 
 	cfg := &config.Config{
 		Addr:        ":8080",
@@ -657,12 +657,12 @@ func TestJSONApi_DocsDisabled(t *testing.T) {
 		LogLevel:    "error",
 		JSONApi:     "off",
 	}
-	localAuth := auth.NewLocalService(database)
-	runtimeSettings := settings.New(database, cfg)
+	localAuth := auth.NewLocalService(repo)
+	runtimeSettings := settings.New(repo, cfg)
 
 	deps := &web.UIDeps{
 		Auth:     localAuth,
-		DB:       database,
+		Repo:     repo,
 		Renderer: ui.NewRenderer(),
 		Config:   cfg,
 		Settings: runtimeSettings,

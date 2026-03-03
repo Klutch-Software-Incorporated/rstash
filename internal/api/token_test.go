@@ -18,35 +18,35 @@ import (
 func tokenTestServer(t *testing.T) (*httptest.Server, *tokenTestEnv) {
 	t.Helper()
 
-	database, err := db.Open(":memory:")
+	repo, err := db.OpenRepository("sqlite::memory:")
 	if err != nil {
 		t.Fatalf("open db: %v", err)
 	}
-	t.Cleanup(func() { database.Close() })
+	t.Cleanup(func() { repo.Close() })
 
-	handler := api.OAuthToken(database, func() string { return "30d" }, func() (bool, string) { return false, "" })
+	handler := api.OAuthToken(repo, func() string { return "30d" }, func() (bool, string) { return false, "" })
 	ts := httptest.NewServer(handler)
 	t.Cleanup(ts.Close)
 
 	ctx := context.Background()
-	user, err := db.CreateUser(ctx, database, "tokenuser", "password", false, true)
+	user, err := repo.CreateUser(ctx, "tokenuser", "password", false, true)
 	if err != nil {
 		t.Fatalf("create user: %v", err)
 	}
 
-	_, err = db.UpsertOAuthClient(ctx, database, "https://app.example.com", "https://app.example.com/callback")
+	_, err = repo.UpsertOAuthClient(ctx, "https://app.example.com", "https://app.example.com/callback")
 	if err != nil {
 		t.Fatalf("upsert client: %v", err)
 	}
 
 	return ts, &tokenTestEnv{
-		DB:     database,
+		Repo:   repo,
 		UserID: user.ID,
 	}
 }
 
 type tokenTestEnv struct {
-	DB     db.Querier
+	Repo   *db.Repository
 	UserID int64
 }
 
@@ -55,11 +55,11 @@ func pkceChallenge(verifier string) string {
 	return base64.RawURLEncoding.EncodeToString(h[:])
 }
 
-func createAuthCode(t *testing.T, dbq db.Querier, userID int64, verifier string) string {
+func createAuthCode(t *testing.T, repo *db.Repository, userID int64, verifier string) string {
 	t.Helper()
 	challenge := pkceChallenge(verifier)
-	ac, err := db.CreateAuthorizationCode(
-		context.Background(), dbq,
+	ac, err := repo.CreateAuthorizationCode(
+		context.Background(),
 
 		userID, "https://app.example.com", "https://app.example.com/callback",
 		"*:rw", challenge, "S256",
@@ -75,7 +75,7 @@ func TestTokenExchange_ValidPKCE(t *testing.T) {
 	client := ts.Client()
 
 	verifier := "dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk"
-	code := createAuthCode(t, env.DB, env.UserID, verifier)
+	code := createAuthCode(t, env.Repo, env.UserID, verifier)
 
 	form := url.Values{
 		"grant_type":    {"authorization_code"},
@@ -116,7 +116,7 @@ func TestTokenExchange_InvalidVerifier(t *testing.T) {
 	client := ts.Client()
 
 	verifier := "correct-verifier-value-for-testing"
-	code := createAuthCode(t, env.DB, env.UserID, verifier)
+	code := createAuthCode(t, env.Repo, env.UserID, verifier)
 
 	form := url.Values{
 		"grant_type":    {"authorization_code"},
@@ -167,7 +167,7 @@ func TestTokenExchange_WrongRedirectURI(t *testing.T) {
 	client := ts.Client()
 
 	verifier := "test-verifier-for-redirect"
-	code := createAuthCode(t, env.DB, env.UserID, verifier)
+	code := createAuthCode(t, env.Repo, env.UserID, verifier)
 
 	form := url.Values{
 		"grant_type":    {"authorization_code"},
@@ -243,7 +243,7 @@ func TestTokenExchange_CodeReuse(t *testing.T) {
 	client := ts.Client()
 
 	verifier := "verifier-for-reuse-test"
-	code := createAuthCode(t, env.DB, env.UserID, verifier)
+	code := createAuthCode(t, env.Repo, env.UserID, verifier)
 
 	form := url.Values{
 		"grant_type":    {"authorization_code"},
@@ -276,29 +276,29 @@ func TestTokenExchange_CodeReuse(t *testing.T) {
 func refreshTokenTestServer(t *testing.T) (*httptest.Server, *tokenTestEnv) {
 	t.Helper()
 
-	database, err := db.Open(":memory:")
+	repo, err := db.OpenRepository("sqlite::memory:")
 	if err != nil {
 		t.Fatalf("open db: %v", err)
 	}
-	t.Cleanup(func() { database.Close() })
+	t.Cleanup(func() { repo.Close() })
 
-	handler := api.OAuthToken(database, func() string { return "30d" }, func() (bool, string) { return true, "90d" })
+	handler := api.OAuthToken(repo, func() string { return "30d" }, func() (bool, string) { return true, "90d" })
 	ts := httptest.NewServer(handler)
 	t.Cleanup(ts.Close)
 
 	ctx := context.Background()
-	user, err := db.CreateUser(ctx, database, "refreshuser", "password", false, true)
+	user, err := repo.CreateUser(ctx, "refreshuser", "password", false, true)
 	if err != nil {
 		t.Fatalf("create user: %v", err)
 	}
 
-	_, err = db.UpsertOAuthClient(ctx, database, "https://app.example.com", "https://app.example.com/callback")
+	_, err = repo.UpsertOAuthClient(ctx, "https://app.example.com", "https://app.example.com/callback")
 	if err != nil {
 		t.Fatalf("upsert client: %v", err)
 	}
 
 	return ts, &tokenTestEnv{
-		DB:     database,
+		Repo:   repo,
 		UserID: user.ID,
 	}
 }
@@ -308,7 +308,7 @@ func TestTokenExchange_RefreshTokenIssued(t *testing.T) {
 	client := ts.Client()
 
 	verifier := "refresh-test-verifier"
-	code := createAuthCode(t, env.DB, env.UserID, verifier)
+	code := createAuthCode(t, env.Repo, env.UserID, verifier)
 
 	form := url.Values{
 		"grant_type":    {"authorization_code"},
@@ -340,7 +340,7 @@ func TestTokenExchange_RefreshTokenGrant(t *testing.T) {
 
 	// Step 1: Get an initial access + refresh token pair.
 	verifier := "refresh-grant-verifier"
-	code := createAuthCode(t, env.DB, env.UserID, verifier)
+	code := createAuthCode(t, env.Repo, env.UserID, verifier)
 
 	form := url.Values{
 		"grant_type":    {"authorization_code"},
@@ -410,7 +410,7 @@ func TestTokenExchange_RefreshTokenDisabled(t *testing.T) {
 	client := ts.Client()
 
 	verifier := "no-refresh-verifier"
-	code := createAuthCode(t, env.DB, env.UserID, verifier)
+	code := createAuthCode(t, env.Repo, env.UserID, verifier)
 
 	form := url.Values{
 		"grant_type":    {"authorization_code"},

@@ -14,11 +14,11 @@ import (
 func setup(t *testing.T) (*storage.Service, int64) {
 	t.Helper()
 
-	database, err := db.Open(":memory:")
+	repo, err := db.OpenRepository("sqlite::memory:")
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() { database.Close() })
+	t.Cleanup(func() { repo.Close() })
 
 	blobs, err := blob.NewSQLiteStore(":memory:")
 	if err != nil {
@@ -26,9 +26,9 @@ func setup(t *testing.T) (*storage.Service, int64) {
 	}
 	t.Cleanup(func() { blobs.Close() })
 
-	svc := storage.NewService(database, blobs, nil)
+	svc := storage.NewService(repo, blobs, nil)
 
-	user, err := db.CreateUser(context.Background(), database, "alice", "secret", false, true)
+	user, err := repo.CreateUser(context.Background(), "alice", "secret", false, true)
 	if err != nil {
 		t.Fatal(err)
 	}

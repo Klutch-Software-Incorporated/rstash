@@ -27,8 +27,8 @@ All configuration is via environment variables (see `gosilo env` for a documente
 |----------|---------|-------------|
 | GOSILO_ADDR | :8080 | Listen address (host:port) |
 | GOSILO_BASE_URL | http://localhost:8080 | Public URL of the server |
-| GOSILO_DB | sqlite:gosilo.db | Metadata database DSN (sqlite:path) |
-| GOSILO_BLOB | sqlite:gosilo-blobs.db | Blob store DSN (sqlite:path, fs:/path) |
+| GOSILO_DB | sqlite:gosilo.db | Metadata database DSN (sqlite:, postgres:, mysql:, mssql:) |
+| GOSILO_BLOB | sqlite:gosilo-blobs.db | Blob store DSN (sqlite:path, fs:/path, or any database DSN) |
 | GOSILO_REGISTRATION | closed | Registration mode: open, closed |
 | GOSILO_LOG_LEVEL | info | Log level: debug, info, warn, error |
 | GOSILO_RATE_LIMIT | 10 | Per-IP rate limit (req/sec, 0=disabled) |
@@ -50,7 +50,7 @@ All configuration is via environment variables (see `gosilo env` for a documente
 - `internal/cli/` — cobra-based CLI: serve, init, user, config, audit, doctor, env commands
 - `internal/config/` — env var configuration loading, validation, DSN parsing, byte-size/token-lifetime parsing
 - `internal/settings/` — runtime settings (DB overrides merged with env defaults, atomic snapshot)
-- `internal/db/` — SQLite database initialization, migrations, and data access (users, sessions, oauth, audit, nodes, settings)
+- `internal/db/` — GORM-based database layer with Repository pattern, AutoMigrate, multi-dialect support (SQLite, PostgreSQL, MySQL, SQL Server)
 - `internal/model/` — domain types (User, OAuthClient, OAuthToken, Node, Session, AuditEntry, AuthorizationCode)
 - `internal/auth/` — authentication service interface and local (password-based) implementation, session/cookie management
 - `internal/blob/` — pluggable blob storage interface and backends (SQLite, filesystem)
@@ -63,14 +63,18 @@ All configuration is via environment variables (see `gosilo env` for a documente
 
 - Standard library net/http for routing (Go 1.22 enhanced patterns)
 - cobra for CLI (command groups, help examples, --json/--db global flags, consistent exit codes)
-- modernc.org/sqlite (pure Go, no CGO)
+- GORM ORM with multi-dialect support (gorm.io/gorm)
+- glebarez/sqlite for pure-Go SQLite (no CGO), gorm.io/driver/postgres, gorm.io/driver/mysql, gorm.io/driver/sqlserver
 - log/slog for structured logging
 - Interfaces for pluggable backends (blob.Store, auth.Service)
 - Server-rendered Go HTML templates for web UI (custom CSS, no build tooling)
 - All assets embedded via go:embed for single-binary deployment
 - Audit logging for all state-changing operations (admin, CLI, storage, auth, OAuth)
 - Runtime settings: DB overrides take precedence over env defaults, atomic snapshot swap
-- SQLite LIKE is case-insensitive by default; we set `PRAGMA case_sensitive_like = ON` at DB init so path prefix queries are case-sensitive. If adding support for another database, ensure LIKE queries on paths remain case-sensitive (e.g. COLLATE BINARY or equivalent).
+- All database access goes through `*db.Repository` (wraps `*gorm.DB`); package-level DB functions no longer exist
+- Transactions use `repo.Transaction(func(txRepo *db.Repository) error { ... })` pattern
+- SQLite LIKE is case-insensitive by default; we set `PRAGMA case_sensitive_like = ON` at DB init so path prefix queries are case-sensitive. For other databases, LIKE queries on paths use case-sensitive collation (e.g. COLLATE BINARY or equivalent).
+- Schema managed by GORM AutoMigrate — no raw DDL strings
 
 ## remoteStorage Protocol
 

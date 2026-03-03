@@ -4,32 +4,30 @@ import (
 	"context"
 	"testing"
 	"time"
-
-	"gosilo/internal/db"
 )
 
 func TestCreateAndGetRefreshToken(t *testing.T) {
 	database := testDB(t)
 	ctx := context.Background()
 
-	user, err := db.CreateUser(ctx, database, "refreshuser", "password", false, true)
+	user, err := database.CreateUser(ctx, "refreshuser", "password", false, true)
 	if err != nil {
 		t.Fatalf("create user: %v", err)
 	}
 
-	_, err = db.UpsertOAuthClient(ctx, database, "https://app.example.com", "https://app.example.com/callback")
+	_, err = database.UpsertOAuthClient(ctx, "https://app.example.com", "https://app.example.com/callback")
 	if err != nil {
 		t.Fatalf("upsert client: %v", err)
 	}
 
 	// Create an access token first.
-	accessToken, err := db.CreateOAuthToken(ctx, database, user.ID, "https://app.example.com", []string{"*:rw"}, 24*time.Hour)
+	accessToken, err := database.CreateOAuthToken(ctx, user.ID, "https://app.example.com", []string{"*:rw"}, 24*time.Hour)
 	if err != nil {
 		t.Fatalf("create access token: %v", err)
 	}
 
 	// Create refresh token.
-	rt, err := db.CreateRefreshToken(ctx, database, user.ID, "https://app.example.com", []string{"*:rw"}, accessToken.Token, 90*24*time.Hour)
+	rt, err := database.CreateRefreshToken(ctx, user.ID, "https://app.example.com", []string{"*:rw"}, accessToken.Token, 90*24*time.Hour)
 	if err != nil {
 		t.Fatalf("create refresh token: %v", err)
 	}
@@ -45,7 +43,7 @@ func TestCreateAndGetRefreshToken(t *testing.T) {
 	}
 
 	// Get it back.
-	got, err := db.GetRefreshToken(ctx, database, rt.Token)
+	got, err := database.GetRefreshToken(ctx, rt.Token)
 	if err != nil {
 		t.Fatalf("get refresh token: %v", err)
 	}
@@ -61,33 +59,33 @@ func TestDeleteRefreshTokenByAccessToken(t *testing.T) {
 	database := testDB(t)
 	ctx := context.Background()
 
-	user, err := db.CreateUser(ctx, database, "refreshuser2", "password", false, true)
+	user, err := database.CreateUser(ctx, "refreshuser2", "password", false, true)
 	if err != nil {
 		t.Fatalf("create user: %v", err)
 	}
 
-	_, err = db.UpsertOAuthClient(ctx, database, "https://app.example.com", "https://app.example.com/callback")
+	_, err = database.UpsertOAuthClient(ctx, "https://app.example.com", "https://app.example.com/callback")
 	if err != nil {
 		t.Fatalf("upsert client: %v", err)
 	}
 
-	accessToken, err := db.CreateOAuthToken(ctx, database, user.ID, "https://app.example.com", []string{"*:rw"}, 24*time.Hour)
+	accessToken, err := database.CreateOAuthToken(ctx, user.ID, "https://app.example.com", []string{"*:rw"}, 24*time.Hour)
 	if err != nil {
 		t.Fatalf("create access token: %v", err)
 	}
 
-	rt, err := db.CreateRefreshToken(ctx, database, user.ID, "https://app.example.com", []string{"*:rw"}, accessToken.Token, 90*24*time.Hour)
+	rt, err := database.CreateRefreshToken(ctx, user.ID, "https://app.example.com", []string{"*:rw"}, accessToken.Token, 90*24*time.Hour)
 	if err != nil {
 		t.Fatalf("create refresh token: %v", err)
 	}
 
 	// Delete by access token.
-	if err := db.DeleteRefreshTokenByAccessToken(ctx, database, accessToken.Token); err != nil {
+	if err := database.DeleteRefreshTokenByAccessToken(ctx, accessToken.Token); err != nil {
 		t.Fatalf("delete by access token: %v", err)
 	}
 
 	// Should be gone.
-	got, err := db.GetRefreshToken(ctx, database, rt.Token)
+	got, err := database.GetRefreshToken(ctx, rt.Token)
 	if err != nil {
 		t.Fatalf("get: %v", err)
 	}
@@ -100,33 +98,33 @@ func TestDeleteExpiredRefreshTokens(t *testing.T) {
 	database := testDB(t)
 	ctx := context.Background()
 
-	user, err := db.CreateUser(ctx, database, "refreshuser3", "password", false, true)
+	user, err := database.CreateUser(ctx, "refreshuser3", "password", false, true)
 	if err != nil {
 		t.Fatalf("create user: %v", err)
 	}
 
-	_, err = db.UpsertOAuthClient(ctx, database, "https://app.example.com", "https://app.example.com/callback")
+	_, err = database.UpsertOAuthClient(ctx, "https://app.example.com", "https://app.example.com/callback")
 	if err != nil {
 		t.Fatalf("upsert client: %v", err)
 	}
 
-	accessToken, err := db.CreateOAuthToken(ctx, database, user.ID, "https://app.example.com", []string{"*:rw"}, 24*time.Hour)
+	accessToken, err := database.CreateOAuthToken(ctx, user.ID, "https://app.example.com", []string{"*:rw"}, 24*time.Hour)
 	if err != nil {
 		t.Fatalf("create access token: %v", err)
 	}
 
 	// Create a non-expiring refresh token.
-	rt, err := db.CreateRefreshToken(ctx, database, user.ID, "https://app.example.com", []string{"*:rw"}, accessToken.Token, 0)
+	rt, err := database.CreateRefreshToken(ctx, user.ID, "https://app.example.com", []string{"*:rw"}, accessToken.Token, 0)
 	if err != nil {
 		t.Fatalf("create refresh token: %v", err)
 	}
 
 	// Cleanup should not delete it.
-	if err := db.DeleteExpiredRefreshTokens(ctx, database); err != nil {
+	if err := database.DeleteExpiredRefreshTokens(ctx); err != nil {
 		t.Fatalf("cleanup: %v", err)
 	}
 
-	got, _ := db.GetRefreshToken(ctx, database, rt.Token)
+	got, _ := database.GetRefreshToken(ctx, rt.Token)
 	if got == nil {
 		t.Fatal("expected non-expiring refresh token to survive cleanup")
 	}

@@ -2,41 +2,39 @@ package db
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
+	"time"
 
 	"gosilo/internal/model"
 
 	"golang.org/x/crypto/bcrypt"
+	"gorm.io/gorm"
 )
 
 // CreateUser inserts a new user with a bcrypt-hashed password.
-func CreateUser(ctx context.Context, q Querier, username, password string, isAdmin, approved bool) (*model.User, error) {
+func (r *Repository) CreateUser(ctx context.Context, username, password string, isAdmin, approved bool) (*model.User, error) {
 	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 	if err != nil {
 		return nil, fmt.Errorf("hash password: %w", err)
 	}
 
-	var u model.User
-	err = q.QueryRowContext(ctx,
-		`INSERT INTO users (username, password_hash, is_admin, approved) VALUES (?, ?, ?, ?)
-		 RETURNING id, username, password_hash, is_admin, storage_quota, disabled, approved, created_at, last_login_at, last_login_ip, tos_accepted_at, privacy_accepted_at`,
-		username, string(hash), isAdmin, approved,
-	).Scan(&u.ID, &u.Username, &u.PasswordHash, &u.IsAdmin, &u.StorageQuota, &u.Disabled, &u.Approved, &u.CreatedAt, &u.LastLoginAt, &u.LastLoginIP, &u.TOSAcceptedAt, &u.PrivacyAcceptedAt)
-	if err != nil {
+	u := model.User{
+		Username:     username,
+		PasswordHash: string(hash),
+		IsAdmin:      isAdmin,
+		Approved:     approved,
+	}
+	if err := r.db.WithContext(ctx).Create(&u).Error; err != nil {
 		return nil, fmt.Errorf("create user: %w", err)
 	}
 	return &u, nil
 }
 
 // GetUserByUsername returns the user with the given username, or nil if not found.
-func GetUserByUsername(ctx context.Context, q Querier, username string) (*model.User, error) {
+func (r *Repository) GetUserByUsername(ctx context.Context, username string) (*model.User, error) {
 	var u model.User
-	err := q.QueryRowContext(ctx,
-		"SELECT id, username, password_hash, is_admin, storage_quota, disabled, approved, created_at, last_login_at, last_login_ip, tos_accepted_at, privacy_accepted_at FROM users WHERE username = ?",
-		username,
-	).Scan(&u.ID, &u.Username, &u.PasswordHash, &u.IsAdmin, &u.StorageQuota, &u.Disabled, &u.Approved, &u.CreatedAt, &u.LastLoginAt, &u.LastLoginIP, &u.TOSAcceptedAt, &u.PrivacyAcceptedAt)
-	if err == sql.ErrNoRows {
+	err := r.db.WithContext(ctx).Where("username = ?", username).First(&u).Error
+	if err == gorm.ErrRecordNotFound {
 		return nil, nil
 	}
 	if err != nil {
@@ -46,13 +44,10 @@ func GetUserByUsername(ctx context.Context, q Querier, username string) (*model.
 }
 
 // GetUserByID returns the user with the given ID, or nil if not found.
-func GetUserByID(ctx context.Context, q Querier, id int64) (*model.User, error) {
+func (r *Repository) GetUserByID(ctx context.Context, id int64) (*model.User, error) {
 	var u model.User
-	err := q.QueryRowContext(ctx,
-		"SELECT id, username, password_hash, is_admin, storage_quota, disabled, approved, created_at, last_login_at, last_login_ip, tos_accepted_at, privacy_accepted_at FROM users WHERE id = ?",
-		id,
-	).Scan(&u.ID, &u.Username, &u.PasswordHash, &u.IsAdmin, &u.StorageQuota, &u.Disabled, &u.Approved, &u.CreatedAt, &u.LastLoginAt, &u.LastLoginIP, &u.TOSAcceptedAt, &u.PrivacyAcceptedAt)
-	if err == sql.ErrNoRows {
+	err := r.db.WithContext(ctx).First(&u, id).Error
+	if err == gorm.ErrRecordNotFound {
 		return nil, nil
 	}
 	if err != nil {
@@ -67,51 +62,39 @@ func CheckPassword(user *model.User, password string) bool {
 }
 
 // ListUsers returns all users ordered by id, excluding the _system sentinel.
-func ListUsers(ctx context.Context, q Querier) ([]*model.User, error) {
-	rows, err := q.QueryContext(ctx,
-		"SELECT id, username, password_hash, is_admin, storage_quota, disabled, approved, created_at, last_login_at, last_login_ip, tos_accepted_at, privacy_accepted_at FROM users WHERE id > 0 ORDER BY id")
+func (r *Repository) ListUsers(ctx context.Context) ([]*model.User, error) {
+	var users []*model.User
+	err := r.db.WithContext(ctx).Where("id >= 1").Order("id").Find(&users).Error
 	if err != nil {
 		return nil, fmt.Errorf("list users: %w", err)
 	}
-	defer rows.Close()
-
-	var users []*model.User
-	for rows.Next() {
-		var u model.User
-		if err := rows.Scan(&u.ID, &u.Username, &u.PasswordHash, &u.IsAdmin, &u.StorageQuota, &u.Disabled, &u.Approved, &u.CreatedAt, &u.LastLoginAt, &u.LastLoginIP, &u.TOSAcceptedAt, &u.PrivacyAcceptedAt); err != nil {
-			return nil, fmt.Errorf("scan user: %w", err)
-		}
-		users = append(users, &u)
-	}
-	return users, rows.Err()
+	return users, nil
 }
 
 // DeleteUser deletes a user by id.
-func DeleteUser(ctx context.Context, q Querier, id int64) error {
-	_, err := q.ExecContext(ctx, "DELETE FROM users WHERE id = ?", id)
-	if err != nil {
+func (r *Repository) DeleteUser(ctx context.Context, id int64) error {
+	if err := r.db.WithContext(ctx).Delete(&model.User{}, id).Error; err != nil {
 		return fmt.Errorf("delete user: %w", err)
 	}
 	return nil
 }
 
 // UpdateUserPassword hashes a new password with bcrypt and updates the user's row.
-func UpdateUserPassword(ctx context.Context, q Querier, userID int64, newPassword string) error {
+func (r *Repository) UpdateUserPassword(ctx context.Context, userID int64, newPassword string) error {
 	hash, err := bcrypt.GenerateFromPassword([]byte(newPassword), bcrypt.DefaultCost)
 	if err != nil {
 		return fmt.Errorf("hash password: %w", err)
 	}
-	_, err = q.ExecContext(ctx, "UPDATE users SET password_hash = ? WHERE id = ?", string(hash), userID)
-	if err != nil {
+	if err := r.db.WithContext(ctx).Model(&model.User{}).Where("id = ?", userID).Update("password_hash", string(hash)).Error; err != nil {
 		return fmt.Errorf("update user password: %w", err)
 	}
 	return nil
 }
 
 // UserCount returns the total number of users, excluding the _system sentinel.
-func UserCount(ctx context.Context, q Querier) (int64, error) {
+func (r *Repository) UserCount(ctx context.Context) (int64, error) {
 	var count int64
-	err := q.QueryRowContext(ctx, "SELECT COUNT(*) FROM users WHERE id > 0").Scan(&count)
+	err := r.db.WithContext(ctx).Model(&model.User{}).Where("id >= 1").Count(&count).Error
 	if err != nil {
 		return 0, fmt.Errorf("count users: %w", err)
 	}
@@ -119,37 +102,33 @@ func UserCount(ctx context.Context, q Querier) (int64, error) {
 }
 
 // UpdateUserQuota sets the per-user storage quota override.
-// A value of 0 means "use server default".
-func UpdateUserQuota(ctx context.Context, q Querier, userID int64, quotaBytes int64) error {
-	_, err := q.ExecContext(ctx, "UPDATE users SET storage_quota = ? WHERE id = ?", quotaBytes, userID)
-	if err != nil {
+func (r *Repository) UpdateUserQuota(ctx context.Context, userID int64, quotaBytes int64) error {
+	if err := r.db.WithContext(ctx).Model(&model.User{}).Where("id = ?", userID).Update("storage_quota", quotaBytes).Error; err != nil {
 		return fmt.Errorf("update user quota: %w", err)
 	}
 	return nil
 }
 
 // UpdateUserAdmin toggles the is_admin flag for a user.
-func UpdateUserAdmin(ctx context.Context, q Querier, userID int64, isAdmin bool) error {
-	_, err := q.ExecContext(ctx, "UPDATE users SET is_admin = ? WHERE id = ?", isAdmin, userID)
-	if err != nil {
+func (r *Repository) UpdateUserAdmin(ctx context.Context, userID int64, isAdmin bool) error {
+	if err := r.db.WithContext(ctx).Model(&model.User{}).Where("id = ?", userID).Update("is_admin", isAdmin).Error; err != nil {
 		return fmt.Errorf("update user admin: %w", err)
 	}
 	return nil
 }
 
 // UpdateUserApproved sets the approved flag for a user.
-func UpdateUserApproved(ctx context.Context, q Querier, userID int64, approved bool) error {
-	_, err := q.ExecContext(ctx, "UPDATE users SET approved = ? WHERE id = ?", approved, userID)
-	if err != nil {
+func (r *Repository) UpdateUserApproved(ctx context.Context, userID int64, approved bool) error {
+	if err := r.db.WithContext(ctx).Model(&model.User{}).Where("id = ?", userID).Update("approved", approved).Error; err != nil {
 		return fmt.Errorf("update user approved: %w", err)
 	}
 	return nil
 }
 
 // CountPendingUsers returns the number of unapproved users.
-func CountPendingUsers(ctx context.Context, q Querier) (int64, error) {
+func (r *Repository) CountPendingUsers(ctx context.Context) (int64, error) {
 	var count int64
-	err := q.QueryRowContext(ctx, "SELECT COUNT(*) FROM users WHERE id > 0 AND approved = 0").Scan(&count)
+	err := r.db.WithContext(ctx).Model(&model.User{}).Where("id >= 1 AND approved = ?", false).Count(&count).Error
 	if err != nil {
 		return 0, fmt.Errorf("count pending users: %w", err)
 	}
@@ -157,52 +136,47 @@ func CountPendingUsers(ctx context.Context, q Querier) (int64, error) {
 }
 
 // ApproveAllPending approves all pending users and returns the count affected.
-func ApproveAllPending(ctx context.Context, q Querier) (int64, error) {
-	result, err := q.ExecContext(ctx, "UPDATE users SET approved = 1 WHERE approved = 0 AND id > 0")
-	if err != nil {
-		return 0, fmt.Errorf("approve all pending: %w", err)
+func (r *Repository) ApproveAllPending(ctx context.Context) (int64, error) {
+	result := r.db.WithContext(ctx).Model(&model.User{}).Where("approved = ? AND id >= 1", false).Update("approved", true)
+	if result.Error != nil {
+		return 0, fmt.Errorf("approve all pending: %w", result.Error)
 	}
-	n, err := result.RowsAffected()
-	if err != nil {
-		return 0, fmt.Errorf("approve all pending rows affected: %w", err)
-	}
-	return n, nil
+	return result.RowsAffected, nil
 }
 
 // UpdateUserDisabled toggles the disabled flag for a user.
-func UpdateUserDisabled(ctx context.Context, q Querier, userID int64, disabled bool) error {
-	_, err := q.ExecContext(ctx, "UPDATE users SET disabled = ? WHERE id = ?", disabled, userID)
-	if err != nil {
+func (r *Repository) UpdateUserDisabled(ctx context.Context, userID int64, disabled bool) error {
+	if err := r.db.WithContext(ctx).Model(&model.User{}).Where("id = ?", userID).Update("disabled", disabled).Error; err != nil {
 		return fmt.Errorf("update user disabled: %w", err)
 	}
 	return nil
 }
 
 // AcceptTOS records that the user accepted the Terms of Service.
-func AcceptTOS(ctx context.Context, q Querier, userID int64) error {
-	_, err := q.ExecContext(ctx, "UPDATE users SET tos_accepted_at = datetime('now') WHERE id = ?", userID)
-	if err != nil {
+func (r *Repository) AcceptTOS(ctx context.Context, userID int64) error {
+	now := time.Now().UTC()
+	if err := r.db.WithContext(ctx).Model(&model.User{}).Where("id = ?", userID).Update("tos_accepted_at", now).Error; err != nil {
 		return fmt.Errorf("accept tos: %w", err)
 	}
 	return nil
 }
 
 // AcceptPrivacy records that the user accepted the Privacy Policy.
-func AcceptPrivacy(ctx context.Context, q Querier, userID int64) error {
-	_, err := q.ExecContext(ctx, "UPDATE users SET privacy_accepted_at = datetime('now') WHERE id = ?", userID)
-	if err != nil {
+func (r *Repository) AcceptPrivacy(ctx context.Context, userID int64) error {
+	now := time.Now().UTC()
+	if err := r.db.WithContext(ctx).Model(&model.User{}).Where("id = ?", userID).Update("privacy_accepted_at", now).Error; err != nil {
 		return fmt.Errorf("accept privacy: %w", err)
 	}
 	return nil
 }
 
 // UpdateUserLastLogin sets the last_login_at and last_login_ip columns for a user.
-func UpdateUserLastLogin(ctx context.Context, q Querier, userID int64, ip string) error {
-	_, err := q.ExecContext(ctx,
-		"UPDATE users SET last_login_at = datetime('now'), last_login_ip = ? WHERE id = ?",
-		ip, userID,
-	)
-	if err != nil {
+func (r *Repository) UpdateUserLastLogin(ctx context.Context, userID int64, ip string) error {
+	now := time.Now().UTC()
+	if err := r.db.WithContext(ctx).Model(&model.User{}).Where("id = ?", userID).Updates(map[string]any{
+		"last_login_at": now,
+		"last_login_ip": ip,
+	}).Error; err != nil {
 		return fmt.Errorf("update user last login: %w", err)
 	}
 	return nil
@@ -215,41 +189,32 @@ type TopUserRow struct {
 }
 
 // TopUsersByStorage returns the top N users by total storage used.
-func TopUsersByStorage(ctx context.Context, q Querier, limit int) ([]*TopUserRow, error) {
-	rows, err := q.QueryContext(ctx,
-		`SELECT u.username, COALESCE(SUM(n.content_length), 0) AS used
-		 FROM users u
-		 LEFT JOIN nodes n ON n.user_id = u.id AND n.is_folder = 0
-		 WHERE u.id > 0
-		 GROUP BY u.id
-		 ORDER BY used DESC
-		 LIMIT ?`,
-		limit,
-	)
+func (r *Repository) TopUsersByStorage(ctx context.Context, limit int) ([]*TopUserRow, error) {
+	var results []*TopUserRow
+	err := r.db.WithContext(ctx).
+		Table("users u").
+		Select("u.username, COALESCE(SUM(n.content_length), 0) AS storage_used").
+		Joins("LEFT JOIN nodes n ON n.user_id = u.id AND n.is_folder = ?", false).
+		Where("u.id >= 1").
+		Group("u.id").
+		Order("storage_used DESC").
+		Limit(limit).
+		Scan(&results).Error
 	if err != nil {
 		return nil, fmt.Errorf("top users by storage: %w", err)
 	}
-	defer rows.Close()
-
-	var result []*TopUserRow
-	for rows.Next() {
-		var r TopUserRow
-		if err := rows.Scan(&r.Username, &r.StorageUsed); err != nil {
-			return nil, fmt.Errorf("scan top user: %w", err)
-		}
-		result = append(result, &r)
-	}
-	return result, rows.Err()
+	return results, nil
 }
 
 // GetTotalStorageUsed returns the total content_length across all users' non-folder nodes.
-func GetTotalStorageUsed(ctx context.Context, q Querier) (int64, error) {
-	var total int64
-	err := q.QueryRowContext(ctx,
-		"SELECT COALESCE(SUM(content_length), 0) FROM nodes WHERE is_folder = 0",
-	).Scan(&total)
+func (r *Repository) GetTotalStorageUsed(ctx context.Context) (int64, error) {
+	var total *int64
+	err := r.db.WithContext(ctx).Model(&model.Node{}).Where("is_folder = ?", false).Select("COALESCE(SUM(content_length), 0)").Scan(&total).Error
 	if err != nil {
 		return 0, fmt.Errorf("get total storage used: %w", err)
 	}
-	return total, nil
+	if total == nil {
+		return 0, nil
+	}
+	return *total, nil
 }

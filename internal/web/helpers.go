@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"strings"
 
-	"gosilo/internal/db"
 	"gosilo/internal/ui"
 )
 
@@ -93,7 +92,7 @@ func (d *UIDeps) adminPageData(w http.ResponseWriter, r *http.Request, title str
 	pd := d.pageData(w, r, title, content)
 	pd.ActiveAdminNav = nav
 	pd.JSONApiEnabled = d.Settings.Load().JSONApi == "admin"
-	pd.OpenAbuseReports, _ = db.CountOpenAbuseReports(r.Context(), d.DB)
+	pd.OpenAbuseReports, _ = d.Repo.CountOpenAbuseReports(r.Context())
 	return pd
 }
 

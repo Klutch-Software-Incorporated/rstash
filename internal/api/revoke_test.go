@@ -16,35 +16,35 @@ import (
 func revokeTestServer(t *testing.T) (*httptest.Server, *revokeTestEnv) {
 	t.Helper()
 
-	database, err := db.Open(":memory:")
+	repo, err := db.OpenRepository("sqlite::memory:")
 	if err != nil {
 		t.Fatalf("open db: %v", err)
 	}
-	t.Cleanup(func() { database.Close() })
+	t.Cleanup(func() { repo.Close() })
 
-	handler := api.CORS(api.OAuthRevoke(database))
+	handler := api.CORS(api.OAuthRevoke(repo))
 	ts := httptest.NewServer(handler)
 	t.Cleanup(ts.Close)
 
 	ctx := context.Background()
-	user, err := db.CreateUser(ctx, database, "revokeuser", "password", false, true)
+	user, err := repo.CreateUser(ctx, "revokeuser", "password", false, true)
 	if err != nil {
 		t.Fatalf("create user: %v", err)
 	}
 
-	_, err = db.UpsertOAuthClient(ctx, database, "https://app.example.com", "https://app.example.com/callback")
+	_, err = repo.UpsertOAuthClient(ctx, "https://app.example.com", "https://app.example.com/callback")
 	if err != nil {
 		t.Fatalf("upsert client: %v", err)
 	}
 
 	return ts, &revokeTestEnv{
-		DB:     database,
+		Repo:   repo,
 		UserID: user.ID,
 	}
 }
 
 type revokeTestEnv struct {
-	DB     db.Querier
+	Repo   *db.Repository
 	UserID int64
 }
 
@@ -54,13 +54,13 @@ func TestRevoke_AccessToken(t *testing.T) {
 	ctx := context.Background()
 
 	// Create an access token.
-	token, err := db.CreateOAuthToken(ctx, env.DB, env.UserID, "https://app.example.com", []string{"*:rw"}, 24*time.Hour)
+	token, err := env.Repo.CreateOAuthToken(ctx, env.UserID, "https://app.example.com", []string{"*:rw"}, 24*time.Hour)
 	if err != nil {
 		t.Fatalf("create token: %v", err)
 	}
 
 	// Also create a linked refresh token.
-	_, err = db.CreateRefreshToken(ctx, env.DB, env.UserID, "https://app.example.com", []string{"*:rw"}, token.Token, 90*24*time.Hour)
+	_, err = env.Repo.CreateRefreshToken(ctx, env.UserID, "https://app.example.com", []string{"*:rw"}, token.Token, 90*24*time.Hour)
 	if err != nil {
 		t.Fatalf("create refresh token: %v", err)
 	}
@@ -78,7 +78,7 @@ func TestRevoke_AccessToken(t *testing.T) {
 	}
 
 	// Verify access token is deleted.
-	got, _ := db.GetOAuthToken(ctx, env.DB, token.Token)
+	got, _ := env.Repo.GetOAuthToken(ctx, token.Token)
 	if got != nil {
 		t.Fatal("expected access token to be deleted")
 	}
@@ -90,12 +90,12 @@ func TestRevoke_RefreshToken(t *testing.T) {
 	ctx := context.Background()
 
 	// Create an access token and linked refresh token.
-	accessToken, err := db.CreateOAuthToken(ctx, env.DB, env.UserID, "https://app.example.com", []string{"*:rw"}, 24*time.Hour)
+	accessToken, err := env.Repo.CreateOAuthToken(ctx, env.UserID, "https://app.example.com", []string{"*:rw"}, 24*time.Hour)
 	if err != nil {
 		t.Fatalf("create token: %v", err)
 	}
 
-	rt, err := db.CreateRefreshToken(ctx, env.DB, env.UserID, "https://app.example.com", []string{"*:rw"}, accessToken.Token, 90*24*time.Hour)
+	rt, err := env.Repo.CreateRefreshToken(ctx, env.UserID, "https://app.example.com", []string{"*:rw"}, accessToken.Token, 90*24*time.Hour)
 	if err != nil {
 		t.Fatalf("create refresh token: %v", err)
 	}
@@ -116,12 +116,12 @@ func TestRevoke_RefreshToken(t *testing.T) {
 	}
 
 	// Verify both tokens are deleted (cascade).
-	gotRT, _ := db.GetRefreshToken(ctx, env.DB, rt.Token)
+	gotRT, _ := env.Repo.GetRefreshToken(ctx, rt.Token)
 	if gotRT != nil {
 		t.Fatal("expected refresh token to be deleted")
 	}
 
-	gotAT, _ := db.GetOAuthToken(ctx, env.DB, accessToken.Token)
+	gotAT, _ := env.Repo.GetOAuthToken(ctx, accessToken.Token)
 	if gotAT != nil {
 		t.Fatal("expected access token to be cascade-deleted")
 	}

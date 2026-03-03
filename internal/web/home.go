@@ -2,7 +2,6 @@ package web
 
 import (
 	"context"
-	"database/sql"
 	"log/slog"
 	"net/http"
 	"sort"
@@ -58,11 +57,11 @@ func (h *homeHandler) Show(w http.ResponseWriter, r *http.Request) {
 	h.deps.Renderer.Render(w, "home", h.deps.pageData(w, r, "Gosilo", nil))
 }
 
-func buildActivityFeed(ctx context.Context, database *sql.DB, userID int64) []*activityEvent {
+func buildActivityFeed(ctx context.Context, repo *db.Repository, userID int64) []*activityEvent {
 	const perSource = 15
 	var events []*activityEvent
 
-	nodes, err := db.GetRecentUserNodes(ctx, database, userID, perSource)
+	nodes, err := repo.GetRecentUserNodes(ctx, userID, perSource)
 	if err != nil {
 		slog.Error("failed to get recent nodes", "error", err)
 	} else {
@@ -70,12 +69,12 @@ func buildActivityFeed(ctx context.Context, database *sql.DB, userID int64) []*a
 			events = append(events, &activityEvent{
 				Type:      "file_update",
 				Summary:   "Updated " + n.Path,
-				Timestamp: n.UpdatedAt,
+				Timestamp: n.UpdatedAt.Format("2006-01-02 15:04:05"),
 			})
 		}
 	}
 
-	sessions, err := db.GetRecentUserSessions(ctx, database, userID, perSource)
+	sessions, err := repo.GetRecentUserSessions(ctx, userID, perSource)
 	if err != nil {
 		slog.Error("failed to get recent sessions", "error", err)
 	} else {
@@ -87,12 +86,12 @@ func buildActivityFeed(ctx context.Context, database *sql.DB, userID int64) []*a
 			events = append(events, &activityEvent{
 				Type:      "login",
 				Summary:   summary,
-				Timestamp: s.CreatedAt,
+				Timestamp: s.CreatedAt.Format("2006-01-02 15:04:05"),
 			})
 		}
 	}
 
-	tokens, err := db.GetRecentUserOAuthTokens(ctx, database, userID, perSource)
+	tokens, err := repo.GetRecentUserOAuthTokens(ctx, userID, perSource)
 	if err != nil {
 		slog.Error("failed to get recent oauth tokens", "error", err)
 	} else {
@@ -100,7 +99,7 @@ func buildActivityFeed(ctx context.Context, database *sql.DB, userID int64) []*a
 			events = append(events, &activityEvent{
 				Type:      "oauth_grant",
 				Summary:   "Authorized app: " + t.ClientID,
-				Timestamp: t.CreatedAt,
+				Timestamp: t.CreatedAt.Format("2006-01-02 15:04:05"),
 			})
 		}
 	}

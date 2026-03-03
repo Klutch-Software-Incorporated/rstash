@@ -12,22 +12,23 @@ import (
 // actor for CLI operations and system events.
 const SystemActorID int64 = 0
 
-// Audit is a convenience wrapper that logs an audit entry and swallows errors
-// (logging them instead). Use for fire-and-forget audit calls.
-func Audit(ctx context.Context, q Querier, actorID int64, action, targetType, targetID, details string) {
-	if err := InsertAuditEntry(ctx, q, actorID, action, targetType, targetID, details); err != nil {
+// Audit is a convenience wrapper that logs an audit entry and swallows errors.
+func (r *Repository) Audit(ctx context.Context, actorID int64, action, targetType, targetID, details string) {
+	if err := r.InsertAuditEntry(ctx, actorID, action, targetType, targetID, details); err != nil {
 		slog.Error("failed to write audit log", "error", err, "action", action)
 	}
 }
 
 // InsertAuditEntry records an audit log entry.
-func InsertAuditEntry(ctx context.Context, q Querier, actorID int64, action, targetType, targetID, details string) error {
-	_, err := q.ExecContext(ctx,
-		`INSERT INTO audit_log (actor_id, action, target_type, target_id, details)
-		 VALUES (?, ?, ?, ?, ?)`,
-		actorID, action, targetType, targetID, details,
-	)
-	if err != nil {
+func (r *Repository) InsertAuditEntry(ctx context.Context, actorID int64, action, targetType, targetID, details string) error {
+	entry := model.AuditEntry{
+		ActorID:    actorID,
+		Action:     action,
+		TargetType: targetType,
+		TargetID:   targetID,
+		Details:    details,
+	}
+	if err := r.db.WithContext(ctx).Create(&entry).Error; err != nil {
 		return fmt.Errorf("insert audit entry: %w", err)
 	}
 	return nil
@@ -40,66 +41,46 @@ type AuditRow struct {
 }
 
 // ListAuditEntries returns recent audit entries joined with actor username.
-func ListAuditEntries(ctx context.Context, q Querier, limit, offset int) ([]*AuditRow, error) {
-	rows, err := q.QueryContext(ctx,
-		`SELECT a.id, a.actor_id, COALESCE(u.username, '_system'), a.action, a.target_type, a.target_id,
-		        COALESCE(a.details, ''), a.created_at
-		 FROM audit_log a
-		 LEFT JOIN users u ON u.id = a.actor_id
-		 ORDER BY a.created_at DESC
-		 LIMIT ? OFFSET ?`,
-		limit, offset,
-	)
-	if err != nil {
+func (r *Repository) ListAuditEntries(ctx context.Context, limit, offset int) ([]*AuditRow, error) {
+	var entries []*AuditRow
+	q := r.db.WithContext(ctx).
+		Table("audit_log a").
+		Select("a.id, a.actor_id, COALESCE(u.username, '_system') AS actor_username, a.action, a.target_type, a.target_id, COALESCE(a.details, '') AS details, a.created_at").
+		Joins("LEFT JOIN users u ON u.id = a.actor_id").
+		Order("a.created_at DESC")
+	if limit > 0 {
+		q = q.Limit(limit)
+	}
+	if offset > 0 {
+		q = q.Offset(offset)
+	}
+	if err := q.Scan(&entries).Error; err != nil {
 		return nil, fmt.Errorf("list audit entries: %w", err)
 	}
-	defer rows.Close()
-
-	var entries []*AuditRow
-	for rows.Next() {
-		var e AuditRow
-		if err := rows.Scan(&e.ID, &e.ActorID, &e.ActorUsername, &e.Action,
-			&e.TargetType, &e.TargetID, &e.Details, &e.CreatedAt); err != nil {
-			return nil, fmt.Errorf("scan audit entry: %w", err)
-		}
-		entries = append(entries, &e)
-	}
-	return entries, rows.Err()
+	return entries, nil
 }
 
 // ListAuditEntriesByTarget returns recent audit entries for a specific target.
-func ListAuditEntriesByTarget(ctx context.Context, q Querier, targetType, targetID string, limit int) ([]*AuditRow, error) {
-	rows, err := q.QueryContext(ctx,
-		`SELECT a.id, a.actor_id, COALESCE(u.username, '_system'), a.action, a.target_type, a.target_id,
-		        COALESCE(a.details, ''), a.created_at
-		 FROM audit_log a
-		 LEFT JOIN users u ON u.id = a.actor_id
-		 WHERE a.target_type = ? AND a.target_id = ?
-		 ORDER BY a.created_at DESC
-		 LIMIT ?`,
-		targetType, targetID, limit,
-	)
+func (r *Repository) ListAuditEntriesByTarget(ctx context.Context, targetType, targetID string, limit int) ([]*AuditRow, error) {
+	var entries []*AuditRow
+	err := r.db.WithContext(ctx).
+		Table("audit_log a").
+		Select("a.id, a.actor_id, COALESCE(u.username, '_system') AS actor_username, a.action, a.target_type, a.target_id, COALESCE(a.details, '') AS details, a.created_at").
+		Joins("LEFT JOIN users u ON u.id = a.actor_id").
+		Where("a.target_type = ? AND a.target_id = ?", targetType, targetID).
+		Order("a.created_at DESC").
+		Limit(limit).
+		Scan(&entries).Error
 	if err != nil {
 		return nil, fmt.Errorf("list audit entries by target: %w", err)
 	}
-	defer rows.Close()
-
-	var entries []*AuditRow
-	for rows.Next() {
-		var e AuditRow
-		if err := rows.Scan(&e.ID, &e.ActorID, &e.ActorUsername, &e.Action,
-			&e.TargetType, &e.TargetID, &e.Details, &e.CreatedAt); err != nil {
-			return nil, fmt.Errorf("scan audit entry: %w", err)
-		}
-		entries = append(entries, &e)
-	}
-	return entries, rows.Err()
+	return entries, nil
 }
 
 // CountAuditEntries returns the total number of audit log entries.
-func CountAuditEntries(ctx context.Context, q Querier) (int64, error) {
+func (r *Repository) CountAuditEntries(ctx context.Context) (int64, error) {
 	var count int64
-	err := q.QueryRowContext(ctx, "SELECT COUNT(*) FROM audit_log").Scan(&count)
+	err := r.db.WithContext(ctx).Model(&model.AuditEntry{}).Count(&count).Error
 	if err != nil {
 		return 0, fmt.Errorf("count audit entries: %w", err)
 	}

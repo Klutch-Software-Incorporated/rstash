@@ -3,15 +3,13 @@ package db_test
 import (
 	"context"
 	"testing"
-
-	"gosilo/internal/db"
 )
 
 func TestCreateAbuseReport(t *testing.T) {
 	database := testDB(t)
 	ctx := context.Background()
 
-	report, err := db.CreateAbuseReport(ctx, database, "test@example.com", "/public/bad.txt", "illegal", "bad content", "1.2.3.4")
+	report, err := database.CreateAbuseReport(ctx, "test@example.com", "/public/bad.txt", "illegal", "bad content", "1.2.3.4")
 	if err != nil {
 		t.Fatalf("create abuse report: %v", err)
 	}
@@ -33,12 +31,12 @@ func TestGetAbuseReport(t *testing.T) {
 	database := testDB(t)
 	ctx := context.Background()
 
-	created, err := db.CreateAbuseReport(ctx, database, "a@b.com", "/file.txt", "spam", "", "10.0.0.1")
+	created, err := database.CreateAbuseReport(ctx, "a@b.com", "/file.txt", "spam", "", "10.0.0.1")
 	if err != nil {
 		t.Fatalf("create: %v", err)
 	}
 
-	got, err := db.GetAbuseReport(ctx, database, created.ID)
+	got, err := database.GetAbuseReport(ctx, created.ID)
 	if err != nil {
 		t.Fatalf("get: %v", err)
 	}
@@ -50,7 +48,7 @@ func TestGetAbuseReport(t *testing.T) {
 	}
 
 	// Non-existent ID returns nil.
-	got, err = db.GetAbuseReport(ctx, database, 9999)
+	got, err = database.GetAbuseReport(ctx, 9999)
 	if err != nil {
 		t.Fatalf("get non-existent: %v", err)
 	}
@@ -64,11 +62,11 @@ func TestListAbuseReports(t *testing.T) {
 	ctx := context.Background()
 
 	// Create several reports.
-	_, _ = db.CreateAbuseReport(ctx, database, "a@b.com", "/f1", "spam", "", "1.1.1.1")
-	_, _ = db.CreateAbuseReport(ctx, database, "c@d.com", "/f2", "illegal", "", "2.2.2.2")
+	_, _ = database.CreateAbuseReport(ctx, "a@b.com", "/f1", "spam", "", "1.1.1.1")
+	_, _ = database.CreateAbuseReport(ctx, "c@d.com", "/f2", "illegal", "", "2.2.2.2")
 
 	// List all.
-	all, err := db.ListAbuseReports(ctx, database, "", 50, 0)
+	all, err := database.ListAbuseReports(ctx, "", 50, 0)
 	if err != nil {
 		t.Fatalf("list all: %v", err)
 	}
@@ -77,7 +75,7 @@ func TestListAbuseReports(t *testing.T) {
 	}
 
 	// List by status.
-	open, err := db.ListAbuseReports(ctx, database, "open", 50, 0)
+	open, err := database.ListAbuseReports(ctx, "open", 50, 0)
 	if err != nil {
 		t.Fatalf("list open: %v", err)
 	}
@@ -85,7 +83,7 @@ func TestListAbuseReports(t *testing.T) {
 		t.Fatalf("expected 2 open reports, got %d", len(open))
 	}
 
-	reviewed, err := db.ListAbuseReports(ctx, database, "reviewed", 50, 0)
+	reviewed, err := database.ListAbuseReports(ctx, "reviewed", 50, 0)
 	if err != nil {
 		t.Fatalf("list reviewed: %v", err)
 	}
@@ -98,24 +96,24 @@ func TestUpdateAbuseReportStatus(t *testing.T) {
 	database := testDB(t)
 	ctx := context.Background()
 
-	admin, err := db.CreateUser(ctx, database, "admin", "password", true, true)
+	admin, err := database.CreateUser(ctx, "admin", "password", true, true)
 	if err != nil {
 		t.Fatalf("create admin: %v", err)
 	}
 
-	report, err := db.CreateAbuseReport(ctx, database, "a@b.com", "/bad", "dmca", "copyright", "1.1.1.1")
+	report, err := database.CreateAbuseReport(ctx, "a@b.com", "/bad", "dmca", "copyright", "1.1.1.1")
 	if err != nil {
 		t.Fatalf("create report: %v", err)
 	}
 
 	// Review the report.
-	err = db.UpdateAbuseReportStatus(ctx, database, report.ID, "reviewed", admin.ID, "Looks fine, no action needed.")
+	err = database.UpdateAbuseReportStatus(ctx, report.ID, "reviewed", admin.ID, "Looks fine, no action needed.")
 	if err != nil {
 		t.Fatalf("update status: %v", err)
 	}
 
 	// Verify.
-	got, err := db.GetAbuseReport(ctx, database, report.ID)
+	got, err := database.GetAbuseReport(ctx, report.ID)
 	if err != nil {
 		t.Fatalf("get: %v", err)
 	}
@@ -138,7 +136,7 @@ func TestCountOpenAbuseReports(t *testing.T) {
 	ctx := context.Background()
 
 	// Initially zero.
-	count, err := db.CountOpenAbuseReports(ctx, database)
+	count, err := database.CountOpenAbuseReports(ctx)
 	if err != nil {
 		t.Fatalf("count: %v", err)
 	}
@@ -147,10 +145,10 @@ func TestCountOpenAbuseReports(t *testing.T) {
 	}
 
 	// Create two reports.
-	r1, _ := db.CreateAbuseReport(ctx, database, "a@b.com", "/f1", "spam", "", "1.1.1.1")
-	_, _ = db.CreateAbuseReport(ctx, database, "c@d.com", "/f2", "illegal", "", "2.2.2.2")
+	r1, _ := database.CreateAbuseReport(ctx, "a@b.com", "/f1", "spam", "", "1.1.1.1")
+	_, _ = database.CreateAbuseReport(ctx, "c@d.com", "/f2", "illegal", "", "2.2.2.2")
 
-	count, err = db.CountOpenAbuseReports(ctx, database)
+	count, err = database.CountOpenAbuseReports(ctx)
 	if err != nil {
 		t.Fatalf("count after create: %v", err)
 	}
@@ -159,10 +157,10 @@ func TestCountOpenAbuseReports(t *testing.T) {
 	}
 
 	// Review one — count should drop.
-	admin, _ := db.CreateUser(ctx, database, "admin", "password", true, true)
-	_ = db.UpdateAbuseReportStatus(ctx, database, r1.ID, "reviewed", admin.ID, "ok")
+	admin, _ := database.CreateUser(ctx, "admin", "password", true, true)
+	_ = database.UpdateAbuseReportStatus(ctx, r1.ID, "reviewed", admin.ID, "ok")
 
-	count, err = db.CountOpenAbuseReports(ctx, database)
+	count, err = database.CountOpenAbuseReports(ctx)
 	if err != nil {
 		t.Fatalf("count after review: %v", err)
 	}

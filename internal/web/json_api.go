@@ -12,7 +12,6 @@ import (
 	"gosilo/api"
 	"gosilo/internal/auth"
 	"gosilo/internal/config"
-	"gosilo/internal/db"
 	"gosilo/internal/model"
 )
 
@@ -77,7 +76,7 @@ func (h *jsonApiHandler) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	db.Audit(r.Context(), h.deps.DB, user.ID, "json_api.login", "user", fmt.Sprintf("%d", user.ID), user.Username)
+	h.deps.Repo.Audit(r.Context(), user.ID, "json_api.login", "user", fmt.Sprintf("%d", user.ID), user.Username)
 
 	jsonOK(w, map[string]string{"authToken": sess.Token})
 }
@@ -128,18 +127,28 @@ func (h *jsonApiHandler) UserList(w http.ResponseWriter, r *http.Request) {
 
 	result := make([]userJSON, len(users))
 	for i, u := range users {
-		result[i] = userJSON{
-			ID:                u.ID,
-			Username:          u.Username,
-			IsAdmin:           u.IsAdmin,
-			Disabled:          u.Disabled,
-			Approved:          u.Approved,
-			StorageQuota:      u.StorageQuota,
-			CreatedAt:         u.CreatedAt,
-			LastLoginAt:       u.LastLoginAt,
-			TOSAcceptedAt:     u.TOSAcceptedAt,
-			PrivacyAcceptedAt: u.PrivacyAcceptedAt,
+		uj := userJSON{
+			ID:           u.ID,
+			Username:     u.Username,
+			IsAdmin:      u.IsAdmin,
+			Disabled:     u.Disabled,
+			Approved:     u.Approved,
+			StorageQuota: u.StorageQuota,
+			CreatedAt:    u.CreatedAt.Format("2006-01-02 15:04:05"),
 		}
+		if u.LastLoginAt != nil {
+			s := (*u.LastLoginAt).Format("2006-01-02 15:04:05")
+			uj.LastLoginAt = &s
+		}
+		if u.TOSAcceptedAt != nil {
+			s := (*u.TOSAcceptedAt).Format("2006-01-02 15:04:05")
+			uj.TOSAcceptedAt = &s
+		}
+		if u.PrivacyAcceptedAt != nil {
+			s := (*u.PrivacyAcceptedAt).Format("2006-01-02 15:04:05")
+			uj.PrivacyAcceptedAt = &s
+		}
+		result[i] = uj
 	}
 
 	jsonOK(w, map[string]any{"users": result})
@@ -172,11 +181,11 @@ func (h *jsonApiHandler) UserAdd(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Auto-accept TOS/Privacy for admin-created users.
-	_ = db.AcceptTOS(r.Context(), h.deps.DB, newUser.ID)
-	_ = db.AcceptPrivacy(r.Context(), h.deps.DB, newUser.ID)
+	_ = h.deps.Repo.AcceptTOS(r.Context(), newUser.ID)
+	_ = h.deps.Repo.AcceptPrivacy(r.Context(), newUser.ID)
 
 	actor := currentUserFromContext(r)
-	db.Audit(r.Context(), h.deps.DB, actor.ID, "user.created", "user", fmt.Sprintf("%d", newUser.ID), req.Username)
+	h.deps.Repo.Audit(r.Context(), actor.ID, "user.created", "user", fmt.Sprintf("%d", newUser.ID), req.Username)
 
 	jsonOK(w, map[string]any{
 		"id":       newUser.ID,
@@ -213,7 +222,7 @@ func (h *jsonApiHandler) UserDelete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	db.Audit(r.Context(), h.deps.DB, actor.ID, "user.deleted", "user", fmt.Sprintf("%d", user.ID), user.Username)
+	h.deps.Repo.Audit(r.Context(), actor.ID, "user.deleted", "user", fmt.Sprintf("%d", user.ID), user.Username)
 	jsonOK(w, map[string]string{"status": "deleted"})
 }
 
@@ -249,7 +258,7 @@ func (h *jsonApiHandler) UserPasswd(w http.ResponseWriter, r *http.Request) {
 	}
 
 	actor := currentUserFromContext(r)
-	db.Audit(r.Context(), h.deps.DB, actor.ID, "user.password_changed", "user", fmt.Sprintf("%d", user.ID), user.Username)
+	h.deps.Repo.Audit(r.Context(), actor.ID, "user.password_changed", "user", fmt.Sprintf("%d", user.ID), user.Username)
 	jsonOK(w, map[string]string{"status": "password updated"})
 }
 
@@ -282,7 +291,7 @@ func (h *jsonApiHandler) UserPromote(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	db.Audit(r.Context(), h.deps.DB, actor.ID, "user.admin_toggled", "user", fmt.Sprintf("%d", user.ID), fmt.Sprintf("admin=%v", newAdmin))
+	h.deps.Repo.Audit(r.Context(), actor.ID, "user.admin_toggled", "user", fmt.Sprintf("%d", user.ID), fmt.Sprintf("admin=%v", newAdmin))
 	jsonOK(w, map[string]any{"username": user.Username, "is_admin": newAdmin})
 }
 
@@ -317,11 +326,11 @@ func (h *jsonApiHandler) UserDisable(w http.ResponseWriter, r *http.Request) {
 
 	if newDisabled {
 		h.deps.Auth.TerminateAllSessions(r.Context(), user.ID)
-		_ = db.DeleteOAuthTokensByUserID(r.Context(), h.deps.DB, user.ID)
-		_ = db.DeleteRefreshTokensByUserID(r.Context(), h.deps.DB, user.ID)
-		db.Audit(r.Context(), h.deps.DB, actor.ID, "user.disabled", "user", fmt.Sprintf("%d", user.ID), user.Username)
+		_ = h.deps.Repo.DeleteOAuthTokensByUserID(r.Context(), user.ID)
+		_ = h.deps.Repo.DeleteRefreshTokensByUserID(r.Context(), user.ID)
+		h.deps.Repo.Audit(r.Context(), actor.ID, "user.disabled", "user", fmt.Sprintf("%d", user.ID), user.Username)
 	} else {
-		db.Audit(r.Context(), h.deps.DB, actor.ID, "user.enabled", "user", fmt.Sprintf("%d", user.ID), user.Username)
+		h.deps.Repo.Audit(r.Context(), actor.ID, "user.enabled", "user", fmt.Sprintf("%d", user.ID), user.Username)
 	}
 
 	jsonOK(w, map[string]any{"username": user.Username, "disabled": newDisabled})
@@ -350,7 +359,7 @@ func (h *jsonApiHandler) UserApprove(w http.ResponseWriter, r *http.Request) {
 	}
 
 	actor := currentUserFromContext(r)
-	db.Audit(r.Context(), h.deps.DB, actor.ID, "user.approved", "user", fmt.Sprintf("%d", user.ID), user.Username)
+	h.deps.Repo.Audit(r.Context(), actor.ID, "user.approved", "user", fmt.Sprintf("%d", user.ID), user.Username)
 	jsonOK(w, map[string]any{"username": user.Username, "approved": true})
 }
 
@@ -377,7 +386,7 @@ func (h *jsonApiHandler) UserReject(w http.ResponseWriter, r *http.Request) {
 	}
 
 	actor := currentUserFromContext(r)
-	db.Audit(r.Context(), h.deps.DB, actor.ID, "user.rejected", "user", fmt.Sprintf("%d", user.ID), user.Username)
+	h.deps.Repo.Audit(r.Context(), actor.ID, "user.rejected", "user", fmt.Sprintf("%d", user.ID), user.Username)
 	jsonOK(w, map[string]string{"status": "rejected"})
 }
 
@@ -498,7 +507,7 @@ func (h *jsonApiHandler) ConfigSet(w http.ResponseWriter, r *http.Request) {
 	}
 
 	actor := currentUserFromContext(r)
-	db.Audit(r.Context(), h.deps.DB, actor.ID, "settings.updated", "setting", req.Key, req.Value)
+	h.deps.Repo.Audit(r.Context(), actor.ID, "settings.updated", "setting", req.Key, req.Value)
 	jsonOK(w, map[string]string{"status": "updated"})
 }
 
@@ -524,7 +533,7 @@ func (h *jsonApiHandler) ConfigReset(w http.ResponseWriter, r *http.Request) {
 	}
 
 	actor := currentUserFromContext(r)
-	db.Audit(r.Context(), h.deps.DB, actor.ID, "settings.reset", "setting", req.Key, "reverted to default")
+	h.deps.Repo.Audit(r.Context(), actor.ID, "settings.reset", "setting", req.Key, "reverted to default")
 	jsonOK(w, map[string]string{"status": "reset to default"})
 }
 
@@ -537,7 +546,7 @@ func (h *jsonApiHandler) AuditTail(w http.ResponseWriter, r *http.Request, param
 		n = *params.N
 	}
 
-	entries, err := db.ListAuditEntries(r.Context(), h.deps.DB, n, 0)
+	entries, err := h.deps.Repo.ListAuditEntries(r.Context(), n, 0)
 	if err != nil {
 		slog.Error("json api: failed to list audit entries", "error", err)
 		jsonErr(w, http.StatusInternalServerError, "failed to list audit entries")
@@ -561,7 +570,7 @@ func (h *jsonApiHandler) AuditTail(w http.ResponseWriter, r *http.Request, param
 			TargetType: e.TargetType,
 			TargetID:   e.TargetID,
 			Details:    e.Details,
-			CreatedAt:  e.CreatedAt,
+			CreatedAt:  e.CreatedAt.Format("2006-01-02 15:04:05"),
 		}
 	}
 

@@ -14,7 +14,6 @@ import (
 	"strings"
 
 	"gosilo/internal/config"
-	"gosilo/internal/db"
 	"gosilo/internal/storage"
 	"gosilo/internal/ui"
 )
@@ -76,21 +75,21 @@ func (h *profileHandler) ShowDashboard(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	prefix := urlPrefix(r)
 
-	stats, err := db.GetUserStorageStats(ctx, h.deps.DB, target.ID)
+	stats, err := h.deps.Repo.GetUserStorageStats(ctx, target.ID)
 	if err != nil {
 		slog.Error("failed to get storage stats", "error", err)
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		return
 	}
 
-	tokenCount, err := db.CountUserOAuthTokens(ctx, h.deps.DB, target.ID)
+	tokenCount, err := h.deps.Repo.CountUserOAuthTokens(ctx, target.ID)
 	if err != nil {
 		slog.Error("failed to count oauth tokens", "error", err)
 	}
 
 	sessCount, _ := h.deps.Auth.CountUserSessions(ctx, target.ID)
 
-	recentNodes, _ := db.GetRecentUserNodes(ctx, h.deps.DB, target.ID, 10)
+	recentNodes, _ := h.deps.Repo.GetRecentUserNodes(ctx, target.ID, 10)
 	fileRows := make([]*recentFileRow, len(recentNodes))
 	for i, n := range recentNodes {
 		fileRows[i] = &recentFileRow{
@@ -99,11 +98,11 @@ func (h *profileHandler) ShowDashboard(w http.ResponseWriter, r *http.Request) {
 			BrowseURL:   prefix + "/files" + path.Dir(n.Path) + "/#file-" + url.PathEscape(path.Base(n.Path)),
 			Size:        formatBytes(n.ContentLength),
 			ContentType: n.ContentType,
-			UpdatedAt:   n.UpdatedAt,
+			UpdatedAt:   n.UpdatedAt.Format("2006-01-02 15:04:05"),
 		}
 	}
 
-	largestNodes, _ := db.GetLargestUserNodes(ctx, h.deps.DB, target.ID, 10)
+	largestNodes, _ := h.deps.Repo.GetLargestUserNodes(ctx, target.ID, 10)
 	largestRows := make([]*recentFileRow, len(largestNodes))
 	for i, n := range largestNodes {
 		largestRows[i] = &recentFileRow{
@@ -112,13 +111,13 @@ func (h *profileHandler) ShowDashboard(w http.ResponseWriter, r *http.Request) {
 			BrowseURL:   prefix + "/files" + path.Dir(n.Path) + "/#file-" + url.PathEscape(path.Base(n.Path)),
 			Size:        formatBytes(n.ContentLength),
 			ContentType: n.ContentType,
-			UpdatedAt:   n.UpdatedAt,
+			UpdatedAt:   n.UpdatedAt.Format("2006-01-02 15:04:05"),
 		}
 	}
 
-	activity := buildActivityFeed(ctx, h.deps.DB, target.ID)
+	activity := buildActivityFeed(ctx, h.deps.Repo, target.ID)
 
-	oauthTokens, err := db.ListOAuthTokensByUserID(ctx, h.deps.DB, target.ID)
+	oauthTokens, err := h.deps.Repo.ListOAuthTokensByUserID(ctx, target.ID)
 	if err != nil {
 		slog.Error("failed to list oauth tokens", "error", err)
 		oauthTokens = nil
@@ -129,8 +128,8 @@ func (h *profileHandler) ShowDashboard(w http.ResponseWriter, r *http.Request) {
 			TokenPrefix: t.Token[:8] + "...",
 			TokenFull:   t.Token,
 			ClientID:    t.ClientID,
-			Scopes:      strings.Join(t.Scopes, ", "),
-			CreatedAt:   t.CreatedAt,
+			Scopes:      strings.ReplaceAll(t.Scopes, " ", ", "),
+			CreatedAt:   t.CreatedAt.Format("2006-01-02 15:04:05"),
 		}
 	}
 
@@ -180,7 +179,7 @@ func (h *profileHandler) ShowDashboard(w http.ResponseWriter, r *http.Request) {
 	// Admin viewing another user: add extra detail.
 	if !isSelf && CurrentUser(r).IsAdmin {
 		idStr := strconv.FormatInt(target.ID, 10)
-		auditEntries, _ := db.ListAuditEntriesByTarget(ctx, h.deps.DB, "user", idStr, 25)
+		auditEntries, _ := h.deps.Repo.ListAuditEntriesByTarget(ctx, "user", idStr, 25)
 		aRows := make([]*auditRow, len(auditEntries))
 		for i, e := range auditEntries {
 			aRows[i] = &auditRow{
@@ -188,8 +187,8 @@ func (h *profileHandler) ShowDashboard(w http.ResponseWriter, r *http.Request) {
 				Action:       e.Action,
 				TargetType:   e.TargetType,
 				TargetID:     e.TargetID,
-				Details:       e.Details,
-				CreatedAt:    e.CreatedAt,
+				Details:      e.Details,
+				CreatedAt:    e.CreatedAt.Format("2006-01-02 15:04:05"),
 			}
 		}
 
@@ -199,19 +198,19 @@ func (h *profileHandler) ShowDashboard(w http.ResponseWriter, r *http.Request) {
 			IsAdmin:   target.IsAdmin,
 			Disabled:  target.Disabled,
 			Approved:  target.Approved,
-			CreatedAt: target.CreatedAt,
+			CreatedAt: target.CreatedAt.Format("2006-01-02 15:04:05"),
 		}
 		if target.LastLoginAt != nil {
-			pt.LastLoginAt = *target.LastLoginAt
+			pt.LastLoginAt = (*target.LastLoginAt).Format("2006-01-02 15:04:05")
 		}
 		if target.LastLoginIP != nil {
 			pt.LastLoginIP = *target.LastLoginIP
 		}
 		if target.TOSAcceptedAt != nil {
-			pt.TOSAcceptedAt = *target.TOSAcceptedAt
+			pt.TOSAcceptedAt = (*target.TOSAcceptedAt).Format("2006-01-02 15:04:05")
 		}
 		if target.PrivacyAcceptedAt != nil {
-			pt.PrivacyAcceptedAt = *target.PrivacyAcceptedAt
+			pt.PrivacyAcceptedAt = (*target.PrivacyAcceptedAt).Format("2006-01-02 15:04:05")
 		}
 		pt.StorageUsed = hs.StorageUsed
 		pt.FileCount = stats.FileCount
@@ -251,7 +250,7 @@ func (h *profileHandler) ShowSettings(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	prefix := urlPrefix(r)
 
-	stats, err := db.GetUserStorageStats(ctx, h.deps.DB, target.ID)
+	stats, err := h.deps.Repo.GetUserStorageStats(ctx, target.ID)
 	if err != nil {
 		slog.Error("failed to get storage stats", "error", err)
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
@@ -280,14 +279,14 @@ func (h *profileHandler) ShowSettings(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	tokenCount, err := db.CountUserOAuthTokens(ctx, h.deps.DB, target.ID)
+	tokenCount, err := h.deps.Repo.CountUserOAuthTokens(ctx, target.ID)
 	if err != nil {
 		slog.Error("failed to count oauth tokens", "error", err)
 	}
 	hs.OAuthApps = tokenCount
 
 	// OAuth tokens.
-	oauthTokens, err := db.ListOAuthTokensByUserID(ctx, h.deps.DB, target.ID)
+	oauthTokens, err := h.deps.Repo.ListOAuthTokensByUserID(ctx, target.ID)
 	if err != nil {
 		slog.Error("failed to list oauth tokens", "error", err)
 		oauthTokens = nil
@@ -298,8 +297,8 @@ func (h *profileHandler) ShowSettings(w http.ResponseWriter, r *http.Request) {
 			TokenPrefix: t.Token[:8] + "...",
 			TokenFull:   t.Token,
 			ClientID:    t.ClientID,
-			Scopes:      strings.Join(t.Scopes, ", "),
-			CreatedAt:   t.CreatedAt,
+			Scopes:      strings.ReplaceAll(t.Scopes, " ", ", "),
+			CreatedAt:   t.CreatedAt.Format("2006-01-02 15:04:05"),
 		}
 	}
 
@@ -314,8 +313,8 @@ func (h *profileHandler) ShowSettings(w http.ResponseWriter, r *http.Request) {
 		sessRows[i] = &sessionRow{
 			TokenPrefix: s.Token[:8] + "...",
 			TokenFull:   s.Token,
-			CreatedAt:   s.CreatedAt,
-			ExpiresAt:   s.ExpiresAt,
+			CreatedAt:   s.CreatedAt.Format("2006-01-02 15:04:05"),
+			ExpiresAt:   s.ExpiresAt.Format("2006-01-02 15:04:05"),
 			IsCurrent:   isSelf && sess != nil && s.Token == sess.Token,
 		}
 	}
@@ -329,7 +328,7 @@ func (h *profileHandler) ShowSettings(w http.ResponseWriter, r *http.Request) {
 		BaseURL:   h.deps.Config.BaseURL,
 		Host:      host,
 		Username:  target.Username,
-		CreatedAt: target.CreatedAt,
+		CreatedAt: target.CreatedAt.Format("2006-01-02 15:04:05"),
 		Tokens:    tokenRows,
 		Sessions:  sessRows,
 		QuotaMode: snap.QuotaMode,
@@ -346,19 +345,19 @@ func (h *profileHandler) ShowSettings(w http.ResponseWriter, r *http.Request) {
 			IsAdmin:   target.IsAdmin,
 			Disabled:  target.Disabled,
 			Approved:  target.Approved,
-			CreatedAt: target.CreatedAt,
+			CreatedAt: target.CreatedAt.Format("2006-01-02 15:04:05"),
 		}
 		if target.LastLoginAt != nil {
-			pt.LastLoginAt = *target.LastLoginAt
+			pt.LastLoginAt = (*target.LastLoginAt).Format("2006-01-02 15:04:05")
 		}
 		if target.LastLoginIP != nil {
 			pt.LastLoginIP = *target.LastLoginIP
 		}
 		if target.TOSAcceptedAt != nil {
-			pt.TOSAcceptedAt = *target.TOSAcceptedAt
+			pt.TOSAcceptedAt = (*target.TOSAcceptedAt).Format("2006-01-02 15:04:05")
 		}
 		if target.PrivacyAcceptedAt != nil {
-			pt.PrivacyAcceptedAt = *target.PrivacyAcceptedAt
+			pt.PrivacyAcceptedAt = (*target.PrivacyAcceptedAt).Format("2006-01-02 15:04:05")
 		}
 		pt.StorageUsed = hs.StorageUsed
 		pt.FileCount = stats.FileCount
@@ -423,7 +422,7 @@ func (h *profileHandler) browseFolder(w http.ResponseWriter, r *http.Request, us
 			ETag:      item.ETag,
 		}
 		if isFolder {
-			subtreeSize, err := db.GetSubtreeSize(r.Context(), h.deps.DB, userID, storagePath+name)
+			subtreeSize, err := h.deps.Repo.GetSubtreeSize(r.Context(), userID, storagePath+name)
 			if err != nil {
 				slog.Error("failed to get subtree size", "error", err, "path", storagePath+name)
 			} else {
@@ -496,7 +495,7 @@ func (h *profileHandler) SearchFiles(w http.ResponseWriter, r *http.Request) {
 	var results []*searchResultRow
 
 	if query != "" {
-		nodes, err := db.SearchUserNodes(r.Context(), h.deps.DB, target.ID, query, 50)
+		nodes, err := h.deps.Repo.SearchUserNodes(r.Context(), target.ID, query, 50)
 		if err != nil {
 			slog.Error("failed to search nodes", "error", err)
 		} else {
@@ -790,7 +789,7 @@ func (h *profileHandler) RevokeToken(w http.ResponseWriter, r *http.Request) {
 	prefix := urlPrefix(r)
 	token := r.PathValue("token")
 
-	t, err := db.GetOAuthToken(r.Context(), h.deps.DB, token)
+	t, err := h.deps.Repo.GetOAuthToken(r.Context(), token)
 	if err != nil {
 		slog.Error("failed to get oauth token", "error", err)
 		ui.SetFlashError(w, "Failed to revoke token.")
@@ -803,13 +802,13 @@ func (h *profileHandler) RevokeToken(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := db.DeleteOAuthToken(r.Context(), h.deps.DB, token); err != nil {
+	if err := h.deps.Repo.DeleteOAuthToken(r.Context(), token); err != nil {
 		slog.Error("failed to revoke oauth token", "error", err)
 		ui.SetFlashError(w, "Failed to revoke token.")
 		http.Redirect(w, r, prefix+"/settings", http.StatusSeeOther)
 		return
 	}
-	_ = db.DeleteRefreshTokenByAccessToken(r.Context(), h.deps.DB, token)
+	_ = h.deps.Repo.DeleteRefreshTokenByAccessToken(r.Context(), token)
 
 	ui.SetFlash(w, "Token revoked.")
 	http.Redirect(w, r, prefix+"/settings", http.StatusSeeOther)
@@ -919,8 +918,8 @@ func (h *profileHandler) ToggleDisabled(w http.ResponseWriter, r *http.Request) 
 		if err := h.deps.Auth.TerminateAllSessions(r.Context(), target.ID); err != nil {
 			slog.Error("failed to terminate sessions on disable", "error", err)
 		}
-		_ = db.DeleteOAuthTokensByUserID(r.Context(), h.deps.DB, target.ID)
-		_ = db.DeleteRefreshTokensByUserID(r.Context(), h.deps.DB, target.ID)
+		_ = h.deps.Repo.DeleteOAuthTokensByUserID(r.Context(), target.ID)
+		_ = h.deps.Repo.DeleteRefreshTokensByUserID(r.Context(), target.ID)
 		h.audit(r, "user.disabled", "user", idStr, target.Username)
 		ui.SetFlash(w, fmt.Sprintf("%s has been disabled.", target.Username))
 	} else {
@@ -993,7 +992,7 @@ func (h *profileHandler) SetQuota(w http.ResponseWriter, r *http.Request) {
 		quotaBytes = parsed
 	}
 
-	if err := db.UpdateUserQuota(r.Context(), h.deps.DB, target.ID, quotaBytes); err != nil {
+	if err := h.deps.Repo.UpdateUserQuota(r.Context(), target.ID, quotaBytes); err != nil {
 		slog.Error("failed to update user quota", "error", err)
 		ui.SetFlashError(w, "Failed to update quota.")
 		http.Redirect(w, r, prefix+"/settings", http.StatusSeeOther)
@@ -1016,7 +1015,7 @@ func (h *profileHandler) audit(r *http.Request, action, targetType, targetID, de
 	if user == nil {
 		return
 	}
-	if err := db.InsertAuditEntry(r.Context(), h.deps.DB, user.ID, action, targetType, targetID, details); err != nil {
+	if err := h.deps.Repo.InsertAuditEntry(r.Context(), user.ID, action, targetType, targetID, details); err != nil {
 		slog.Error("failed to write audit log", "error", err, "action", action)
 	}
 }

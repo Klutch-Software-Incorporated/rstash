@@ -2,7 +2,6 @@ package cli
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -84,9 +83,9 @@ func init() {
 	rootCmd.AddCommand(configCmd)
 }
 
-func openSettings() (*settings.Settings, *sql.DB, func(), error) {
+func openSettings() (*settings.Settings, *db.Repository, func(), error) {
 	dsn := resolvedDBDSN("sqlite:gosilo.db")
-	database, err := db.Open(dsn)
+	repo, err := db.OpenRepository(dsn)
 	if err != nil {
 		return nil, nil, nil, &SystemError{fmt.Errorf("open database: %w", err)}
 	}
@@ -94,8 +93,8 @@ func openSettings() (*settings.Settings, *sql.DB, func(), error) {
 	if dbFlag != "" {
 		cfg.DatabaseDSN = dbFlag
 	}
-	s := settings.New(database, cfg)
-	return s, database, func() { database.Close() }, nil
+	s := settings.New(repo, cfg)
+	return s, repo, func() { repo.Close() }, nil
 }
 
 func runConfigList(cmd *cobra.Command, args []string) error {
@@ -176,7 +175,7 @@ func runConfigGet(cmd *cobra.Command, args []string) error {
 func runConfigSet(cmd *cobra.Command, args []string) error {
 	key, value := args[0], args[1]
 
-	s, database, cleanup, err := openSettings()
+	s, repo, cleanup, err := openSettings()
 	if err != nil {
 		return err
 	}
@@ -187,12 +186,12 @@ func runConfigSet(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("set %s: %w", key, err)
 	}
 
-	db.Audit(ctx, database, db.SystemActorID, "settings.updated", "setting", key, value)
+	repo.Audit(ctx, db.SystemActorID, "settings.updated", "setting", key, value)
 	fmt.Fprintf(os.Stderr, "Set %s = %s\n", key, value)
 
 	// Auto-approve pending users when switching to "open" registration mode.
 	if key == "registration_mode" && value == "open" {
-		n, _ := db.ApproveAllPending(ctx, database)
+		n, _ := repo.ApproveAllPending(ctx)
 		if n > 0 {
 			fmt.Fprintf(os.Stderr, "Auto-approved %d pending user(s).\n", n)
 		}
@@ -204,7 +203,7 @@ func runConfigSet(cmd *cobra.Command, args []string) error {
 func runConfigReset(cmd *cobra.Command, args []string) error {
 	key := args[0]
 
-	s, database, cleanup, err := openSettings()
+	s, repo, cleanup, err := openSettings()
 	if err != nil {
 		return err
 	}
@@ -215,7 +214,7 @@ func runConfigReset(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("reset %s: %w", key, err)
 	}
 
-	db.Audit(ctx, database, db.SystemActorID, "settings.reset", "setting", key, "reverted to default")
+	repo.Audit(ctx, db.SystemActorID, "settings.reset", "setting", key, "reverted to default")
 	fmt.Fprintf(os.Stderr, "Reset %s to default.\n", key)
 	return nil
 }

@@ -104,11 +104,11 @@ func runInit(cmd *cobra.Command, args []string) error {
 	}
 
 	// Open (creates the database + runs migrations).
-	database, err := db.Open(dsn)
+	repo, err := db.OpenRepository(dsn)
 	if err != nil {
 		return &SystemError{fmt.Errorf("create database: %w", err)}
 	}
-	defer database.Close()
+	defer repo.Close()
 
 	fmt.Fprintf(os.Stderr, "Database created at %s\n\n", dsn)
 
@@ -143,7 +143,7 @@ func runInit(cmd *cobra.Command, args []string) error {
 	}
 
 	// Create admin user.
-	localAuth := auth.NewLocalService(database)
+	localAuth := auth.NewLocalService(repo)
 	_, err = localAuth.CreateUser(context.Background(), username, password, true, true)
 	if err != nil {
 		return fmt.Errorf("create admin user: %w", err)
@@ -155,7 +155,7 @@ func runInit(cmd *cobra.Command, args []string) error {
 	if initProfile != "" {
 		overrides, _ := profileSettings(initProfile)
 		cfg := config.Load()
-		svc := settings.New(database, cfg)
+		svc := settings.New(repo, cfg)
 		ctx := context.Background()
 		for k, v := range overrides {
 			if err := svc.Set(ctx, k, v); err != nil {

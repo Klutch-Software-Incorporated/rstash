@@ -6,7 +6,6 @@ import (
 	"net/url"
 	"strings"
 
-	"gosilo/internal/db"
 	"gosilo/internal/ui"
 )
 
@@ -56,7 +55,7 @@ func (h *settingsHandler) Show(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
 	// Storage stats.
-	stats, err := db.GetUserStorageStats(ctx, h.deps.DB, user.ID)
+	stats, err := h.deps.Repo.GetUserStorageStats(ctx, user.ID)
 	if err != nil {
 		slog.Error("failed to get storage stats", "error", err)
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
@@ -86,7 +85,7 @@ func (h *settingsHandler) Show(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// OAuth tokens.
-	oauthTokens, err := db.ListOAuthTokensByUserID(ctx, h.deps.DB, user.ID)
+	oauthTokens, err := h.deps.Repo.ListOAuthTokensByUserID(ctx, user.ID)
 	if err != nil {
 		slog.Error("failed to list oauth tokens", "error", err)
 		oauthTokens = nil
@@ -97,8 +96,8 @@ func (h *settingsHandler) Show(w http.ResponseWriter, r *http.Request) {
 			TokenPrefix: t.Token[:8] + "...",
 			TokenFull:   t.Token,
 			ClientID:    t.ClientID,
-			Scopes:      strings.Join(t.Scopes, ", "),
-			CreatedAt:   t.CreatedAt,
+			Scopes:      strings.ReplaceAll(t.Scopes, " ", ", "),
+			CreatedAt:   t.CreatedAt.Format("2006-01-02 15:04:05"),
 		}
 	}
 
@@ -113,13 +112,13 @@ func (h *settingsHandler) Show(w http.ResponseWriter, r *http.Request) {
 		sessRows[i] = &sessionRow{
 			TokenPrefix: s.Token[:8] + "...",
 			TokenFull:   s.Token,
-			CreatedAt:   s.CreatedAt,
-			ExpiresAt:   s.ExpiresAt,
+			CreatedAt:   s.CreatedAt.Format("2006-01-02 15:04:05"),
+			ExpiresAt:   s.ExpiresAt.Format("2006-01-02 15:04:05"),
 			IsCurrent:   sess != nil && s.Token == sess.Token,
 		}
 	}
 
-	tokenCount, err := db.CountUserOAuthTokens(ctx, h.deps.DB, user.ID)
+	tokenCount, err := h.deps.Repo.CountUserOAuthTokens(ctx, user.ID)
 	if err != nil {
 		slog.Error("failed to count oauth tokens", "error", err)
 	}
@@ -134,7 +133,7 @@ func (h *settingsHandler) Show(w http.ResponseWriter, r *http.Request) {
 		BaseURL:   h.deps.Config.BaseURL,
 		Host:      host,
 		Username:  user.Username,
-		CreatedAt: user.CreatedAt,
+		CreatedAt: user.CreatedAt.Format("2006-01-02 15:04:05"),
 		Tokens:    tokenRows,
 		Sessions:  sessRows,
 		QuotaMode: snap.QuotaMode,
@@ -228,7 +227,7 @@ func (h *settingsHandler) RevokeToken(w http.ResponseWriter, r *http.Request) {
 	user := CurrentUser(r)
 
 	// Verify the token belongs to this user before deleting.
-	t, err := db.GetOAuthToken(r.Context(), h.deps.DB, token)
+	t, err := h.deps.Repo.GetOAuthToken(r.Context(), token)
 	if err != nil {
 		slog.Error("failed to get oauth token", "error", err)
 		ui.SetFlashError(w, "Failed to revoke token.")
@@ -241,13 +240,13 @@ func (h *settingsHandler) RevokeToken(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := db.DeleteOAuthToken(r.Context(), h.deps.DB, token); err != nil {
+	if err := h.deps.Repo.DeleteOAuthToken(r.Context(), token); err != nil {
 		slog.Error("failed to revoke oauth token", "error", err)
 		ui.SetFlashError(w, "Failed to revoke token.")
 		http.Redirect(w, r, "/settings", http.StatusSeeOther)
 		return
 	}
-	_ = db.DeleteRefreshTokenByAccessToken(r.Context(), h.deps.DB, token)
+	_ = h.deps.Repo.DeleteRefreshTokenByAccessToken(r.Context(), token)
 
 	ui.SetFlash(w, "Token revoked.")
 	http.Redirect(w, r, "/settings", http.StatusSeeOther)
