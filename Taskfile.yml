@@ -1,8 +1,14 @@
 version: '3'
 
 tasks:
+  collect-licenses:
+    desc: Collect third-party license information
+    cmds:
+      - go run ./cmd/collect-licenses
+
   build:
     desc: Build the gosilo binary
+    deps: [collect-licenses]
     cmds:
       - go build -ldflags "-X gosilo/internal/config.Version={{.VERSION}}" -o ./build/gosilo.exe .
     vars:

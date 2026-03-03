@@ -78,6 +78,7 @@ func NewRenderer() *Renderer {
 		"templates/profile_files.html",
 		"templates/profile_files_search.html",
 		"templates/legal.html",
+		"templates/licenses.html",
 		"templates/abuse_report.html",
 		"templates/admin_abuse.html",
 	)
