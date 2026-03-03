@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/url"
+	"sort"
 	"strings"
 
 	"gosilo/internal/api"
@@ -26,6 +27,8 @@ type scopeDisplay struct {
 	Permission  string
 	Description string
 	Raw         string
+	IsWrite     bool
+	BadgeText   string
 }
 
 type authorizeContent struct {
@@ -45,6 +48,8 @@ type authorizeContent struct {
 	Error               string
 	TOSUrl              string
 	PrivacyUrl          string
+	ClientIsURL    bool
+	ClientHostname string
 }
 
 func buildScopeDisplay(scopes []string) ([]scopeDisplay, bool) {
@@ -58,10 +63,16 @@ func buildScopeDisplay(scopes []string) ([]scopeDisplay, bool) {
 			access = parts[1]
 		}
 
-		display := scopeDisplay{Raw: s}
+		isWrite := access == "rw"
+		display := scopeDisplay{Raw: s, IsWrite: isWrite}
+		if isWrite {
+			display.BadgeText = "Read & write"
+		} else {
+			display.BadgeText = "Read only"
+		}
 		if module == "*" {
 			display.Module = "All modules"
-			if access == "rw" {
+			if isWrite {
 				display.Description = "Full access to all your data"
 				hasRoot = true
 			} else {
@@ -69,19 +80,22 @@ func buildScopeDisplay(scopes []string) ([]scopeDisplay, bool) {
 			}
 		} else {
 			display.Module = "/" + module
-			if access == "rw" {
+			if isWrite {
 				display.Description = fmt.Sprintf("Read and write your %s data", module)
 			} else {
 				display.Description = fmt.Sprintf("Read your %s data", module)
 			}
 		}
-		if access == "rw" {
+		if isWrite {
 			display.Permission = "read & write"
 		} else {
 			display.Permission = "read only"
 		}
 		out = append(out, display)
 	}
+	sort.SliceStable(out, func(i, j int) bool {
+		return out[i].IsWrite && !out[j].IsWrite
+	})
 	return out, hasRoot
 }
 
@@ -152,6 +166,15 @@ func (h *oauthHandler) ShowAuthorize(w http.ResponseWriter, r *http.Request) {
 
 	scopeDisplayList, hasRootScope := buildScopeDisplay(scopes)
 
+	// Client identity is always the redirect_uri origin per RS spec
+	// (draft-dejong-remotestorage-26: server MUST ignore client_id param).
+	var clientIsURL bool
+	var clientHostname string
+	if u, err := url.Parse(origin); err == nil && u.Scheme != "" && u.Host != "" {
+		clientIsURL = true
+		clientHostname = u.Hostname()
+	}
+
 	snap := h.deps.Settings.Load()
 	var tosUrl, privacyUrl string
 	if snap.TOSMode == "url" {
@@ -185,6 +208,8 @@ func (h *oauthHandler) ShowAuthorize(w http.ResponseWriter, r *http.Request) {
 			CodeChallengeMethod: codeChallengeMethod,
 			TOSUrl:              tosUrl,
 			PrivacyUrl:          privacyUrl,
+			ClientIsURL:    clientIsURL,
+			ClientHostname: clientHostname,
 		},
 	})
 }

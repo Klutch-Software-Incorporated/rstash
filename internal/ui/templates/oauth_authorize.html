@@ -9,12 +9,28 @@
 
         <div class="oauth-consent-card">
             <div class="oauth-consent-header">
-                <p class="oauth-request-label">Authorization request from</p>
-                <p class="oauth-origin">{{.ClientOrigin}}</p>
-                <p>
-                    This application is requesting access to
-                    {{if .LoggedIn}}your storage{{else}}a Gosilo account{{end}}.
-                </p>
+                <p class="oauth-title">Authorize access</p>
+                <p class="oauth-subtitle">An application wants to access
+                    {{if .LoggedIn}}your storage{{else}}a Gosilo account{{end}}.</p>
+            </div>
+
+            <div class="oauth-app-identity">
+                {{if .ClientIsURL}}
+                    <p class="oauth-app-primary">{{.ClientHostname}}</p>
+                    <p class="oauth-app-secondary">{{.ClientOrigin}}</p>
+                {{else}}
+                    <p class="oauth-app-unverified">Unverified application</p>
+                    <p class="oauth-app-secondary">{{.ClientOrigin}}</p>
+                {{end}}
+                {{if .LoggedIn}}
+                    <p class="oauth-app-label">
+                        Signed in as
+                        <span class="oauth-signed-in">
+                            <span class="oauth-avatar-sm">{{slice .Username 0 1}}</span>
+                            {{.Username}}
+                        </span>
+                    </p>
+                {{end}}
             </div>
 
             {{if .HasRootScope}}
@@ -25,35 +41,23 @@
             {{end}}
 
             <div class="oauth-consent-perms">
-                {{if .LoggedIn}}
-                    <div class="oauth-account">
-                        <div class="oauth-avatar">{{slice .Username 0 1}}</div>
-                        <div>
-                            <p class="oauth-account-name">{{.Username}}</p>
-                            <p class="oauth-account-label">Gosilo account</p>
-                        </div>
-                    </div>
-                {{end}}
+                <p class="oauth-perms-title">Permissions requested</p>
+                <ul class="oauth-scope-list">
+                    {{range .ScopeDisplay}}
+                        <li class="oauth-scope-row">
+                            <span class="oauth-scope-indicators">
+                                <span class="oauth-scope-read">Read</span>
+                                <span class="oauth-scope-write{{if not .IsWrite}} oauth-scope-hidden{{end}}">Write</span>
+                            </span>
+                            <span class="oauth-scope-module">{{.Module}}</span>
+                        </li>
+                    {{end}}
+                </ul>
+            </div>
 
-                <table class="oauth-scope-table">
-                    <thead>
-                        <tr>
-                            <th>Permission</th>
-                            <th>Access</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {{range .ScopeDisplay}}
-                            <tr>
-                                <td class="oauth-scope-module">
-                                    {{.Description}}
-                                    <span class="oauth-scope-raw">({{.Module}} &mdash; {{.Permission}})</span>
-                                </td>
-                                <td><span class="oauth-scope-access">{{.Permission}}</span></td>
-                            </tr>
-                        {{end}}
-                    </tbody>
-                </table>
+            <div class="oauth-redirect-section">
+                <p class="oauth-redirect-title">After you allow</p>
+                <p class="oauth-redirect-dest">{{.RedirectURI}}</p>
             </div>
 
             <div class="oauth-consent-footer">
@@ -84,10 +88,6 @@
                     <p class="oauth-login-prompt">Log in to your account to allow or deny this request.</p>
                     <a href="{{.LoginURL}}" class="oauth-btn-login">Log in to continue</a>
                 {{end}}
-
-                <p class="oauth-redirect-note">
-                    Will redirect to <strong>{{.RedirectURI}}</strong>
-                </p>
             </div>
         </div>
 
