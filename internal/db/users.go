@@ -3,6 +3,8 @@ package db
 import (
 	"context"
 	"fmt"
+	"regexp"
+	"strings"
 	"time"
 
 	"gosilo/internal/model"
@@ -11,8 +13,29 @@ import (
 	"gorm.io/gorm"
 )
 
+var usernameRe = regexp.MustCompile(`^[a-z][a-z0-9._-]*$`)
+
+// ValidateUsername normalizes and validates a username per RFC 7613 UsernameCaseMapped.
+// It lowercases, trims whitespace, and checks format constraints.
+// Returns the normalized username or an error.
+func ValidateUsername(input string) (string, error) {
+	name := strings.ToLower(strings.TrimSpace(input))
+	if name == "" {
+		return "", fmt.Errorf("username is required")
+	}
+	if len(name) > 63 {
+		return "", fmt.Errorf("username must be 63 characters or fewer")
+	}
+	if !usernameRe.MatchString(name) {
+		return "", fmt.Errorf("username must start with a letter and contain only lowercase letters, digits, dots, hyphens, or underscores")
+	}
+	return name, nil
+}
+
 // CreateUser inserts a new user with a bcrypt-hashed password.
+// The username is normalized to lowercase as a safety net.
 func (r *Repository) CreateUser(ctx context.Context, username, password string, isAdmin, approved bool) (*model.User, error) {
+	username = strings.ToLower(strings.TrimSpace(username))
 	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 	if err != nil {
 		return nil, fmt.Errorf("hash password: %w", err)
@@ -31,7 +54,9 @@ func (r *Repository) CreateUser(ctx context.Context, username, password string, 
 }
 
 // GetUserByUsername returns the user with the given username, or nil if not found.
+// The username is normalized to lowercase for case-insensitive lookup.
 func (r *Repository) GetUserByUsername(ctx context.Context, username string) (*model.User, error) {
+	username = strings.ToLower(strings.TrimSpace(username))
 	var u model.User
 	err := r.db.WithContext(ctx).Where("username = ?", username).First(&u).Error
 	if err == gorm.ErrRecordNotFound {

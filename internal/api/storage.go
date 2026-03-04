@@ -8,10 +8,50 @@ import (
 	"log/slog"
 	"net/http"
 	"strings"
+	"unicode/utf8"
 
 	"gosilo/internal/db"
 	"gosilo/internal/storage"
 )
+
+// ValidatePath checks that a storage path conforms to the remoteStorage spec
+// (draft-dejong-remotestorage-26) and fits within the DB schema limit.
+//
+// Rules:
+//  1. Must start with "/"
+//  2. No null bytes
+//  3. No empty segments (item names must not have zero length)
+//  4. No "." or ".." segments (item names must not equal "." or "..")
+//  5. Total path ≤ 512 UTF-8 characters (matches Node.Path gorm:"size:512")
+func ValidatePath(path string) error {
+	if path == "" || path[0] != '/' {
+		return fmt.Errorf("must start with /")
+	}
+	if strings.ContainsRune(path, '\x00') {
+		return fmt.Errorf("null byte not allowed")
+	}
+	if utf8.RuneCountInString(path) > 512 {
+		return fmt.Errorf("path exceeds 512 characters")
+	}
+	// Check each segment between slashes. The leading "/" produces an empty
+	// first element which we skip. A trailing "/" (folder path) produces an
+	// empty last element which we also skip — that's fine per spec.
+	segments := strings.Split(path, "/")
+	for i := 1; i < len(segments); i++ {
+		seg := segments[i]
+		// Trailing slash (folder): last element is empty — allowed.
+		if seg == "" && i == len(segments)-1 {
+			continue
+		}
+		if seg == "" {
+			return fmt.Errorf("empty segment (double slash)")
+		}
+		if seg == "." || seg == ".." {
+			return fmt.Errorf("segment %q not allowed", seg)
+		}
+	}
+	return nil
+}
 
 // storageAudit logs a storage operation to the audit log.
 func storageAudit(r *http.Request, repo *db.Repository, userID int64, action, path string) {
@@ -25,9 +65,8 @@ func Storage(repo *db.Repository, svc *storage.Service, maxUploadSize func() int
 		pathVal := r.PathValue("path")
 		storagePath := "/" + pathVal
 
-		// Reject dangerous path components.
-		if strings.Contains(storagePath, "..") || strings.Contains(storagePath, "//") {
-			http.Error(w, "invalid path", http.StatusBadRequest)
+		if err := ValidatePath(storagePath); err != nil {
+			http.Error(w, "invalid path: "+err.Error(), http.StatusBadRequest)
 			return
 		}
 

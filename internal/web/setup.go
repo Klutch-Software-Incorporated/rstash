@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
-	"strings"
 
 	"gosilo/internal/auth"
+	"gosilo/internal/db"
 	"gosilo/internal/ui"
 )
 
@@ -56,9 +56,10 @@ func (h *setupHandler) DoSetup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	username := strings.TrimSpace(r.FormValue("username"))
 	password := r.FormValue("password")
 	confirm := r.FormValue("password_confirm")
+
+	username, valErr := db.ValidateUsername(r.FormValue("username"))
 
 	renderErr := func(msg string) {
 		h.deps.Renderer.Render(w, "setup", ui.PageData{
@@ -67,8 +68,8 @@ func (h *setupHandler) DoSetup(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 
-	if username == "" {
-		renderErr("Username is required.")
+	if valErr != nil {
+		renderErr(valErr.Error())
 		return
 	}
 	if msg := validatePassword(password); msg != "" {

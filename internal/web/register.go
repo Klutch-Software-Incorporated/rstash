@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
-	"strings"
 
 	"gosilo/internal/auth"
+	"gosilo/internal/db"
 	"gosilo/internal/settings"
 	"gosilo/internal/ui"
 )
@@ -54,9 +54,10 @@ func (h *registerHandler) DoRegister(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	username := strings.TrimSpace(r.FormValue("username"))
 	password := r.FormValue("password")
 	confirm := r.FormValue("password_confirm")
+
+	username, valErr := db.ValidateUsername(r.FormValue("username"))
 
 	tosUrl, privacyUrl := h.legalURLs(snap)
 
@@ -73,8 +74,8 @@ func (h *registerHandler) DoRegister(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 
-	if username == "" {
-		renderErr("Username is required.")
+	if valErr != nil {
+		renderErr(valErr.Error())
 		return
 	}
 	if msg := validatePassword(password); msg != "" {

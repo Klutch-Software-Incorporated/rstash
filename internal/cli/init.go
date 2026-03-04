@@ -113,15 +113,16 @@ func runInit(cmd *cobra.Command, args []string) error {
 	fmt.Fprintf(os.Stderr, "Database created at %s\n\n", dsn)
 
 	// Get admin credentials.
-	username := initUsername
-	if username == "" {
-		username, err = prompt("Admin username")
+	usernameInput := initUsername
+	if usernameInput == "" {
+		usernameInput, err = prompt("Admin username")
 		if err != nil {
 			return err
 		}
 	}
-	if username == "" {
-		return fmt.Errorf("username cannot be empty")
+	username, err := db.ValidateUsername(usernameInput)
+	if err != nil {
+		return err
 	}
 
 	password := initPassword

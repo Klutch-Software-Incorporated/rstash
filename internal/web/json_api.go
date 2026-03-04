@@ -12,6 +12,7 @@ import (
 	"gosilo/api"
 	"gosilo/internal/auth"
 	"gosilo/internal/config"
+	"gosilo/internal/db"
 	"gosilo/internal/model"
 )
 
@@ -165,8 +166,13 @@ func (h *jsonApiHandler) UserAdd(w http.ResponseWriter, r *http.Request) {
 		jsonErr(w, http.StatusBadRequest, "invalid JSON body")
 		return
 	}
-	if req.Username == "" || req.Password == "" {
-		jsonErr(w, http.StatusBadRequest, "username and password are required")
+	username, valErr := db.ValidateUsername(req.Username)
+	if valErr != nil {
+		jsonErr(w, http.StatusBadRequest, valErr.Error())
+		return
+	}
+	if req.Password == "" {
+		jsonErr(w, http.StatusBadRequest, "password is required")
 		return
 	}
 	if msg := validatePassword(req.Password); msg != "" {
@@ -174,7 +180,7 @@ func (h *jsonApiHandler) UserAdd(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	newUser, err := h.deps.Auth.CreateUser(r.Context(), req.Username, req.Password, req.IsAdmin, true)
+	newUser, err := h.deps.Auth.CreateUser(r.Context(), username, req.Password, req.IsAdmin, true)
 	if err != nil {
 		jsonErr(w, http.StatusConflict, "failed to create user (username may already exist)")
 		return
@@ -185,7 +191,7 @@ func (h *jsonApiHandler) UserAdd(w http.ResponseWriter, r *http.Request) {
 	_ = h.deps.Repo.AcceptPrivacy(r.Context(), newUser.ID)
 
 	actor := currentUserFromContext(r)
-	h.deps.Repo.Audit(r.Context(), actor.ID, "user.created", "user", fmt.Sprintf("%d", newUser.ID), req.Username)
+	h.deps.Repo.Audit(r.Context(), actor.ID, "user.created", "user", fmt.Sprintf("%d", newUser.ID), username)
 
 	jsonOK(w, map[string]any{
 		"id":       newUser.ID,

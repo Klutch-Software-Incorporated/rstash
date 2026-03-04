@@ -137,7 +137,10 @@ func openAuthService() (*auth.LocalService, *db.Repository, func(), error) {
 }
 
 func runUserAdd(cmd *cobra.Command, args []string) error {
-	username := args[0]
+	username, err := db.ValidateUsername(args[0])
+	if err != nil {
+		return err
+	}
 
 	password := userPasswordFlag
 	if password == "" {

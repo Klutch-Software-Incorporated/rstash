@@ -33,13 +33,16 @@ func WebFinger(cfg *config.Config) http.Handler {
 			http.Error(w, "invalid resource format", http.StatusBadRequest)
 			return
 		}
-		username := parts[0]
+		username := strings.ToLower(parts[0])
 
 		storageHref := cfg.BaseURL + "/storage/" + username
 		authURL := cfg.BaseURL + "/oauth/authorize"
 
+		// Use canonical lowercase username in subject.
+		canonicalResource := "acct:" + username + "@" + parts[1]
+
 		resp := map[string]any{
-			"subject": resource,
+			"subject": canonicalResource,
 			"links": []map[string]any{
 				{
 					"href": storageHref,

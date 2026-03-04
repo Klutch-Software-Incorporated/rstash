@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"gosilo/internal/config"
+	"gosilo/internal/db"
 	"gosilo/internal/ui"
 )
 
@@ -439,12 +440,17 @@ func (h *adminHandler) SetUserQuota(w http.ResponseWriter, r *http.Request) {
 
 func (h *adminHandler) CreateUser(w http.ResponseWriter, r *http.Request) {
 
-	username := r.FormValue("username")
 	password := r.FormValue("password")
 	isAdmin := r.FormValue("is_admin") == "on"
 
-	if username == "" || password == "" {
-		ui.SetFlashError(w, "Username and password are required.")
+	username, valErr := db.ValidateUsername(r.FormValue("username"))
+	if valErr != nil {
+		ui.SetFlashError(w, valErr.Error())
+		http.Redirect(w, r, "/admin/users", http.StatusSeeOther)
+		return
+	}
+	if password == "" {
+		ui.SetFlashError(w, "Password is required.")
 		http.Redirect(w, r, "/admin/users", http.StatusSeeOther)
 		return
 	}
