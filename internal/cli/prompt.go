@@ -22,6 +22,29 @@ func prompt(label string) (string, error) {
 	return strings.TrimSpace(scanner.Text()), nil
 }
 
+// promptYesNo asks a yes/no question. defaultYes controls the default when the user presses Enter.
+func promptYesNo(label string, defaultYes bool) (bool, error) {
+	fmt.Fprintf(os.Stderr, "%s ", label)
+	scanner := bufio.NewScanner(os.Stdin)
+	if !scanner.Scan() {
+		if err := scanner.Err(); err != nil {
+			return false, err
+		}
+		return defaultYes, nil
+	}
+	answer := strings.TrimSpace(strings.ToLower(scanner.Text()))
+	switch answer {
+	case "":
+		return defaultYes, nil
+	case "y", "yes":
+		return true, nil
+	case "n", "no":
+		return false, nil
+	default:
+		return false, fmt.Errorf("invalid answer %q — expected y or n", answer)
+	}
+}
+
 // promptPassword reads a password from the terminal without echoing.
 func promptPassword(label string) (string, error) {
 	fmt.Fprintf(os.Stderr, "%s: ", label)

@@ -1,0 +1,296 @@
+---
+import Base from "../layouts/Base.astro";
+
+const features = [
+  {
+    title: "Single Binary",
+    desc: "One executable, zero runtime dependencies. Download, run, done.",
+    icon: `<svg viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="8" y="6" width="24" height="28" rx="3" stroke="currentColor" stroke-width="2"/><path d="M14 16h12M14 20h12M14 24h8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M16 6V2M24 6V2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>`,
+  },
+  {
+    title: "Multi-Database",
+    desc: "SQLite by default. Postgres, MySQL, and SQL Server when you need them.",
+    icon: `<svg viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg"><ellipse cx="20" cy="10" rx="12" ry="4" stroke="currentColor" stroke-width="2"/><path d="M8 10v8c0 2.2 5.4 4 12 4s12-1.8 12-4v-8" stroke="currentColor" stroke-width="2"/><path d="M8 18v8c0 2.2 5.4 4 12 4s12-1.8 12-4v-8" stroke="currentColor" stroke-width="2"/></svg>`,
+  },
+  {
+    title: "remoteStorage Protocol",
+    desc: "Full spec implementation (draft-dejong-remotestorage-26) with WebFinger discovery.",
+    icon: `<svg viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="20" cy="20" r="12" stroke="currentColor" stroke-width="2"/><path d="M8 20h24M20 8c-4 4-4 12 0 16M20 8c4 4 4 12 0 16" stroke="currentColor" stroke-width="2"/><path d="M10 14h20M10 26h20" stroke="currentColor" stroke-width="2"/></svg>`,
+  },
+  {
+    title: "OAuth Built-in",
+    desc: "Integrated OAuth 2.0 authorization — no external auth provider needed.",
+    icon: `<svg viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="10" y="18" width="20" height="14" rx="3" stroke="currentColor" stroke-width="2"/><path d="M14 18v-4a6 6 0 1 1 12 0v4" stroke="currentColor" stroke-width="2"/><circle cx="20" cy="26" r="2" fill="currentColor"/></svg>`,
+  },
+  {
+    title: "Quotas & Rate Limiting",
+    desc: "Per-user and global storage quotas, configurable per-IP rate limiting.",
+    icon: `<svg viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M20 6v28M6 20h28" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M12 28l4-8 4 4 4-12 4 8" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
+  },
+  {
+    title: "Web UI Included",
+    desc: "Admin dashboard, file browser, user management, and OAuth flows — all built in.",
+    icon: `<svg viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="6" y="8" width="28" height="20" rx="3" stroke="currentColor" stroke-width="2"/><path d="M6 14h28" stroke="currentColor" stroke-width="2"/><circle cx="10" cy="11" r="1" fill="currentColor"/><circle cx="14" cy="11" r="1" fill="currentColor"/><path d="M16 32h8M20 28v4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>`,
+  },
+];
+
+const configVars = [
+  { name: "GOSILO_ADDR", default: ":8080", desc: "Listen address" },
+  { name: "GOSILO_BASE_URL", default: "http://localhost:8080", desc: "Public URL" },
+  { name: "GOSILO_DB", default: "sqlite:gosilo.db", desc: "Database DSN" },
+  { name: "GOSILO_BLOB", default: "sqlite:gosilo-blobs.db", desc: "Blob store DSN" },
+  { name: "GOSILO_REGISTRATION", default: "closed", desc: "Registration mode" },
+  { name: "GOSILO_QUOTA_MODE", default: "total", desc: "Quota mode" },
+  { name: "GOSILO_QUOTA_TOTAL", default: "50GB", desc: "Global storage limit" },
+  { name: "GOSILO_TLS_MODE", default: "auto-detect", desc: "TLS mode" },
+];
+---
+
+<Base title="gosilo — A remoteStorage server written in Go">
+
+  <!-- Hero -->
+  <section class="py-20 md:py-32">
+    <div class="max-w-4xl mx-auto px-6 flex flex-col md:flex-row items-center gap-12">
+      <div class="flex-1 text-center md:text-left">
+        <h1 class="text-4xl md:text-5xl font-bold tracking-tight mb-5" style="line-height: 1.1;">
+          Your data,<br/>your server.
+        </h1>
+        <p class="text-lg mb-8" style="color: var(--color-text-muted); max-width: 480px;">
+          gosilo is a <a href="https://remotestorage.io" class="underline" style="color: var(--color-accent);">remoteStorage</a> server
+          written in Go. Deploy a single binary and give your apps a personal data backend.
+        </p>
+        <div class="flex flex-wrap gap-3 justify-center md:justify-start">
+          <a
+            href="#quickstart"
+            class="inline-flex items-center px-5 py-2.5 rounded-md font-semibold text-sm transition-colors"
+            style="background: var(--color-accent); color: #fff;"
+          >
+            Get Started
+          </a>
+          <a
+            href="https://code.lag.dev/gosilo"
+            class="inline-flex items-center px-5 py-2.5 rounded-md font-semibold text-sm transition-colors"
+            style={`border: 1px solid var(--color-border); color: var(--color-text);`}
+            target="_blank"
+            rel="noopener"
+          >
+            Source Code
+          </a>
+        </div>
+      </div>
+      <div class="flex-shrink-0 w-64 md:w-80">
+        <!-- Placeholder: screenshot of the app UI goes here -->
+        <div
+          class="rounded-lg overflow-hidden"
+          style={`border: 1px solid var(--color-border); background: var(--color-surface);`}
+        >
+          <div class="px-3 py-2 flex items-center gap-1.5" style={`background: var(--color-bg-alt); border-bottom: 1px solid var(--color-border);`}>
+            <span class="w-2.5 h-2.5 rounded-full" style="background: var(--color-danger); opacity: 0.6;"></span>
+            <span class="w-2.5 h-2.5 rounded-full" style="background: var(--color-accent); opacity: 0.6;"></span>
+            <span class="w-2.5 h-2.5 rounded-full" style="background: #4a9a4a; opacity: 0.6;"></span>
+            <span class="ml-2 text-xs" style="color: var(--color-text-muted); font-family: var(--font-mono);">gosilo</span>
+          </div>
+          <div class="p-4 space-y-3">
+            <div class="flex items-center gap-2">
+              <svg viewBox="0 0 16 16" class="w-4 h-4" style="color: var(--color-accent);" fill="currentColor"><path d="M1 3.5A1.5 1.5 0 0 1 2.5 2h3.879a1.5 1.5 0 0 1 1.06.44l1.122 1.12A1.5 1.5 0 0 0 9.62 4H13.5A1.5 1.5 0 0 1 15 5.5v7a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 1 12.5v-9z"/></svg>
+              <span class="text-sm">documents/</span>
+            </div>
+            <div class="flex items-center gap-2">
+              <svg viewBox="0 0 16 16" class="w-4 h-4" style="color: var(--color-accent);" fill="currentColor"><path d="M1 3.5A1.5 1.5 0 0 1 2.5 2h3.879a1.5 1.5 0 0 1 1.06.44l1.122 1.12A1.5 1.5 0 0 0 9.62 4H13.5A1.5 1.5 0 0 1 15 5.5v7a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 1 12.5v-9z"/></svg>
+              <span class="text-sm">photos/</span>
+            </div>
+            <div class="flex items-center gap-2">
+              <svg viewBox="0 0 16 16" class="w-4 h-4" style="color: var(--color-text-muted);" fill="currentColor"><path d="M4 1.5A1.5 1.5 0 0 1 5.5 0h5A1.5 1.5 0 0 1 12 1.5v13A1.5 1.5 0 0 1 10.5 16h-5A1.5 1.5 0 0 1 4 14.5v-13zM5.5 1a.5.5 0 0 0-.5.5v13a.5.5 0 0 0 .5.5h5a.5.5 0 0 0 .5-.5v-13a.5.5 0 0 0-.5-.5h-5z"/></svg>
+              <span class="text-sm">notes.txt</span>
+              <span class="ml-auto text-xs" style="color: var(--color-text-muted);">2.4 KB</span>
+            </div>
+            <div class="flex items-center gap-2">
+              <svg viewBox="0 0 16 16" class="w-4 h-4" style="color: var(--color-text-muted);" fill="currentColor"><path d="M4 1.5A1.5 1.5 0 0 1 5.5 0h5A1.5 1.5 0 0 1 12 1.5v13A1.5 1.5 0 0 1 10.5 16h-5A1.5 1.5 0 0 1 4 14.5v-13zM5.5 1a.5.5 0 0 0-.5.5v13a.5.5 0 0 0 .5.5h5a.5.5 0 0 0 .5-.5v-13a.5.5 0 0 0-.5-.5h-5z"/></svg>
+              <span class="text-sm">config.json</span>
+              <span class="ml-auto text-xs" style="color: var(--color-text-muted);">812 B</span>
+            </div>
+            <div class="pt-2 mt-2" style={`border-top: 1px solid var(--color-border);`}>
+              <div class="flex items-center justify-between text-xs" style="color: var(--color-text-muted);">
+                <span>Storage</span>
+                <span>1.2 GB / 50 GB</span>
+              </div>
+              <div class="mt-1.5 h-1.5 rounded-full overflow-hidden" style="background: var(--color-bg-alt);">
+                <div class="h-full rounded-full" style="width: 2.4%; background: var(--color-accent);"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Features -->
+  <section id="features" class="py-20" style="background: var(--color-bg-alt);">
+    <div class="max-w-4xl mx-auto px-6">
+      <h2 class="text-2xl font-bold text-center mb-3">Everything you need, nothing you don't.</h2>
+      <p class="text-center mb-12" style="color: var(--color-text-muted);">
+        A spec-compliant remoteStorage server that runs anywhere.
+      </p>
+      <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
+        {features.map((f) => (
+          <div
+            class="rounded-lg p-5"
+            style={`background: var(--color-surface); border: 1px solid var(--color-border);`}
+          >
+            <div class="w-10 h-10 mb-3" style="color: var(--color-accent);" set:html={f.icon} />
+            <h3 class="font-semibold mb-1.5">{f.title}</h3>
+            <p class="text-sm" style="color: var(--color-text-muted);">{f.desc}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  </section>
+
+  <!-- Quick Start -->
+  <section id="quickstart" class="py-20">
+    <div class="max-w-4xl mx-auto px-6">
+      <h2 class="text-2xl font-bold text-center mb-3">Up and running in seconds.</h2>
+      <p class="text-center mb-10" style="color: var(--color-text-muted);">
+        Download, initialize, serve. That's it.
+      </p>
+      <div class="max-w-2xl mx-auto">
+        <div
+          class="rounded-lg overflow-hidden"
+          style={`border: 1px solid var(--color-border);`}
+        >
+          <div class="px-4 py-2 text-xs font-medium flex items-center gap-2" style={`background: var(--color-bg-alt); border-bottom: 1px solid var(--color-border); color: var(--color-text-muted);`}>
+            <svg viewBox="0 0 16 16" class="w-3.5 h-3.5" fill="currentColor"><path d="M6 1a1 1 0 0 0-1 1v1H3.5A1.5 1.5 0 0 0 2 4.5v9A1.5 1.5 0 0 0 3.5 15h9a1.5 1.5 0 0 0 1.5-1.5V6l-4-4H6zm0 1h3v2.5A1.5 1.5 0 0 0 10.5 6H13v7.5a.5.5 0 0 1-.5.5h-9a.5.5 0 0 1-.5-.5v-9a.5.5 0 0 1 .5-.5H5V2z"/></svg>
+            Terminal
+          </div>
+          <div
+            class="p-5 text-sm leading-relaxed overflow-x-auto"
+            style={`background: var(--color-code-bg); font-family: var(--font-mono);`}
+          >
+            <div style="color: var(--color-text-muted);"># Download the latest release</div>
+            <div>curl -LO https://code.lag.dev/gosilo/releases/latest/gosilo-linux-amd64</div>
+            <div>chmod +x gosilo-linux-amd64</div>
+            <br/>
+            <div style="color: var(--color-text-muted);"># Initialize and create your first user</div>
+            <div>./gosilo-linux-amd64 init</div>
+            <br/>
+            <div style="color: var(--color-text-muted);"># Start serving</div>
+            <div>./gosilo-linux-amd64 serve</div>
+            <div style="color: var(--color-text-muted);">
+              <br/>
+              # → listening on http://localhost:8080
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Configuration -->
+  <section id="config" class="py-20" style="background: var(--color-bg-alt);">
+    <div class="max-w-4xl mx-auto px-6">
+      <h2 class="text-2xl font-bold text-center mb-3">Configure with environment variables.</h2>
+      <p class="text-center mb-10" style="color: var(--color-text-muted);">
+        No config files needed — everything is a <code class="text-xs px-1.5 py-0.5 rounded" style="background: var(--color-code-bg); font-family: var(--font-mono);">GOSILO_*</code> env var.
+      </p>
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm" style={`border: 1px solid var(--color-border); border-collapse: collapse;`}>
+          <thead>
+            <tr style={`background: var(--color-surface);`}>
+              <th class="text-left px-4 py-2.5 font-semibold" style={`border-bottom: 1px solid var(--color-border); font-family: var(--font-mono); font-size: 0.8rem;`}>Variable</th>
+              <th class="text-left px-4 py-2.5 font-semibold" style={`border-bottom: 1px solid var(--color-border);`}>Default</th>
+              <th class="text-left px-4 py-2.5 font-semibold" style={`border-bottom: 1px solid var(--color-border);`}>Description</th>
+            </tr>
+          </thead>
+          <tbody>
+            {configVars.map((v, i) => (
+              <tr style={i % 2 === 0 ? "" : `background: var(--color-surface);`}>
+                <td class="px-4 py-2" style={`border-bottom: 1px solid var(--color-border); font-family: var(--font-mono); font-size: 0.8rem; color: var(--color-accent); white-space: nowrap;`}>{v.name}</td>
+                <td class="px-4 py-2" style={`border-bottom: 1px solid var(--color-border); font-family: var(--font-mono); font-size: 0.8rem;`}>{v.default}</td>
+                <td class="px-4 py-2" style={`border-bottom: 1px solid var(--color-border); color: var(--color-text-muted);`}>{v.desc}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <p class="text-center mt-6 text-sm" style="color: var(--color-text-muted);">
+        <a href="/docs/configuration/" class="underline" style="color: var(--color-accent);">See full configuration reference →</a>
+      </p>
+    </div>
+  </section>
+
+  <!-- Deployment -->
+  <section id="deploy" class="py-20">
+    <div class="max-w-4xl mx-auto px-6">
+      <h2 class="text-2xl font-bold text-center mb-3">Deploy anywhere.</h2>
+      <p class="text-center mb-12" style="color: var(--color-text-muted);">
+        A single binary that fits wherever you need it.
+      </p>
+      <div class="grid sm:grid-cols-3 gap-5 max-w-3xl mx-auto">
+        <div class="text-center p-6 rounded-lg" style={`background: var(--color-bg-alt); border: 1px solid var(--color-border);`}>
+          <svg viewBox="0 0 48 48" class="w-12 h-12 mx-auto mb-3" style="color: var(--color-accent);" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="10" y="6" width="28" height="36" rx="3"/>
+            <path d="M18 16h12M18 22h12M18 28h8"/>
+            <circle cx="24" cy="36" r="2"/>
+          </svg>
+          <h3 class="font-semibold mb-1">Bare Metal</h3>
+          <p class="text-sm" style="color: var(--color-text-muted);">
+            Download the binary, run it with systemd. Built-in TLS via Let's Encrypt.
+          </p>
+        </div>
+        <div class="text-center p-6 rounded-lg" style={`background: var(--color-bg-alt); border: 1px solid var(--color-border);`}>
+          <svg viewBox="0 0 48 48" class="w-12 h-12 mx-auto mb-3" style="color: var(--color-accent);" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M4 32h40M8 32V16a4 4 0 0 1 4-4h24a4 4 0 0 1 4 4v16"/>
+            <path d="M14 24h4M22 24h4M30 24h4M14 18h4M22 18h4"/>
+            <path d="M4 32v4h40v-4"/>
+          </svg>
+          <h3 class="font-semibold mb-1">Docker</h3>
+          <p class="text-sm" style="color: var(--color-text-muted);">
+            Minimal Alpine image. Mount a volume for data and you're set.
+          </p>
+        </div>
+        <div class="text-center p-6 rounded-lg" style={`background: var(--color-bg-alt); border: 1px solid var(--color-border);`}>
+          <svg viewBox="0 0 48 48" class="w-12 h-12 mx-auto mb-3" style="color: var(--color-accent);" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M24 6l18 10v16L24 42 6 32V16L24 6z"/>
+            <path d="M24 22v20M6 16l18 6 18-6"/>
+          </svg>
+          <h3 class="font-semibold mb-1">Reverse Proxy</h3>
+          <p class="text-sm" style="color: var(--color-text-muted);">
+            Sit behind nginx or Caddy. Works with any TLS termination setup.
+          </p>
+        </div>
+      </div>
+      <p class="text-center mt-8 text-sm" style="color: var(--color-text-muted);">
+        <a href="/docs/deployment/" class="underline" style="color: var(--color-accent);">Read the deployment guide →</a>
+      </p>
+    </div>
+  </section>
+
+  <!-- CTA -->
+  <section class="py-20" style="background: var(--color-bg-alt);">
+    <div class="max-w-2xl mx-auto px-6 text-center">
+      <h2 class="text-2xl font-bold mb-4">Ready to take control of your data?</h2>
+      <p class="mb-8" style="color: var(--color-text-muted);">
+        gosilo is free, open source, and built for self-hosting.
+      </p>
+      <div class="flex flex-wrap gap-3 justify-center">
+        <a
+          href="#quickstart"
+          class="inline-flex items-center px-6 py-3 rounded-md font-semibold text-sm transition-colors"
+          style="background: var(--color-accent); color: #fff;"
+        >
+          Get Started
+        </a>
+        <a
+          href="https://code.lag.dev/gosilo"
+          class="inline-flex items-center px-6 py-3 rounded-md font-semibold text-sm transition-colors"
+          style={`border: 1px solid var(--color-border); color: var(--color-text);`}
+          target="_blank"
+          rel="noopener"
+        >
+          View Source
+        </a>
+      </div>
+    </div>
+  </section>
+
+</Base>

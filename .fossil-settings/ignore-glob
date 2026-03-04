@@ -42,9 +42,11 @@ android/**/*.jks
 # Windows
 windows/flutter/ephemeral/
 
-# Astro
+# Astro / Site
 astro/dist/
 astro/.astro/
+site/dist/
+site/.astro/
 
 # Infrastructure
 infra/pulumi/node_modules/

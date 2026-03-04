@@ -1,0 +1,59 @@
+---
+import "../styles/global.css";
+
+interface Props {
+  title: string;
+  description?: string;
+}
+
+const { title, description = "A remoteStorage server written in Go" } = Astro.props;
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content={description} />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <title>{title}</title>
+  </head>
+  <body class="min-h-screen flex flex-col">
+    <nav
+      class="sticky top-0 z-50 backdrop-blur-sm"
+      style={`background: color-mix(in srgb, var(--color-bg) 90%, transparent); border-bottom: 1px solid var(--color-border);`}
+    >
+      <div class="max-w-4xl mx-auto px-6 h-14 flex items-center justify-between">
+        <a href="/" class="flex items-center gap-2 font-semibold text-lg" style="color: var(--color-text);">
+          <img src="/favicon.svg" alt="" class="w-6 h-6" />
+          gosilo
+        </a>
+        <div class="flex items-center gap-6 text-sm font-medium">
+          <a href="#features" style="color: var(--color-text-muted);">Features</a>
+          <a href="#quickstart" style="color: var(--color-text-muted);">Quick Start</a>
+          <a href="/docs/getting-started/" style="color: var(--color-text-muted);">Docs</a>
+          <a
+            href="https://code.lag.dev/gosilo"
+            style="color: var(--color-text-muted);"
+            target="_blank"
+            rel="noopener"
+          >Source</a>
+        </div>
+      </div>
+    </nav>
+
+    <main class="flex-1">
+      <slot />
+    </main>
+
+    <footer
+      class="py-8 text-center text-sm"
+      style={`border-top: 1px solid var(--color-border); color: var(--color-text-muted);`}
+    >
+      <div class="max-w-4xl mx-auto px-6">
+        &copy; {new Date().getFullYear()} gosilo &middot;
+        <a href="https://code.lag.dev/gosilo" class="underline" style="color: var(--color-text-muted);">Source Code</a>
+      </div>
+    </footer>
+  </body>
+</html>

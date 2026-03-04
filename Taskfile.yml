@@ -42,6 +42,33 @@ tasks:
       - rm -f gosilo.db gosilo.db-wal gosilo.db-shm
       - rm -rf ./dist
 
+  site:install:
+    desc: Install site dependencies
+    dir: site
+    cmds:
+      - npm install
+
+  site:dev:
+    desc: Start site dev server
+    dir: site
+    cmds:
+      - npm run dev
+
+  site:build:
+    desc: Build static site
+    dir: site
+    cmds:
+      - npm run build
+
+  site:deploy:
+    desc: Build and deploy site to server
+    deps:
+      - site:build
+    cmds:
+      - ssh {{.SITE_HOST}} "rm -rf /srv/site && mkdir -p /srv/site"
+      - scp -r site/dist/* {{.SITE_HOST}}:/srv/site/
+      - ssh {{.SITE_HOST}} "chmod -R o+rX /srv/site/"
+
   release:
     desc: Cross-compile release binaries for all platforms
     cmds:

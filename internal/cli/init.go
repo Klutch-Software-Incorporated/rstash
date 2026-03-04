@@ -14,7 +14,6 @@ import (
 )
 
 var (
-	initProfile  string
 	initPassword string
 	initUsername  string
 )
@@ -25,72 +24,18 @@ var initCmd = &cobra.Command{
 	Long:    "Initialize a new gosilo instance by creating the database and prompting for an admin account.",
 	GroupID: "server",
 	Example: `  gosilo init
-  gosilo init --profile personal
-  gosilo init --profile team --username admin --password "s3cure-p4ss"`,
+  gosilo init --username admin --password "s3cure-p4ss"`,
 	RunE: runInit,
 }
 
 func init() {
-	initCmd.Flags().StringVar(&initProfile, "profile", "", "configuration profile: personal, team, hardened")
 	initCmd.Flags().StringVar(&initUsername, "username", "", "admin username (non-interactive)")
 	initCmd.Flags().StringVar(&initPassword, "password", "", "admin password (non-interactive)")
 	rootCmd.AddCommand(initCmd)
 }
 
-// profileSettings returns the DB settings overrides for a given profile.
-func profileSettings(name string) (map[string]string, error) {
-	switch name {
-	case "personal":
-		return map[string]string{
-			"registration_mode": "closed",
-			"rate_limit_rate":   "0",
-		}, nil
-	case "team":
-		return map[string]string{
-			"registration_mode": "open",
-			"rate_limit_rate":   "10",
-			"rate_limit_burst":  "20",
-		}, nil
-	case "hardened":
-		return map[string]string{
-			"registration_mode": "closed",
-			"rate_limit_rate":   "5",
-			"rate_limit_burst":  "10",
-		}, nil
-	default:
-		return nil, fmt.Errorf("unknown profile %q (choose: personal, team, hardened)", name)
-	}
-}
-
-// profileEnvHints returns suggested env vars for a profile.
-func profileEnvHints(name string) string {
-	switch name {
-	case "personal":
-		return `Recommended environment variables for "personal" profile:
-  GOSILO_ADDR=127.0.0.1:8080
-  GOSILO_WEB_MODE=oauth`
-	case "team":
-		return `Recommended environment variables for "team" profile:
-  GOSILO_ADDR=:8080
-  GOSILO_WEB_MODE=full`
-	case "hardened":
-		return `Recommended environment variables for "hardened" profile:
-  GOSILO_ADDR=:8080
-  GOSILO_WEB_MODE=oauth`
-	default:
-		return ""
-	}
-}
-
 func runInit(cmd *cobra.Command, args []string) error {
 	dsn := resolvedDBDSN("sqlite:gosilo.db")
-
-	// Validate profile early.
-	if initProfile != "" {
-		if _, err := profileSettings(initProfile); err != nil {
-			return err
-		}
-	}
 
 	// Check if the DB file already exists (for file-based paths).
 	_, path, err := parseDBPath(dsn)
@@ -111,6 +56,8 @@ func runInit(cmd *cobra.Command, args []string) error {
 	defer repo.Close()
 
 	fmt.Fprintf(os.Stderr, "Database created at %s\n\n", dsn)
+
+	interactive := initUsername == ""
 
 	// Get admin credentials.
 	usernameInput := initUsername
@@ -152,20 +99,43 @@ func runInit(cmd *cobra.Command, args []string) error {
 
 	fmt.Fprintf(os.Stderr, "Admin user %q created.\n", username)
 
-	// Apply profile settings.
-	if initProfile != "" {
-		overrides, _ := profileSettings(initProfile)
-		cfg := config.Load()
-		svc := settings.New(repo, cfg)
-		ctx := context.Background()
-		for k, v := range overrides {
-			if err := svc.Set(ctx, k, v); err != nil {
-				return fmt.Errorf("apply profile setting %s=%s: %w", k, v, err)
-			}
-		}
-		fmt.Fprintf(os.Stderr, "\nProfile %q applied.\n", initProfile)
+	// Ask setup questions interactively; use defaults when non-interactive.
+	openRegistration := false
+	rateLimiting := true
+
+	if interactive {
 		fmt.Fprintln(os.Stderr)
-		fmt.Fprintln(os.Stderr, profileEnvHints(initProfile))
+		openRegistration, err = promptYesNo("Allow public registration? (y/N):", false)
+		if err != nil {
+			return err
+		}
+		rateLimiting, err = promptYesNo("Enable rate limiting? (Y/n):", true)
+		if err != nil {
+			return err
+		}
+	}
+
+	// Apply settings.
+	overrides := map[string]string{}
+	if openRegistration {
+		overrides["registration_mode"] = "open"
+	} else {
+		overrides["registration_mode"] = "closed"
+	}
+	if rateLimiting {
+		overrides["rate_limit_rate"] = "10"
+		overrides["rate_limit_burst"] = "20"
+	} else {
+		overrides["rate_limit_rate"] = "0"
+	}
+
+	cfg := config.Load()
+	svc := settings.New(repo, cfg)
+	ctx := context.Background()
+	for k, v := range overrides {
+		if err := svc.Set(ctx, k, v); err != nil {
+			return fmt.Errorf("apply setting %s=%s: %w", k, v, err)
+		}
 	}
 
 	fmt.Fprintln(os.Stderr, "\nRun 'gosilo serve' to start the server.")
