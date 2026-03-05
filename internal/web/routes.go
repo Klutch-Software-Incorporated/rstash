@@ -15,12 +15,12 @@ func OAuthRoutes(deps *UIDeps) http.Handler {
 	// Setup wizard (needed so first user can be created when CLI wasn't used).
 	setupHandler := SetupHandler(deps)
 	mux.HandleFunc("GET /setup", setupHandler.ShowSetup)
-	mux.HandleFunc("POST /setup", setupHandler.DoSetup)
+	mux.HandleFunc("POST /setup", RequireCSRF(setupHandler.DoSetup))
 
 	// Auth (login/logout — needed for OAuth session).
 	authHandler := AuthHandler(deps)
 	mux.HandleFunc("GET /login", authHandler.ShowLogin)
-	mux.HandleFunc("POST /login", authHandler.DoLogin)
+	mux.HandleFunc("POST /login", RequireCSRF(authHandler.DoLogin))
 	mux.HandleFunc("POST /logout", RequireCSRF(authHandler.DoLogout))
 
 	// Legal pages (public, no auth).
@@ -43,18 +43,18 @@ func FullRoutes(deps *UIDeps) http.Handler {
 	// Setup wizard.
 	setupHandler := SetupHandler(deps)
 	mux.HandleFunc("GET /setup", setupHandler.ShowSetup)
-	mux.HandleFunc("POST /setup", setupHandler.DoSetup)
+	mux.HandleFunc("POST /setup", RequireCSRF(setupHandler.DoSetup))
 
 	// Auth (login/logout).
 	authHandler := AuthHandler(deps)
 	mux.HandleFunc("GET /login", authHandler.ShowLogin)
-	mux.HandleFunc("POST /login", authHandler.DoLogin)
+	mux.HandleFunc("POST /login", RequireCSRF(authHandler.DoLogin))
 	mux.HandleFunc("POST /logout", RequireCSRF(authHandler.DoLogout))
 
 	// Registration.
 	registerHandler := RegisterHandler(deps)
 	mux.HandleFunc("GET /register", registerHandler.ShowRegister)
-	mux.HandleFunc("POST /register", registerHandler.DoRegister)
+	mux.HandleFunc("POST /register", RequireCSRF(registerHandler.DoRegister))
 
 	// Legal pages (public, no auth).
 	legalH := LegalHandler(deps)
@@ -65,7 +65,7 @@ func FullRoutes(deps *UIDeps) http.Handler {
 	// Abuse reporting (public, no auth).
 	abuseH := AbuseHandler(deps)
 	mux.HandleFunc("GET /abuse/report", abuseH.ShowReportForm)
-	mux.HandleFunc("POST /abuse/report", abuseH.DoReport)
+	mux.HandleFunc("POST /abuse/report", RequireCSRF(abuseH.DoReport))
 
 	// --- Legacy redirects for old URL paths ---
 	mux.HandleFunc("GET /settings", redirectToSelf("/settings"))

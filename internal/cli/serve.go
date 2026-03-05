@@ -253,9 +253,11 @@ func runServe(cmd *cobra.Command, args []string) error {
 			uiHandler = web.OAuthRoutes(uiDeps)
 		}
 
-		// Wrap UI handler with auth loader and setup guard.
+		// Wrap UI handler with auth loader, CSRF cookie, and setup guard.
 		wrapped := web.AuthLoader(localAuth, secureCookies)(
-			web.SetupGuard(localAuth)(uiHandler),
+			web.EnsureCSRFCookie(secureCookies)(
+				web.SetupGuard(localAuth)(uiHandler),
+			),
 		)
 		mux.Handle("/", wrapped)
 	}
@@ -324,23 +326,29 @@ func runServe(cmd *cobra.Command, args []string) error {
 		}
 
 		update := func() {
+			// Run all DB reads in a single transaction so we acquire the
+			// connection once rather than competing for it 4 separate times.
 			bgCtx := context.Background()
-			if total, err := repo.GetTotalStorageUsed(bgCtx); err == nil {
-				metrics.StorageUsedBytes.Set(float64(total))
-			}
+			_ = repo.Transaction(func(tx *db.Repository) error {
+				if total, err := tx.GetTotalStorageUsed(bgCtx); err == nil {
+					metrics.StorageUsedBytes.Set(float64(total))
+				}
+				if count, err := tx.UserCount(bgCtx); err == nil {
+					metrics.UsersTotal.Set(float64(count))
+				}
+				if count, err := tx.CountActiveSessions(bgCtx); err == nil {
+					metrics.ActiveSessions.Set(float64(count))
+				}
+				if count, err := tx.CountActiveOAuthTokens(bgCtx); err == nil {
+					metrics.ActiveTokens.Set(float64(count))
+				}
+				return nil
+			})
+			// Disk space check is not a DB operation.
 			if diskPath != "" {
 				if avail, err := metrics.DiskAvailableBytes(diskPath); err == nil {
 					metrics.StorageAvailableBytes.Set(float64(avail))
 				}
-			}
-			if count, err := repo.UserCount(bgCtx); err == nil {
-				metrics.UsersTotal.Set(float64(count))
-			}
-			if count, err := repo.CountActiveSessions(bgCtx); err == nil {
-				metrics.ActiveSessions.Set(float64(count))
-			}
-			if count, err := repo.CountActiveOAuthTokens(bgCtx); err == nil {
-				metrics.ActiveTokens.Set(float64(count))
 			}
 		}
 

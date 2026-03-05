@@ -2,6 +2,8 @@ package web
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"log/slog"
 	"net/http"
 	"sync/atomic"
@@ -18,7 +20,10 @@ const (
 	ctxKeySession    contextKey = "session"
 	ctxKeyTargetUser contextKey = "targetUser"
 	ctxKeyIsSelf     contextKey = "isSelf"
+	ctxKeyCSRFCookie contextKey = "csrfCookie"
 )
+
+const csrfCookieName = "gosilo_csrf"
 
 // AuthLoader returns middleware that reads the session cookie and loads
 // the user into the request context.
@@ -75,22 +80,67 @@ func CurrentSession(r *http.Request) *model.Session {
 	return s
 }
 
-// CSRFToken returns the CSRF token for the current session, or empty string.
+// EnsureCSRFCookie is middleware that sets a gosilo_csrf cookie on every response
+// if one is not already present. The cookie value is stored in context so that
+// CSRFToken() can return it for template rendering on pre-auth pages.
+func EnsureCSRFCookie(secureCookies bool) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			var token string
+			if c, err := r.Cookie(csrfCookieName); err == nil && c.Value != "" {
+				token = c.Value
+			} else {
+				b := make([]byte, 16)
+				if _, err := rand.Read(b); err != nil {
+					http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+					return
+				}
+				token = hex.EncodeToString(b)
+				http.SetCookie(w, &http.Cookie{
+					Name:     csrfCookieName,
+					Value:    token,
+					Path:     "/",
+					HttpOnly: true,
+					Secure:   secureCookies,
+					SameSite: http.SameSiteLaxMode,
+				})
+			}
+			ctx := context.WithValue(r.Context(), ctxKeyCSRFCookie, token)
+			next.ServeHTTP(w, r.WithContext(ctx))
+		})
+	}
+}
+
+// csrfCookieToken returns the CSRF cookie value from context, or empty string.
+func csrfCookieToken(r *http.Request) string {
+	v, _ := r.Context().Value(ctxKeyCSRFCookie).(string)
+	return v
+}
+
+// CSRFToken returns the CSRF token for the current request. It prefers the
+// session-based token when a session exists, and falls back to the double-submit
+// cookie token for pre-auth pages (login, setup, register, abuse report).
 func CSRFToken(r *http.Request) string {
 	if s := CurrentSession(r); s != nil {
 		return s.CSRFToken
 	}
-	return ""
+	return csrfCookieToken(r)
 }
 
-// ValidateCSRF checks that the form's csrf_token matches the session's CSRF token.
-// Returns true if valid.
+// ValidateCSRF checks that the form's csrf_token matches either the session's
+// CSRF token or the double-submit cookie token. Returns true if valid.
 func ValidateCSRF(r *http.Request) bool {
-	sess := CurrentSession(r)
-	if sess == nil {
+	formToken := r.FormValue("csrf_token")
+	if formToken == "" {
 		return false
 	}
-	return r.FormValue("csrf_token") == sess.CSRFToken
+	// Prefer session-based CSRF when a session exists.
+	if sess := CurrentSession(r); sess != nil {
+		return formToken == sess.CSRFToken
+	}
+	// Fall back to double-submit cookie comparison.
+	cookieToken := csrfCookieToken(r)
+	return cookieToken != "" && formToken == cookieToken
 }
 
 // RequireCSRF wraps a handler to reject requests with an invalid CSRF token.

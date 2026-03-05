@@ -48,7 +48,9 @@ func setupTestServer(t *testing.T, regMode string) (*httptest.Server, *web.UIDep
 
 	uiHandler := web.Routes(deps)
 	wrapped := web.AuthLoader(localAuth, false)(
-		web.SetupGuard(localAuth)(uiHandler),
+		web.EnsureCSRFCookie(false)(
+			web.SetupGuard(localAuth)(uiHandler),
+		),
 	)
 
 	ts := httptest.NewServer(wrapped)
@@ -96,16 +98,24 @@ func TestSetupCreatesAdmin(t *testing.T) {
 		t.Fatalf("expected 200 for GET /setup, got %d", resp.StatusCode)
 	}
 
+	// Extract CSRF token from the GET response cookies.
+	var csrfToken string
+	for _, c := range resp.Cookies() {
+		if c.Name == "gosilo_csrf" {
+			csrfToken = c.Value
+		}
+	}
+	if csrfToken == "" {
+		t.Fatal("expected gosilo_csrf cookie from GET /setup")
+	}
+
 	// POST /setup to create admin.
 	form := url.Values{
 		"username":         {"admin"},
 		"password":         {"secretpassword"},
 		"password_confirm": {"secretpassword"},
 	}
-	resp, err = client.Post(ts.URL+"/setup", "application/x-www-form-urlencoded", strings.NewReader(form.Encode()))
-	if err != nil {
-		t.Fatalf("post /setup: %v", err)
-	}
+	resp = postWithCSRF(t, client, ts.URL+"/setup", csrfToken, form)
 	resp.Body.Close()
 
 	if resp.StatusCode != http.StatusSeeOther {
@@ -141,15 +151,15 @@ func TestLoginLogoutCycle(t *testing.T) {
 		Jar: jar,
 	}
 
+	// Get CSRF token.
+	csrfToken := getCSRFToken(t, client, ts.URL+"/login")
+
 	// Login.
 	form := url.Values{
 		"username": {"testuser"},
 		"password": {"password123"},
 	}
-	resp, err := client.Post(ts.URL+"/login", "application/x-www-form-urlencoded", strings.NewReader(form.Encode()))
-	if err != nil {
-		t.Fatalf("post /login: %v", err)
-	}
+	resp := postWithCSRF(t, client, ts.URL+"/login", csrfToken, form)
 	resp.Body.Close()
 
 	if resp.StatusCode != http.StatusSeeOther {
@@ -177,14 +187,13 @@ func TestLoginInvalidCredentials(t *testing.T) {
 		return http.ErrUseLastResponse
 	}}
 
+	csrfToken := getCSRFToken(t, client, ts.URL+"/login")
+
 	form := url.Values{
 		"username": {"badloginuser"},
 		"password": {"wrongpassword"},
 	}
-	resp, err := client.Post(ts.URL+"/login", "application/x-www-form-urlencoded", strings.NewReader(form.Encode()))
-	if err != nil {
-		t.Fatalf("post /login: %v", err)
-	}
+	resp := postWithCSRF(t, client, ts.URL+"/login", csrfToken, form)
 	resp.Body.Close()
 
 	// Should re-render the login page (200), not redirect.
@@ -268,16 +277,15 @@ func TestRegistrationOpen(t *testing.T) {
 		return http.ErrUseLastResponse
 	}}
 
+	csrfToken := getCSRFToken(t, client, ts.URL+"/register")
+
 	form := url.Values{
 		"username":         {"newuser"},
 		"password":         {"newpassword123"},
 		"password_confirm": {"newpassword123"},
 		"tos_accept":       {"on"},
 	}
-	resp, err := client.Post(ts.URL+"/register", "application/x-www-form-urlencoded", strings.NewReader(form.Encode()))
-	if err != nil {
-		t.Fatalf("post /register: %v", err)
-	}
+	resp := postWithCSRF(t, client, ts.URL+"/register", csrfToken, form)
 	resp.Body.Close()
 
 	if resp.StatusCode != http.StatusSeeOther {
@@ -302,16 +310,15 @@ func TestSetupValidation(t *testing.T) {
 		return http.ErrUseLastResponse
 	}}
 
+	csrfToken := getCSRFToken(t, client, ts.URL+"/setup")
+
 	// Password too short.
 	form := url.Values{
 		"username":         {"admin"},
 		"password":         {"short"},
 		"password_confirm": {"short"},
 	}
-	resp, err := client.Post(ts.URL+"/setup", "application/x-www-form-urlencoded", strings.NewReader(form.Encode()))
-	if err != nil {
-		t.Fatalf("post /setup: %v", err)
-	}
+	resp := postWithCSRF(t, client, ts.URL+"/setup", csrfToken, form)
 	resp.Body.Close()
 
 	// Should re-render form (200), not redirect.
@@ -325,14 +332,46 @@ func TestSetupValidation(t *testing.T) {
 		"password":         {"longpassword123"},
 		"password_confirm": {"differentpassword"},
 	}
-	resp, err = client.Post(ts.URL+"/setup", "application/x-www-form-urlencoded", strings.NewReader(form.Encode()))
-	if err != nil {
-		t.Fatalf("post /setup: %v", err)
-	}
+	resp = postWithCSRF(t, client, ts.URL+"/setup", csrfToken, form)
 	resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("expected 200 for password mismatch, got %d", resp.StatusCode)
 	}
+}
+
+// getCSRFToken performs a GET request to the given URL and returns the CSRF
+// cookie value. Tests must include this value as the csrf_token form field.
+func getCSRFToken(t *testing.T, client *http.Client, url string) string {
+	t.Helper()
+	resp, err := client.Get(url)
+	if err != nil {
+		t.Fatalf("get csrf token: %v", err)
+	}
+	resp.Body.Close()
+	for _, c := range resp.Cookies() {
+		if c.Name == "gosilo_csrf" {
+			return c.Value
+		}
+	}
+	t.Fatal("no gosilo_csrf cookie in response")
+	return ""
+}
+
+// postWithCSRF performs a POST request that includes the CSRF cookie and form token.
+func postWithCSRF(t *testing.T, client *http.Client, targetURL string, csrfToken string, form url.Values) *http.Response {
+	t.Helper()
+	form.Set("csrf_token", csrfToken)
+	req, err := http.NewRequest("POST", targetURL, strings.NewReader(form.Encode()))
+	if err != nil {
+		t.Fatalf("create request: %v", err)
+	}
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.AddCookie(&http.Cookie{Name: "gosilo_csrf", Value: csrfToken})
+	resp, err := client.Do(req)
+	if err != nil {
+		t.Fatalf("post with csrf: %v", err)
+	}
+	return resp
 }
 
 // simpleCookieJar is a minimal cookie jar for testing.
