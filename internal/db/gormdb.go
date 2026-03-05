@@ -6,6 +6,7 @@ import (
 	"net/url"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/glebarez/sqlite"
 	"gorm.io/driver/mysql"
@@ -69,6 +70,11 @@ func OpenGORM(dsn string) (*gorm.DB, Dialect, error) {
 		return nil, "", err
 	}
 
+	// Configure connection pool.
+	if err := configurePool(gormDB, dialect); err != nil {
+		return nil, "", err
+	}
+
 	return gormDB, dialect, nil
 }
 
@@ -118,6 +124,27 @@ func initDialect(gormDB *gorm.DB, dialect Dialect) error {
 		// We rely on the database collation being set appropriately.
 	}
 
+	return nil
+}
+
+// configurePool sets connection pool parameters on the underlying *sql.DB.
+// SQLite is single-writer so it gets 1 connection; network databases get a
+// larger pool suitable for concurrent access.
+func configurePool(gormDB *gorm.DB, dialect Dialect) error {
+	sqlDB, err := gormDB.DB()
+	if err != nil {
+		return fmt.Errorf("get underlying sql.DB for pool config: %w", err)
+	}
+
+	if dialect == DialectSQLite {
+		sqlDB.SetMaxOpenConns(1)
+		sqlDB.SetMaxIdleConns(1)
+	} else {
+		sqlDB.SetMaxOpenConns(25)
+		sqlDB.SetMaxIdleConns(5)
+		sqlDB.SetConnMaxLifetime(5 * time.Minute)
+		sqlDB.SetConnMaxIdleTime(5 * time.Minute)
+	}
 	return nil
 }
 

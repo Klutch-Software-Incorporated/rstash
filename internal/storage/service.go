@@ -1,7 +1,6 @@
 package storage
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -107,7 +106,7 @@ func (s *Service) PutDocument(ctx context.Context, userID int64, path string, co
 	}
 
 	// Write blob first (non-transactional).
-	if err := s.blobs.Put(ctx, userID, path, bytes.NewReader(data)); err != nil {
+	if err := s.blobs.Put(ctx, userID, path, data); err != nil {
 		return nil, err
 	}
 

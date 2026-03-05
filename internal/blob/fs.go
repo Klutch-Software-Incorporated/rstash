@@ -54,7 +54,7 @@ func (s *FSStore) Get(_ context.Context, userID int64, path string) (io.ReadClos
 }
 
 // Put stores a blob on the filesystem using atomic rename.
-func (s *FSStore) Put(_ context.Context, userID int64, path string, content io.Reader) error {
+func (s *FSStore) Put(_ context.Context, userID int64, path string, data []byte) error {
 	p, err := s.blobPath(userID, path)
 	if err != nil {
 		return err
@@ -70,7 +70,7 @@ func (s *FSStore) Put(_ context.Context, userID int64, path string, content io.R
 	}
 	tmpName := tmp.Name()
 
-	if _, err := io.Copy(tmp, content); err != nil {
+	if _, err := tmp.Write(data); err != nil {
 		tmp.Close()
 		os.Remove(tmpName)
 		return fmt.Errorf("write blob: %w", err)

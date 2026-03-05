@@ -23,7 +23,7 @@ func TestFSStore_PutThenGet(t *testing.T) {
 	ctx := context.Background()
 
 	data := []byte("hello, world")
-	if err := store.Put(ctx, 1, "docs/readme.txt", bytes.NewReader(data)); err != nil {
+	if err := store.Put(ctx, 1, "docs/readme.txt", data); err != nil {
 		t.Fatalf("Put: %v", err)
 	}
 
@@ -46,10 +46,10 @@ func TestFSStore_PutOverwrites(t *testing.T) {
 	store := newTestFSStore(t)
 	ctx := context.Background()
 
-	if err := store.Put(ctx, 1, "file.txt", bytes.NewReader([]byte("v1"))); err != nil {
+	if err := store.Put(ctx, 1, "file.txt", []byte("v1")); err != nil {
 		t.Fatalf("Put v1: %v", err)
 	}
-	if err := store.Put(ctx, 1, "file.txt", bytes.NewReader([]byte("v2"))); err != nil {
+	if err := store.Put(ctx, 1, "file.txt", []byte("v2")); err != nil {
 		t.Fatalf("Put v2: %v", err)
 	}
 
@@ -72,7 +72,7 @@ func TestFSStore_Delete(t *testing.T) {
 	store := newTestFSStore(t)
 	ctx := context.Background()
 
-	if err := store.Put(ctx, 1, "file.txt", bytes.NewReader([]byte("data"))); err != nil {
+	if err := store.Put(ctx, 1, "file.txt", []byte("data")); err != nil {
 		t.Fatalf("Put: %v", err)
 	}
 	if err := store.Delete(ctx, 1, "file.txt"); err != nil {
@@ -112,7 +112,7 @@ func TestFSStore_DeleteTree(t *testing.T) {
 	// Create a subtree of files.
 	files := []string{"photos/a.jpg", "photos/b.jpg", "photos/sub/c.jpg"}
 	for _, f := range files {
-		if err := store.Put(ctx, 1, f, bytes.NewReader([]byte("img"))); err != nil {
+		if err := store.Put(ctx, 1, f, []byte("img")); err != nil {
 			t.Fatalf("Put %s: %v", f, err)
 		}
 	}
@@ -145,7 +145,7 @@ func TestFSStore_PathTraversal(t *testing.T) {
 		t.Fatal("expected path traversal to be rejected, got nil")
 	}
 
-	err = store.Put(ctx, 1, "../../etc/evil", bytes.NewReader([]byte("bad")))
+	err = store.Put(ctx, 1, "../../etc/evil", []byte("bad"))
 	if err == nil {
 		t.Fatal("expected path traversal to be rejected, got nil")
 	}
@@ -155,10 +155,10 @@ func TestFSStore_UserIsolation(t *testing.T) {
 	store := newTestFSStore(t)
 	ctx := context.Background()
 
-	if err := store.Put(ctx, 1, "file.txt", bytes.NewReader([]byte("user1"))); err != nil {
+	if err := store.Put(ctx, 1, "file.txt", []byte("user1")); err != nil {
 		t.Fatalf("Put user 1: %v", err)
 	}
-	if err := store.Put(ctx, 2, "file.txt", bytes.NewReader([]byte("user2"))); err != nil {
+	if err := store.Put(ctx, 2, "file.txt", []byte("user2")); err != nil {
 		t.Fatalf("Put user 2: %v", err)
 	}
 

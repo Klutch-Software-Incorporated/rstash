@@ -273,9 +273,9 @@ func runServe(cmd *cobra.Command, args []string) error {
 	// Start server.
 	srv := &http.Server{
 		Addr:              cfg.Addr,
-		Handler:           api.RequestLogger(api.SecurityHeaders(api.SecurityHeadersConfig{
+		Handler:           api.Recovery(api.RequestLogger(api.SecurityHeaders(api.SecurityHeadersConfig{
 			HTTPS: strings.HasPrefix(cfg.BaseURL, "https://"),
-		})(handler)),
+		})(handler))),
 		ReadHeaderTimeout: 10 * time.Second,
 		ReadTimeout:       30 * time.Second,
 		WriteTimeout:      60 * time.Second,

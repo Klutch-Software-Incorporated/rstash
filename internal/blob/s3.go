@@ -1,6 +1,7 @@
 package blob
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"io"
@@ -154,9 +155,9 @@ func (s *S3Store) Get(ctx context.Context, userID int64, path string) (io.ReadCl
 }
 
 // Put stores a blob in S3.
-func (s *S3Store) Put(ctx context.Context, userID int64, path string, content io.Reader) error {
+func (s *S3Store) Put(ctx context.Context, userID int64, path string, data []byte) error {
 	key := s.objectKey(userID, path)
-	_, err := s.client.PutObject(ctx, s.bucket, key, content, -1, minio.PutObjectOptions{})
+	_, err := s.client.PutObject(ctx, s.bucket, key, bytes.NewReader(data), int64(len(data)), minio.PutObjectOptions{})
 	if err != nil {
 		return fmt.Errorf("put blob: %w", err)
 	}

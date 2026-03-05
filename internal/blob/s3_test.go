@@ -192,7 +192,7 @@ func TestS3_Integration_PutGetRoundTrip(t *testing.T) {
 	ctx := context.Background()
 
 	data := []byte("hello, S3!")
-	if err := s.Put(ctx, 1, "test/round-trip.txt", bytes.NewReader(data)); err != nil {
+	if err := s.Put(ctx, 1, "test/round-trip.txt", data); err != nil {
 		t.Fatalf("Put: %v", err)
 	}
 
@@ -218,10 +218,10 @@ func TestS3_Integration_Overwrite(t *testing.T) {
 	s := newTestS3Store(t)
 	ctx := context.Background()
 
-	if err := s.Put(ctx, 1, "test/overwrite.txt", bytes.NewReader([]byte("v1"))); err != nil {
+	if err := s.Put(ctx, 1, "test/overwrite.txt", []byte("v1")); err != nil {
 		t.Fatalf("Put v1: %v", err)
 	}
-	if err := s.Put(ctx, 1, "test/overwrite.txt", bytes.NewReader([]byte("v2"))); err != nil {
+	if err := s.Put(ctx, 1, "test/overwrite.txt", []byte("v2")); err != nil {
 		t.Fatalf("Put v2: %v", err)
 	}
 
@@ -243,7 +243,7 @@ func TestS3_Integration_Delete(t *testing.T) {
 	s := newTestS3Store(t)
 	ctx := context.Background()
 
-	if err := s.Put(ctx, 1, "test/delete-me.txt", bytes.NewReader([]byte("bye"))); err != nil {
+	if err := s.Put(ctx, 1, "test/delete-me.txt", []byte("bye")); err != nil {
 		t.Fatalf("Put: %v", err)
 	}
 	if err := s.Delete(ctx, 1, "test/delete-me.txt"); err != nil {
@@ -282,7 +282,7 @@ func TestS3_Integration_DeleteTree(t *testing.T) {
 
 	// Create several files under a prefix.
 	for _, name := range []string{"tree/a.txt", "tree/b.txt", "tree/sub/c.txt"} {
-		if err := s.Put(ctx, 2, name, bytes.NewReader([]byte(name))); err != nil {
+		if err := s.Put(ctx, 2, name, []byte(name)); err != nil {
 			t.Fatalf("Put %q: %v", name, err)
 		}
 	}
@@ -304,7 +304,7 @@ func TestS3_Integration_UserIsolation(t *testing.T) {
 	s := newTestS3Store(t)
 	ctx := context.Background()
 
-	if err := s.Put(ctx, 10, "iso/file.txt", bytes.NewReader([]byte("user10"))); err != nil {
+	if err := s.Put(ctx, 10, "iso/file.txt", []byte("user10")); err != nil {
 		t.Fatalf("Put user10: %v", err)
 	}
 

@@ -39,19 +39,14 @@ func (s *GORMStore) Get(ctx context.Context, userID int64, path string) (io.Read
 }
 
 // Put stores a blob (insert or replace).
-func (s *GORMStore) Put(ctx context.Context, userID int64, path string, content io.Reader) error {
-	data, err := io.ReadAll(content)
-	if err != nil {
-		return fmt.Errorf("read content: %w", err)
-	}
-
+func (s *GORMStore) Put(ctx context.Context, userID int64, path string, data []byte) error {
 	b := model.Blob{
 		UserID: userID,
 		Path:   path,
 		Data:   data,
 	}
 
-	err = s.db.WithContext(ctx).
+	err := s.db.WithContext(ctx).
 		Clauses(clause.OnConflict{
 			Columns:   []clause.Column{{Name: "user_id"}, {Name: "path"}},
 			DoUpdates: clause.AssignmentColumns([]string{"data"}),

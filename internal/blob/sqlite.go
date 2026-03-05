@@ -64,12 +64,8 @@ func (s *SQLiteStore) Get(ctx context.Context, userID int64, path string) (io.Re
 }
 
 // Put stores a blob (insert or replace).
-func (s *SQLiteStore) Put(ctx context.Context, userID int64, path string, content io.Reader) error {
-	data, err := io.ReadAll(content)
-	if err != nil {
-		return fmt.Errorf("read content: %w", err)
-	}
-	_, err = s.db.ExecContext(ctx,
+func (s *SQLiteStore) Put(ctx context.Context, userID int64, path string, data []byte) error {
+	_, err := s.db.ExecContext(ctx,
 		"INSERT INTO blobs (user_id, path, data) VALUES (?, ?, ?) ON CONFLICT(user_id, path) DO UPDATE SET data = excluded.data",
 		userID, path, data,
 	)
