@@ -206,6 +206,7 @@ func runServe(cmd *cobra.Command, args []string) error {
 			metricsH.ServeHTTP(w, r)
 		}
 	})
+	mux.Handle("GET /health", api.Health(repo))
 	mux.Handle("/.well-known/webfinger", api.CORS(api.WebFinger(cfg)))
 	mux.Handle("POST /oauth/token", api.CORS(api.OAuthToken(repo,
 		func() string { return runtimeSettings.Load().TokenLifetime },
@@ -265,7 +266,7 @@ func runServe(cmd *cobra.Command, args []string) error {
 	runtimeSettings.OnChange(func(s *settings.Snapshot) {
 		limiter.UpdateConfig(s.RateLimitRate, s.RateLimitBurst)
 	})
-	var handler http.Handler = api.MetricsMiddleware(api.RateLimit(limiter)(mux))
+	var handler http.Handler = api.MetricsMiddleware(api.RateLimit(limiter)(api.MaxBodySize(1<<20)(mux)))
 	if snap.RateLimitRate > 0 {
 		slog.Info("rate limiting enabled", "rate", snap.RateLimitRate, "burst", snap.RateLimitBurst)
 	}

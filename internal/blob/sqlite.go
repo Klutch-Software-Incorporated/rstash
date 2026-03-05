@@ -32,9 +32,18 @@ func NewSQLiteStore(path string) (*SQLiteStore, error) {
 		return nil, fmt.Errorf("open blob database: %w", err)
 	}
 
+	// SQLite is single-writer; limit pool to 1 connection.
+	db.SetMaxOpenConns(1)
+	db.SetMaxIdleConns(1)
+
 	if _, err := db.Exec("PRAGMA journal_mode=WAL"); err != nil {
 		db.Close()
 		return nil, fmt.Errorf("enable WAL mode on blob database: %w", err)
+	}
+
+	if _, err := db.Exec("PRAGMA busy_timeout=5000"); err != nil {
+		db.Close()
+		return nil, fmt.Errorf("set busy_timeout on blob database: %w", err)
 	}
 
 	// Enable case-sensitive LIKE (SQLite default is case-insensitive for ASCII).
@@ -97,6 +106,13 @@ func (s *SQLiteStore) DeleteTree(ctx context.Context, userID int64, folderPath s
 		return fmt.Errorf("delete blob tree: %w", err)
 	}
 	return nil
+}
+
+// Count returns the total number of blobs stored.
+func (s *SQLiteStore) Count(ctx context.Context) (int64, error) {
+	var n int64
+	err := s.db.QueryRowContext(ctx, "SELECT COUNT(*) FROM blobs").Scan(&n)
+	return n, err
 }
 
 // Close closes the underlying database connection.

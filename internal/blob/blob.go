@@ -13,3 +13,10 @@ type Store interface {
 	DeleteTree(ctx context.Context, userID int64, folderPath string) error
 	Close() error
 }
+
+// Counter is an optional interface that blob stores can implement to report
+// the total number of stored blobs. Used by the doctor command for
+// consistency checking against metadata node counts.
+type Counter interface {
+	Count(ctx context.Context) (int64, error)
+}

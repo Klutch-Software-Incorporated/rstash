@@ -103,6 +103,7 @@ func initDialect(gormDB *gorm.DB, dialect Dialect) error {
 	case DialectSQLite:
 		pragmas := []string{
 			"PRAGMA journal_mode=WAL",
+			"PRAGMA busy_timeout=5000",
 			"PRAGMA foreign_keys=ON",
 			"PRAGMA case_sensitive_like=ON",
 		}

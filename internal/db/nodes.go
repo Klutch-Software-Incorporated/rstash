@@ -105,6 +105,15 @@ func (r *Repository) GetUserStorageStats(ctx context.Context, userID int64) (*Us
 	return &s, nil
 }
 
+// CountDocumentNodes returns the total number of non-folder nodes across all users.
+func (r *Repository) CountDocumentNodes(ctx context.Context) (int64, error) {
+	var n int64
+	err := r.db.WithContext(ctx).Model(&model.Node{}).
+		Where("is_folder = ?", false).
+		Count(&n).Error
+	return n, err
+}
+
 // ModuleStats holds per-module storage metrics.
 type ModuleStats struct {
 	Module     string

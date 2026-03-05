@@ -562,6 +562,11 @@ func (h *adminHandler) ToggleAdmin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Force re-login so the session reflects the new privilege level.
+	if err := h.deps.Auth.TerminateAllSessions(r.Context(), id); err != nil {
+		slog.Error("failed to terminate sessions after admin toggle", "error", err)
+	}
+
 	h.audit(r, "user.admin_toggled", "user", idStr, fmt.Sprintf("admin=%v", newAdmin))
 
 	if newAdmin {
@@ -616,6 +621,10 @@ func (h *adminHandler) ToggleDisabled(w http.ResponseWriter, r *http.Request) {
 		h.audit(r, "user.disabled", "user", idStr, user.Username)
 		ui.SetFlash(w, fmt.Sprintf("%s has been disabled.", user.Username))
 	} else {
+		// Clear any stale sessions from before the account was disabled.
+		if err := h.deps.Auth.TerminateAllSessions(r.Context(), id); err != nil {
+			slog.Error("failed to terminate sessions on enable", "error", err)
+		}
 		h.audit(r, "user.enabled", "user", idStr, user.Username)
 		ui.SetFlash(w, fmt.Sprintf("%s has been enabled.", user.Username))
 	}

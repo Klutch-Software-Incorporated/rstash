@@ -23,6 +23,15 @@ func OpenRepository(dsn string) (*Repository, error) {
 	return NewRepository(gormDB, dialect), nil
 }
 
+// Ping verifies the database connection is alive.
+func (r *Repository) Ping() error {
+	sqlDB, err := r.db.DB()
+	if err != nil {
+		return err
+	}
+	return sqlDB.Ping()
+}
+
 // Close closes the underlying database connection.
 func (r *Repository) Close() error {
 	sqlDB, err := r.db.DB()

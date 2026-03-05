@@ -13,6 +13,7 @@ import (
 	"strconv"
 	"strings"
 
+	"gosilo/internal/auth"
 	"gosilo/internal/config"
 	"gosilo/internal/storage"
 	"gosilo/internal/ui"
@@ -774,10 +775,15 @@ func (h *profileHandler) ChangePassword(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	// Invalidate all other sessions.
-	sess := CurrentSession(r)
-	if err := h.deps.Auth.InvalidateOtherSessions(r.Context(), target.ID, sess.Token); err != nil {
-		slog.Error("failed to invalidate other sessions", "error", err)
+	// Invalidate all sessions (including current) and issue a fresh one.
+	if err := h.deps.Auth.TerminateAllSessions(r.Context(), target.ID); err != nil {
+		slog.Error("failed to terminate sessions after password change", "error", err)
+	}
+	newSess, err := h.deps.Auth.CreateSession(r.Context(), target.ID, ClientIP(r))
+	if err != nil {
+		slog.Error("failed to create new session after password change", "error", err)
+	} else {
+		auth.SetSessionCookie(w, newSess.Token, h.deps.SecureCookies)
 	}
 
 	ui.SetFlash(w, "Password changed successfully.")
@@ -887,6 +893,11 @@ func (h *profileHandler) ToggleAdmin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Force re-login so the session reflects the new privilege level.
+	if err := h.deps.Auth.TerminateAllSessions(r.Context(), target.ID); err != nil {
+		slog.Error("failed to terminate sessions after admin toggle", "error", err)
+	}
+
 	idStr := strconv.FormatInt(target.ID, 10)
 	h.audit(r, "user.admin_toggled", "user", idStr, fmt.Sprintf("admin=%v", newAdmin))
 
@@ -923,6 +934,10 @@ func (h *profileHandler) ToggleDisabled(w http.ResponseWriter, r *http.Request) 
 		h.audit(r, "user.disabled", "user", idStr, target.Username)
 		ui.SetFlash(w, fmt.Sprintf("%s has been disabled.", target.Username))
 	} else {
+		// Clear any stale sessions from before the account was disabled.
+		if err := h.deps.Auth.TerminateAllSessions(r.Context(), target.ID); err != nil {
+			slog.Error("failed to terminate sessions on enable", "error", err)
+		}
 		h.audit(r, "user.enabled", "user", idStr, target.Username)
 		ui.SetFlash(w, fmt.Sprintf("%s has been enabled.", target.Username))
 	}

@@ -110,6 +110,21 @@ func (s *FSStore) DeleteTree(_ context.Context, userID int64, folderPath string)
 	return nil
 }
 
+// Count returns the total number of blob files stored.
+func (s *FSStore) Count(_ context.Context) (int64, error) {
+	var n int64
+	err := filepath.Walk(s.basePath, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if !info.IsDir() {
+			n++
+		}
+		return nil
+	})
+	return n, err
+}
+
 // Close is a no-op for the filesystem backend.
 func (s *FSStore) Close() error {
 	return nil

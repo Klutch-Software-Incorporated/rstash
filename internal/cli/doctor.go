@@ -299,8 +299,33 @@ func runDoctor(cmd *cobra.Command, args []string) error {
 		if err != nil {
 			add("Blob store", "fail", err.Error())
 		} else {
-			blobs.Close()
+			defer blobs.Close()
 			add("Blob store", "ok", blobScheme)
+
+			// Check 13: blob/metadata consistency.
+			if counter, ok := blobs.(blob.Counter); ok {
+				blobCount, blobErr := counter.Count(ctx)
+				nodeCount, nodeErr := repo.CountDocumentNodes(ctx)
+				if blobErr != nil || nodeErr != nil {
+					detail := ""
+					if blobErr != nil {
+						detail = fmt.Sprintf("blob count: %v", blobErr)
+					}
+					if nodeErr != nil {
+						if detail != "" {
+							detail += "; "
+						}
+						detail += fmt.Sprintf("node count: %v", nodeErr)
+					}
+					add("Blob consistency", "warn", detail)
+				} else if blobCount != nodeCount {
+					add("Blob consistency", "warn",
+						fmt.Sprintf("blob store has %d entries, metadata has %d document nodes (delta: %d)",
+							blobCount, nodeCount, blobCount-nodeCount))
+				} else {
+					add("Blob consistency", "ok", fmt.Sprintf("%d blobs match %d document nodes", blobCount, nodeCount))
+				}
+			}
 		}
 	}
 

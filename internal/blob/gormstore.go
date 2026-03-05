@@ -81,6 +81,13 @@ func (s *GORMStore) DeleteTree(ctx context.Context, userID int64, folderPath str
 	return nil
 }
 
+// Count returns the total number of blobs stored.
+func (s *GORMStore) Count(ctx context.Context) (int64, error) {
+	var n int64
+	err := s.db.WithContext(ctx).Model(&model.Blob{}).Count(&n).Error
+	return n, err
+}
+
 // Close is a no-op — the caller owns the *gorm.DB lifecycle.
 func (s *GORMStore) Close() error {
 	return nil
