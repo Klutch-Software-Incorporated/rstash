@@ -25,7 +25,6 @@ type PageData struct {
 	RegistrationMode string
 	ActiveNav        string
 	ActiveAdminNav   string
-	JSONApiEnabled   bool
 	TOSUrl           string
 	PrivacyUrl       string
 	OpenAbuseReports int64
@@ -39,16 +38,8 @@ type Renderer struct {
 // NewRenderer parses all templates from the embedded FS and returns a Renderer.
 func NewRenderer() *Renderer {
 	funcMap := template.FuncMap{
-		"eq":          func(a, b string) bool { return a == b },
-		"split":       strings.Split,
-		"commandPath": func(fullName string) string {
-			// "gosilo user add" → "user/add"
-			parts := strings.Fields(fullName)
-			if len(parts) > 1 {
-				return strings.Join(parts[1:], "/")
-			}
-			return ""
-		},
+		"eq":    func(a, b string) bool { return a == b },
+		"split": strings.Split,
 	}
 
 	tmpl, err := template.New("").Funcs(funcMap).ParseFS(Templates,
@@ -66,13 +57,8 @@ func NewRenderer() *Renderer {
 		"templates/admin_setting_detail.html",
 		"templates/admin_audit.html",
 		"templates/admin_logs.html",
-		"templates/admin_help_index.html",
-		"templates/admin_help_command.html",
 		"templates/admin_oauth_test.html",
 		"templates/oauth_authorize.html",
-		"templates/files.html",
-		"templates/files_search.html",
-		"templates/settings.html",
 		"templates/profile_dashboard.html",
 		"templates/profile_settings.html",
 		"templates/profile_files.html",

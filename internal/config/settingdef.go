@@ -368,18 +368,6 @@ func SettingDefs() []SettingDef {
 			RuntimeEditable: true,
 		},
 
-		// ── API (runtime-editable, no env var) ──
-		{
-			Key:             "json_api",
-			Group:           "API",
-			Label:           "JSON API",
-			Description:     "Enable the /json/* management API for programmatic admin access.",
-			Help:            "Controls the JSON management API at /json/*. When \"off\", all /json/* endpoints return 404. When \"admin\", the API is enabled and requires admin authentication via session cookie or Bearer token (obtained from POST /json/login). The API provides programmatic access to user management, settings, and audit log — mirroring CLI functionality. Changes take effect immediately.",
-			Default:         "off",
-			ValidValues:     []string{"off", "admin"},
-			InputType:       InputSelect,
-			RuntimeEditable: true,
-		},
 	}
 }
 

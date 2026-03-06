@@ -16,7 +16,6 @@ import (
 // Snapshot holds the current resolved settings (DB overrides merged with env defaults).
 type Snapshot struct {
 	MetricsMode      string
-	JSONApi          string
 	RegistrationMode string
 	LogLevel         string
 	RateLimitRate    float64
@@ -142,7 +141,6 @@ func (s *Settings) Overrides(ctx context.Context) (map[string]string, error) {
 func (snap *Snapshot) ValueMap() map[string]string {
 	return map[string]string{
 		"metrics_mode":      snap.MetricsMode,
-		"json_api":          snap.JSONApi,
 		"registration_mode": snap.RegistrationMode,
 		"log_level":         snap.LogLevel,
 		"rate_limit_rate":   fmt.Sprintf("%g", snap.RateLimitRate),
@@ -167,7 +165,6 @@ func (snap *Snapshot) ValueMap() map[string]string {
 func (s *Settings) buildSnapshot(overrides map[string]string) *Snapshot {
 	snap := &Snapshot{
 		MetricsMode:          s.defaults.MetricsMode,
-		JSONApi:              s.defaults.JSONApi,
 		RegistrationMode:     s.defaults.RegistrationMode,
 		LogLevel:             s.defaults.LogLevel,
 		RateLimitRate:        s.defaults.RateLimitRate,
@@ -192,9 +189,6 @@ func (s *Settings) buildSnapshot(overrides map[string]string) *Snapshot {
 
 	if v, ok := overrides["metrics_mode"]; ok {
 		snap.MetricsMode = v
-	}
-	if v, ok := overrides["json_api"]; ok {
-		snap.JSONApi = v
 	}
 	if v, ok := overrides["registration_mode"]; ok {
 		snap.RegistrationMode = v

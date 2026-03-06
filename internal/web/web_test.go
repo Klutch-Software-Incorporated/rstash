@@ -46,7 +46,7 @@ func setupTestServer(t *testing.T, regMode string) (*httptest.Server, *web.UIDep
 		Settings: runtimeSettings,
 	}
 
-	uiHandler := web.Routes(deps)
+	uiHandler := web.FullRoutes(deps)
 	wrapped := web.AuthLoader(localAuth, false)(
 		web.EnsureCSRFCookie(false)(
 			web.SetupGuard(localAuth)(uiHandler),

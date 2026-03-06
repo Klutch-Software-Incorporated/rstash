@@ -1,9 +1,7 @@
 package web
 
 import (
-	"fmt"
 	"net/http"
-	"strconv"
 	"strings"
 )
 
@@ -67,27 +65,6 @@ func FullRoutes(deps *UIDeps) http.Handler {
 	mux.HandleFunc("GET /abuse/report", abuseH.ShowReportForm)
 	mux.HandleFunc("POST /abuse/report", RequireCSRF(abuseH.DoReport))
 
-	// --- Legacy redirects for old URL paths ---
-	mux.HandleFunc("GET /settings", redirectToSelf("/settings"))
-	mux.HandleFunc("GET /files", func(w http.ResponseWriter, r *http.Request) {
-		user := CurrentUser(r)
-		if user == nil {
-			http.Redirect(w, r, "/login", http.StatusSeeOther)
-			return
-		}
-		http.Redirect(w, r, "/~"+user.Username+"/files/", http.StatusMovedPermanently)
-	})
-	mux.HandleFunc("GET /files/search", redirectToSelf("/files/search"))
-	mux.HandleFunc("GET /files/{path...}", func(w http.ResponseWriter, r *http.Request) {
-		user := CurrentUser(r)
-		if user == nil {
-			http.Redirect(w, r, "/login", http.StatusSeeOther)
-			return
-		}
-		rawPath := r.PathValue("path")
-		http.Redirect(w, r, "/~"+user.Username+"/files/"+rawPath, http.StatusMovedPermanently)
-	})
-
 	// Admin sub-pages — all protected by AdminGuard middleware.
 	adminHandler := AdminHandler(deps)
 	mux.HandleFunc("GET /admin", AdminGuard(adminHandler.ShowDashboard))
@@ -97,9 +74,6 @@ func FullRoutes(deps *UIDeps) http.Handler {
 	mux.HandleFunc("GET /admin/audit", AdminGuard(adminHandler.ShowAudit))
 	logsH := LogsHandler(deps)
 	mux.HandleFunc("GET /admin/logs", AdminGuard(logsH.ShowLogs))
-	helpH := HelpHandler(deps)
-	mux.HandleFunc("GET /admin/help", AdminGuard(helpH.ShowIndex))
-	mux.HandleFunc("GET /admin/help/{command...}", AdminGuard(helpH.ShowCommand))
 	mux.HandleFunc("GET /admin/oauth-test", AdminGuard(adminHandler.ShowOAuthTest))
 	mux.HandleFunc("POST /admin/users/create", AdminGuard(RequireCSRF(adminHandler.CreateUser)))
 	mux.HandleFunc("POST /admin/users/{id}/delete", AdminGuard(RequireCSRF(adminHandler.DeleteUser)))
@@ -113,24 +87,6 @@ func FullRoutes(deps *UIDeps) http.Handler {
 	mux.HandleFunc("GET /admin/abuse", AdminGuard(abuseH.ShowAbuseReports))
 	mux.HandleFunc("POST /admin/abuse/{id}/review", AdminGuard(RequireCSRF(abuseH.ReviewAbuseReport)))
 
-	// Legacy admin user detail/session redirects.
-	mux.HandleFunc("GET /admin/users/{id}/activity", AdminGuard(func(w http.ResponseWriter, r *http.Request) {
-		username := adminIDToUsername(deps, r)
-		if username == "" {
-			http.NotFound(w, r)
-			return
-		}
-		http.Redirect(w, r, "/~"+username+"/", http.StatusMovedPermanently)
-	}))
-	mux.HandleFunc("GET /admin/users/{id}/sessions", AdminGuard(func(w http.ResponseWriter, r *http.Request) {
-		username := adminIDToUsername(deps, r)
-		if username == "" {
-			http.NotFound(w, r)
-			return
-		}
-		http.Redirect(w, r, "/~"+username+"/settings", http.StatusMovedPermanently)
-	}))
-
 	// Profile routes are handled via a custom router since Go's ServeMux
 	// doesn't support partial-segment wildcards like /~{username}/.
 	tildeRouter := profileRouter(deps)
@@ -142,12 +98,6 @@ func FullRoutes(deps *UIDeps) http.Handler {
 		}
 		mux.ServeHTTP(w, r)
 	})
-}
-
-// Routes returns an http.Handler that serves all web UI routes.
-// Deprecated: use FullRoutes instead.
-func Routes(deps *UIDeps) http.Handler {
-	return FullRoutes(deps)
 }
 
 // profileRouter builds a handler that dispatches /~{username}/... requests.
@@ -246,32 +196,3 @@ func profileRouter(deps *UIDeps) http.Handler {
 	})
 }
 
-// redirectToSelf returns a handler that redirects to /~{username}/{suffix}.
-func redirectToSelf(suffix string) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		user := CurrentUser(r)
-		if user == nil {
-			http.Redirect(w, r, "/login", http.StatusSeeOther)
-			return
-		}
-		target := fmt.Sprintf("/~%s%s", user.Username, suffix)
-		if r.URL.RawQuery != "" {
-			target += "?" + r.URL.RawQuery
-		}
-		http.Redirect(w, r, target, http.StatusMovedPermanently)
-	}
-}
-
-// adminIDToUsername resolves a user ID from {id} path value to a username.
-func adminIDToUsername(deps *UIDeps, r *http.Request) string {
-	idStr := r.PathValue("id")
-	id, err := strconv.ParseInt(idStr, 10, 64)
-	if err != nil {
-		return ""
-	}
-	user, err := deps.Auth.GetUser(r.Context(), id)
-	if err != nil || user == nil {
-		return ""
-	}
-	return user.Username
-}
