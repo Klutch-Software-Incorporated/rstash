@@ -2,7 +2,6 @@ package web
 
 import (
 	"gosilo/internal/auth"
-	"gosilo/internal/cmdinfo"
 	"gosilo/internal/config"
 	"gosilo/internal/db"
 	"gosilo/internal/settings"
@@ -18,7 +17,6 @@ type UIDeps struct {
 	Config        *config.Config
 	Storage       *storage.Service
 	Settings      *settings.Settings
-	SecureCookies bool // true when base URL scheme is https
+	SecureCookies bool   // true when base URL scheme is https
 	LogFile       string // path to log file (empty = no file logging)
-	CommandIndex  []cmdinfo.CommandInfo // cobra command tree for /admin/help pages
 }

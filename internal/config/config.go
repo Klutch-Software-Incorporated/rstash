@@ -31,7 +31,6 @@ type Config struct {
 	RefreshTokenLifetime string  // refresh token lifetime: "90d", "0" (no expiry)
 	MetricsMode          string  // "public", "admin", or "off"
 	PublicWrites         string  // "on" or "off"
-	JSONApi              string  // "off" or "admin"
 	TOSMode              string  // "off", "text", "url"
 	TOSContent           string
 	PrivacyMode          string  // "off", "text", "url"
@@ -78,7 +77,6 @@ func Load() *Config {
 		// Runtime-editable: sane defaults, changed via CLI/admin UI.
 		MetricsMode:      "public",
 		PublicWrites:     "on",
-		JSONApi:          "off",
 		TOSMode:          "text",
 		TOSContent:       defaultTOSContent,
 		PrivacyMode:      "text",
@@ -131,7 +129,6 @@ func (c *Config) ValueMap() map[string]string {
 		"database_dsn":      c.DatabaseDSN,
 		"blob_dsn":          c.BlobDSN,
 		"metrics_mode":      c.MetricsMode,
-		"json_api":          c.JSONApi,
 		"log_file":          c.LogFile,
 		"registration_mode": c.RegistrationMode,
 		"log_level":         c.LogLevel,

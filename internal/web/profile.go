@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/url"
 	"path"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -18,6 +19,76 @@ import (
 	"gosilo/internal/storage"
 	"gosilo/internal/ui"
 )
+
+var moduleNameRe = regexp.MustCompile(`^[a-zA-Z0-9_-]+$`)
+var folderNameRe = regexp.MustCompile(`^[a-zA-Z0-9_.-]+$`)
+
+// fallbackMIME supplements Go's mime package for common extensions it doesn't know.
+var fallbackMIME = map[string]string{
+	".md":         "text/markdown",
+	".markdown":   "text/markdown",
+	".yaml":       "application/yaml",
+	".yml":        "application/yaml",
+	".toml":       "application/toml",
+	".go":         "text/x-go",
+	".rs":         "text/x-rust",
+	".sh":         "text/x-shellscript",
+	".bash":       "text/x-shellscript",
+	".zsh":        "text/x-shellscript",
+	".fish":       "text/x-shellscript",
+	".ps1":        "text/x-powershell",
+	".bat":        "text/x-bat",
+	".cmd":        "text/x-bat",
+	".dockerfile": "text/x-dockerfile",
+	".tf":         "text/x-terraform",
+	".tsx":        "text/tsx",
+	".jsx":        "text/jsx",
+}
+
+// knownFilenames maps extensionless filenames to MIME types.
+var knownFilenames = map[string]string{
+	"dockerfile": "text/x-dockerfile",
+	"makefile":   "text/x-makefile",
+}
+
+type tokenRow struct {
+	TokenPrefix string
+	TokenFull   string
+	ClientID    string
+	Scopes      string
+	CreatedAt   string
+}
+
+type sessionRow struct {
+	TokenPrefix string
+	TokenFull   string
+	CreatedAt   string
+	ExpiresAt   string
+	IsCurrent   bool
+}
+
+type breadcrumb struct {
+	Name string
+	Path string
+}
+
+type fileItem struct {
+	Name        string
+	Path        string
+	BrowseURL   string
+	IsFolder    bool
+	Size        string
+	ContentType string
+	ETag        string
+}
+
+type searchResultRow struct {
+	Name        string
+	Path        string
+	BrowseURL   string
+	Size        string
+	ContentType string
+}
 
 type profileHandler struct {
 	deps *UIDeps

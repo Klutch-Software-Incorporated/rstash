@@ -19,7 +19,6 @@ import (
 	"gosilo/internal/api"
 	"gosilo/internal/auth"
 	"gosilo/internal/blob"
-	"gosilo/internal/cmdinfo"
 	"gosilo/internal/config"
 	"gosilo/internal/db"
 	"gosilo/internal/metrics"
@@ -33,36 +32,19 @@ import (
 	"golang.org/x/crypto/acme/autocert"
 )
 
-var webModeFlag string
-
 var serveCmd = &cobra.Command{
-	Use:     "serve",
-	Short:   "Start the server",
-	Long:    "Start the HTTP server with storage API, OAuth, and optional web UI.",
-	GroupID: "server",
-	Example: `  gosilo serve
-  gosilo serve --web=oauth
-  GOSILO_ADDR=:9090 gosilo serve`,
-	RunE: runServe,
+	Use:   "serve",
+	Short: "Start the server",
+	Long:  "Start the HTTP server with storage API, OAuth, and web UI.",
+	RunE:  runServe,
 }
 
 func init() {
-	serveCmd.Flags().StringVar(&webModeFlag, "web", "", "web UI mode: full, oauth, off (overrides GOSILO_WEB_MODE)")
 	rootCmd.AddCommand(serveCmd)
 }
 
 func runServe(cmd *cobra.Command, args []string) error {
 	cfg := config.Load()
-
-	// Apply --db flag override.
-	if dbFlag != "" {
-		cfg.DatabaseDSN = dbFlag
-	}
-
-	// Apply --web flag override.
-	if webModeFlag != "" {
-		cfg.WebMode = webModeFlag
-	}
 
 	if err := cfg.Validate(); err != nil {
 		return fmt.Errorf("configuration error:\n%w", err)
@@ -188,7 +170,6 @@ func runServe(cmd *cobra.Command, args []string) error {
 		Settings:      runtimeSettings,
 		SecureCookies: secureCookies,
 		LogFile:       cfg.LogFile,
-		CommandIndex:  cmdinfo.WalkCommands(rootCmd),
 	}
 
 	// Build routes.
@@ -222,11 +203,7 @@ func runServe(cmd *cobra.Command, args []string) error {
 		return runtimeSettings.Load().PublicWrites
 	})))
 
-	// JSON management API (registered outside web_mode gating).
-	jsonH := web.JSONApiHandler(uiDeps)
-	jsonH.RegisterRoutes(mux)
-
-	// Web mode gating.
+	// Web UI routes.
 	if cfg.WebMode != "off" {
 		// Static file server from embedded assets.
 		staticFS, err := fs.Sub(ui.Static, "static")
