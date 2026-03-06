@@ -39,9 +39,7 @@ const configVars = [
   { name: "GOSILO_BASE_URL", default: "http://localhost:8080", desc: "Public URL" },
   { name: "GOSILO_DB", default: "sqlite:gosilo.db", desc: "Database DSN" },
   { name: "GOSILO_BLOB", default: "sqlite:gosilo-blobs.db", desc: "Blob store DSN" },
-  { name: "GOSILO_REGISTRATION", default: "closed", desc: "Registration mode" },
-  { name: "GOSILO_QUOTA_MODE", default: "total", desc: "Quota mode" },
-  { name: "GOSILO_QUOTA_TOTAL", default: "50GB", desc: "Global storage limit" },
+  { name: "GOSILO_LOG_LEVEL", default: "info", desc: "Log level" },
   { name: "GOSILO_TLS_MODE", default: "auto-detect", desc: "TLS mode" },
 ];
 ---
@@ -151,7 +149,7 @@ const configVars = [
     <div class="max-w-4xl mx-auto px-6">
       <h2 class="text-2xl font-bold text-center mb-3">Up and running in seconds.</h2>
       <p class="text-center mb-10" style="color: var(--color-text-muted);">
-        Download, initialize, serve. That's it.
+        Download, run, done.
       </p>
       <div class="max-w-2xl mx-auto">
         <div
@@ -170,14 +168,12 @@ const configVars = [
             <div>curl -LO https://code.lag.dev/gosilo/releases/latest/gosilo-linux-amd64</div>
             <div>chmod +x gosilo-linux-amd64</div>
             <br/>
-            <div style="color: var(--color-text-muted);"># Initialize and create your first user</div>
-            <div>./gosilo-linux-amd64 init</div>
-            <br/>
-            <div style="color: var(--color-text-muted);"># Start serving</div>
-            <div>./gosilo-linux-amd64 serve</div>
+            <div style="color: var(--color-text-muted);"># Start the server</div>
+            <div>./gosilo-linux-amd64</div>
             <div style="color: var(--color-text-muted);">
               <br/>
-              # → listening on http://localhost:8080
+              # → listening on http://localhost:8080<br/>
+              # → visit the browser to complete setup
             </div>
           </div>
         </div>

@@ -13,7 +13,7 @@ export GOSILO_ADDR=":443"
 export GOSILO_BASE_URL="https://storage.example.com"
 export GOSILO_TLS_MODE="auto"
 
-gosilo serve
+gosilo
 ```
 
 Requirements:
@@ -89,7 +89,7 @@ Type=simple
 User=gosilo
 Group=gosilo
 WorkingDirectory=/opt/gosilo
-ExecStart=/usr/local/bin/gosilo serve
+ExecStart=/usr/local/bin/gosilo
 Restart=on-failure
 RestartSec=5
 EnvironmentFile=/opt/gosilo/.env
@@ -126,7 +126,7 @@ RUN chmod +x /usr/local/bin/gosilo
 EXPOSE 8080
 VOLUME ["/data"]
 WORKDIR /data
-CMD ["gosilo", "serve"]
+CMD ["gosilo"]
 ```
 
 ```bash
@@ -138,11 +138,21 @@ docker run -d \
   gosilo
 ```
 
+## Verify Your Setup
+
+Before going to production, run `gosilo check` to verify your configuration:
+
+```bash
+gosilo check
+```
+
+This validates all settings and tests connectivity to the database and blob store.
+
 ## Database in Production
 
 ### SQLite
 
-Works well for small to medium deployments. Make sure the database directory is on a filesystem that supports file locking (avoid NFS). SQLite is the default and requires no setup.
+Works well for personal and small-group use. Make sure the database directory is on a filesystem that supports file locking (avoid NFS). SQLite is the default and requires no setup.
 
 ### PostgreSQL
 
@@ -169,13 +179,3 @@ cp /opt/gosilo/gosilo-blobs.db /backups/gosilo-blobs-$(date +%F).db
 ### Filesystem Blob Storage
 
 If you use `fs:` for blobs, include that directory in your regular backup schedule alongside the metadata database.
-
-## Health Checks
-
-Use `gosilo doctor` to verify your installation:
-
-```bash
-gosilo doctor
-```
-
-This checks database integrity, schema, storage, TLS, and overall configuration. Useful for monitoring and post-deployment verification.

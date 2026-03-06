@@ -4,7 +4,7 @@ description: Complete environment variables reference.
 order: 4
 ---
 
-All configuration starts with environment variables. Most settings can also be changed at runtime via the [admin panel](/docs/web-ui/) or `gosilo config set` — database overrides take precedence over env vars.
+All configuration starts with environment variables. Many settings can also be changed at runtime via the [admin panel](/docs/web-ui/) — database overrides take precedence over env vars.
 
 Run `gosilo env` to generate a documented `.env` template:
 
@@ -19,6 +19,7 @@ gosilo env > .env
 | `GOSILO_ADDR` | `:8080` | Listen address (`host:port`) |
 | `GOSILO_BASE_URL` | `http://localhost:8080` | Public-facing URL of the server |
 | `GOSILO_LOG_LEVEL` | `info` | Log level: `debug`, `info`, `warn`, `error` |
+| `GOSILO_LOG_FILE` | *(none)* | Path to log file (empty = stderr only) |
 
 `GOSILO_BASE_URL` is important — it's used in WebFinger responses and OAuth redirects. Set it to your actual public URL in production.
 
@@ -36,42 +37,10 @@ Both support these DSN prefixes:
 - `mysql:dsn` — MySQL / MariaDB
 - `mssql:dsn` — SQL Server
 
-The blob store also supports filesystem storage:
+The blob store also supports:
 
 - `fs:/path/to/directory` — stores files on disk instead of in a database
-
-## Web UI
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `GOSILO_WEB_MODE` | `full` | Web UI mode: `full`, `oauth`, `off` |
-
-This setting requires a restart to change (it affects route registration at startup).
-
-## Authentication & Registration
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `GOSILO_REGISTRATION` | `closed` | Registration mode: `open`, `approval`, `closed` |
-| `GOSILO_TOKEN_LIFETIME` | `30d` | OAuth token lifetime (`30d`, `24h`, `0` = no expiry) |
-
-These can also be changed at runtime via the admin panel.
-
-## Rate Limiting
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `GOSILO_RATE_LIMIT` | `10` | Per-IP requests per second (`0` = disabled) |
-| `GOSILO_RATE_BURST` | `20` | Rate limit burst size |
-
-## Storage Quotas
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `GOSILO_QUOTA_MODE` | `total` | Quota mode: `off`, `total`, `user` |
-| `GOSILO_QUOTA_TOTAL` | `50GB` | Global storage limit (when mode is `total`) |
-| `GOSILO_QUOTA_USER` | *(none)* | Per-user default quota (when mode is `user`) |
-| `GOSILO_MAX_UPLOAD` | `50MB` | Maximum upload size per request |
+- `s3:bucket?region=us-east-1` — S3-compatible object storage (AWS, DigitalOcean Spaces, MinIO, etc.)
 
 ## TLS
 
@@ -88,6 +57,21 @@ When `GOSILO_TLS_MODE` is empty, gosilo auto-detects:
 
 Set `GOSILO_TLS_MODE=auto` for automatic HTTPS via Let's Encrypt. Your `GOSILO_BASE_URL` must use a real domain and port 443 must be reachable.
 
+## Runtime Settings
+
+The following settings have sensible defaults and can be changed at any time through the admin panel (Settings page). Changes take effect immediately without restarting the server.
+
+- **Registration mode** — `closed` (default), `open`, or `approval`
+- **Rate limiting** — per-IP requests per second (default: 10 req/sec, burst 20)
+- **Storage quotas** — off, global total (default: 50 GB), or per-user
+- **Max upload size** — per-request limit (default: 50 MB)
+- **OAuth token lifetime** — how long tokens last (default: 30 days)
+- **Refresh tokens** — enabled/disabled and lifetime
+- **Metrics** — public, admin-only, or off
+- **Legal pages** — terms of service and privacy policy (built-in text, custom URL, or off)
+- **Blocked MIME types** — content type filtering for uploads
+- **Public writes** — whether unauthenticated writes to public paths are allowed
+
 ## Example Production Config
 
 ```bash
@@ -96,10 +80,6 @@ export GOSILO_BASE_URL="https://storage.example.com"
 export GOSILO_DB="postgres:host=localhost dbname=gosilo sslmode=disable"
 export GOSILO_BLOB="fs:/var/lib/gosilo/blobs"
 export GOSILO_TLS_MODE="auto"
-export GOSILO_REGISTRATION="closed"
-export GOSILO_QUOTA_MODE="user"
-export GOSILO_QUOTA_USER="1GB"
-export GOSILO_LOG_LEVEL="info"
 
-gosilo serve
+gosilo
 ```

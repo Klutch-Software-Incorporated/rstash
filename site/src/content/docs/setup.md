@@ -6,40 +6,25 @@ order: 2
 
 ## Initial Setup
 
-When you run `gosilo init` interactively, it asks two setup questions after creating the admin account:
+When you first run `gosilo`, it starts the server and redirects you to the setup wizard at `/setup`. The wizard has two steps:
 
-```
-Allow public registration? (y/N):
-Enable rate limiting? (Y/n):
-```
+1. **Review settings** — shows your current server configuration: base URL, database type (e.g., "SQLite (default)" or "PostgreSQL"), file storage type, and TLS status. If the database or file storage is using SQLite defaults, a warning explains what that means and how to change it before continuing.
 
-- **Registration** — defaults to **closed** (only admins can create accounts). Answer `y` to allow anyone to register.
-- **Rate limiting** — defaults to **enabled** (10 req/sec with a burst of 20). Answer `n` to disable it.
+2. **Create admin account** — pick a username and password. This account has full admin privileges.
 
-When running non-interactively (`gosilo init --username admin --password secret`), the defaults are used automatically (closed registration, rate limiting enabled).
+After setup, you're logged in and taken to the admin panel.
+
+> **Tip:** If you want to use PostgreSQL, MySQL, or a different storage backend, set the `GOSILO_DB` and `GOSILO_BLOB` environment variables *before* running gosilo for the first time. Run `gosilo env` to see all available options, or `gosilo check` to verify your configuration.
 
 ## Creating Users
 
-There are two ways to create users:
+From the admin panel, go to Users and use the "Create User" form. You can set admin privileges from there.
 
-**From the CLI:**
-
-```bash
-gosilo user add alice           # interactive password prompt
-gosilo user add alice --admin   # create as admin
-```
-
-**From the admin panel:**
-
-Log in as an admin, go to the admin panel, and use the "Create User" form at the bottom of the Users page. You can set admin privileges right from there.
+If registration is open, users can also create their own accounts at `/register`.
 
 ## Registration Modes
 
-Control how new users can sign up. Change this in the admin panel under Settings, or via CLI:
-
-```bash
-gosilo config set registration_mode open
-```
+Control how new users can sign up. Change this in the admin panel under Settings.
 
 - **`closed`** (default) — Only admins can create accounts. The registration page shows a "closed" message.
 - **`open`** — Anyone can register and immediately log in.
@@ -57,56 +42,21 @@ The storage meter appears on each user's dashboard so they can track their usage
 
 ## Rate Limiting
 
-Per-IP rate limiting is enabled by default (10 requests/sec with a burst of 20). Adjust or disable it:
-
-```bash
-gosilo config set rate_limit_rate 0    # disable
-gosilo config set rate_limit_rate 20   # 20 req/sec
-gosilo config set rate_limit_burst 40
-```
+Per-IP rate limiting is enabled by default (10 requests/sec with a burst of 20). Adjust or disable it from the admin Settings page.
 
 ## Upload Size
 
-The maximum file size per upload defaults to 50 MB. Change it in Settings or via CLI:
-
-```bash
-gosilo config set max_upload_size 100MB
-```
+The maximum file size per upload defaults to 50 MB. Change it in Settings.
 
 ## OAuth Token Lifetime
 
-OAuth tokens issued to remoteStorage apps expire after 30 days by default. Users can always revoke tokens manually from their settings page.
-
-```bash
-gosilo config set token_lifetime 90d    # 90 days
-gosilo config set token_lifetime 0      # never expire
-```
-
-## Web UI Mode
-
-gosilo's web interface has three modes:
-
-- **`full`** (default) — Everything: login, file browser, admin panel, OAuth.
-- **`oauth`** — Only login and OAuth authorization (no file browser or admin panel). Useful if you only want API access.
-- **`off`** — No web UI at all, pure API server.
-
-Set via environment variable (requires restart):
-
-```bash
-export GOSILO_WEB_MODE=oauth
-```
+OAuth tokens issued to remoteStorage apps expire after 30 days by default. Users can always revoke tokens manually from their settings page. Adjust the lifetime in Settings.
 
 ## Changing Settings at Runtime
 
-Most settings can be changed without restarting the server. Use the admin panel Settings page, or the CLI:
+Most settings can be changed without restarting the server. Use the admin panel Settings page — changes take effect immediately. Each setting shows whether it's using the default value or a database override, and you can reset any override with one click.
 
-```bash
-gosilo config list              # show all settings with current values
-gosilo config set key value     # override a setting (takes effect immediately)
-gosilo config reset key         # remove override, revert to env/default
-```
-
-Database overrides always take precedence over environment variables. Run `gosilo config list` to see which settings are overridden.
+Settings that require a restart (database DSN, blob store DSN, listen address, TLS) are configured via environment variables and shown in the admin panel as read-only.
 
 ## Next Steps
 

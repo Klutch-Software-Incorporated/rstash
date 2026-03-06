@@ -35,19 +35,15 @@ go build -o gosilo .
 Start the server:
 
 ```bash
-gosilo serve
+gosilo
 ```
 
-Visit `http://localhost:8080` in your browser. Since no users exist yet, gosilo automatically shows the setup page where you can create your first admin account.
+Visit `http://localhost:8080` in your browser. Since no users exist yet, gosilo shows the setup wizard:
 
-Alternatively, you can set up the first admin from the command line before starting the server:
+1. **Review settings** — gosilo shows your current server configuration (database, storage backend, base URL, TLS). If you're using the SQLite defaults, a note explains what that means and how to change it.
+2. **Create admin account** — pick a username and password for the first admin user.
 
-```bash
-gosilo init                              # interactive setup
-gosilo init --username admin --password secret   # non-interactive
-```
-
-Either way, gosilo creates a SQLite database in the current directory on first start.
+That's it — you're in. gosilo creates a SQLite database in the current directory on first start.
 
 ## Connect a remoteStorage App
 

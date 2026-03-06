@@ -71,6 +71,8 @@ View and manage all users. From here you can:
 
 A grouped editor for all runtime settings — access control, rate limiting, storage quotas, OAuth, legal pages, and more. Changes take effect immediately without restarting the server. Each setting shows whether it's using the default value or a database override, and you can reset any override with one click.
 
+Environment-only settings (database DSN, listen address, TLS) are shown as read-only so you can see their current values.
+
 ### Audit Log
 
 A searchable log of all state-changing actions: user creation, login attempts, file uploads/deletions, setting changes, admin actions, and OAuth grants. Useful for troubleshooting and security review.
@@ -78,10 +80,10 @@ A searchable log of all state-changing actions: user creation, login attempts, f
 ### Other Admin Tools
 
 - **Abuse Reports** — review and resolve content reports submitted via the public abuse form
-- **CLI Help Browser** — searchable index of all CLI commands and their usage
 - **OAuth Test Tool** — test the OAuth authorization flow interactively
+- **Server Logs** — view recent log output (when file logging is enabled)
 
 ## Next Steps
 
 - [Configuration Reference](/docs/configuration/) — all environment variables
-- [CLI Reference](/docs/cli/) — command-line interface documentation
+- [CLI Reference](/docs/cli/) — command-line tools
