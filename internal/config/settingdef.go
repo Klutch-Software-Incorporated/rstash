@@ -20,7 +20,6 @@ const (
 	EnvBaseURL  = "GOSILO_BASE_URL"
 	EnvDB       = "GOSILO_DB"
 	EnvBlob     = "GOSILO_BLOB"
-	EnvWebMode  = "GOSILO_WEB_MODE"
 	EnvLogLevel = "GOSILO_LOG_LEVEL"
 	EnvLogFile  = "GOSILO_LOG_FILE"
 	EnvTLSCert  = "GOSILO_TLS_CERT"
@@ -98,18 +97,6 @@ func SettingDefs() []SettingDef {
 			Help:            "The Data Source Name for the blob (file content) store, set via the " + EnvBlob + " environment variable. Supported backends: sqlite:path stores blobs in a SQLite database (simple, single-file), fs:/path/to/dir stores blobs as individual files on the filesystem (better for large deployments), postgres:/mysql:/mssql: store blobs in the corresponding database (useful when running on a non-SQLite metadata database), and s3:bucket?region=us-east-1&endpoint=s3.amazonaws.com&prefix=optional/prefix stores blobs in an S3-compatible object store. S3 credentials can be set via access_key/secret_key query parameters or AWS_ACCESS_KEY_ID/AWS_SECRET_ACCESS_KEY environment variables. S3 examples: s3:my-bucket?region=us-west-2 (AWS), s3:my-space?region=nyc3&endpoint=nyc3.digitaloceanspaces.com (DigitalOcean Spaces), s3:data?endpoint=minio.local:9000&tls=false&access_key=minioadmin&secret_key=minioadmin (MinIO). Changing this setting requires a server restart.",
 			Default:         "sqlite:gosilo-blobs.db",
 			InputType:       InputText,
-			RuntimeEditable: false,
-		},
-		{
-			Key:             "web_mode",
-			EnvVar:          EnvWebMode,
-			Group:           "Server",
-			Label:           "Web UI mode",
-			Description:     "Web UI mode. full=all routes, oauth=login+OAuth only, off=API only.",
-			Help:            "Controls which web UI routes are enabled, set via the " + EnvWebMode + " environment variable. \"full\" enables all routes including the file browser, admin panel, and user settings. \"oauth\" enables only the login page and OAuth consent flow (useful when you want API-only access with OAuth). \"off\" disables all web UI routes entirely, serving only the storage API and WebFinger. Changing this setting requires a server restart.",
-			Default:         "full",
-			ValidValues:     []string{"full", "oauth", "off"},
-			InputType:       InputSelect,
 			RuntimeEditable: false,
 		},
 		{

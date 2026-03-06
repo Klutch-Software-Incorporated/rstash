@@ -5,31 +5,6 @@ import (
 	"strings"
 )
 
-// OAuthRoutes returns an http.Handler with the minimal routes needed for
-// OAuth consent flow: login, logout, and setup (first-user bootstrap).
-func OAuthRoutes(deps *UIDeps) http.Handler {
-	mux := http.NewServeMux()
-
-	// Setup wizard (needed so first user can be created when CLI wasn't used).
-	setupHandler := SetupHandler(deps)
-	mux.HandleFunc("GET /setup", setupHandler.ShowSetup)
-	mux.HandleFunc("POST /setup", RequireCSRF(setupHandler.DoSetup))
-
-	// Auth (login/logout — needed for OAuth session).
-	authHandler := AuthHandler(deps)
-	mux.HandleFunc("GET /login", authHandler.ShowLogin)
-	mux.HandleFunc("POST /login", RequireCSRF(authHandler.DoLogin))
-	mux.HandleFunc("POST /logout", RequireCSRF(authHandler.DoLogout))
-
-	// Legal pages (public, no auth).
-	legalH := LegalHandler(deps)
-	mux.HandleFunc("GET /legal/terms", legalH.ShowTerms)
-	mux.HandleFunc("GET /legal/privacy", legalH.ShowPrivacy)
-	mux.HandleFunc("GET /legal/licenses", legalH.ShowLicenses)
-
-	return mux
-}
-
 // FullRoutes returns an http.Handler with all web UI routes (the full web experience).
 func FullRoutes(deps *UIDeps) http.Handler {
 	mux := http.NewServeMux()

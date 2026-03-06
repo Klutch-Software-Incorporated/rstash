@@ -25,7 +25,6 @@ type Config struct {
 	QuotaTotal       int64   // GOSILO_QUOTA_TOTAL — bytes (parsed from human-readable)
 	QuotaUser        int64   // GOSILO_QUOTA_USER — bytes (parsed from human-readable)
 	MaxUploadSize    int64   // GOSILO_MAX_UPLOAD — max request body size (parsed from human-readable)
-	WebMode          string  // GOSILO_WEB_MODE — "full", "oauth", or "off"
 	TokenLifetime        string  // GOSILO_TOKEN_LIFETIME — OAuth token lifetime: "30d", "24h", "0" (no expiry)
 	RefreshTokens        string  // "enabled" or "disabled"
 	RefreshTokenLifetime string  // refresh token lifetime: "90d", "0" (no expiry)
@@ -66,7 +65,6 @@ func Load() *Config {
 		BaseURL:     envOrDefault(EnvBaseURL, "http://localhost:8080"),
 		DatabaseDSN: envOrDefault(EnvDB, "sqlite:gosilo.db"),
 		BlobDSN:     envOrDefault(EnvBlob, "sqlite:gosilo-blobs.db"),
-		WebMode:     envOrDefault(EnvWebMode, "full"),
 		LogLevel:    envOrDefault(EnvLogLevel, "info"),
 		LogFile:     os.Getenv(EnvLogFile),
 		TLSCert:     os.Getenv(EnvTLSCert),
@@ -138,7 +136,6 @@ func (c *Config) ValueMap() map[string]string {
 		"quota_total":       FormatByteSize(c.QuotaTotal),
 		"quota_user":        FormatByteSize(c.QuotaUser),
 		"max_upload_size":   FormatByteSize(c.MaxUploadSize),
-		"web_mode":          c.WebMode,
 		"token_lifetime":         c.TokenLifetime,
 		"refresh_tokens":         c.RefreshTokens,
 		"refresh_token_lifetime": c.RefreshTokenLifetime,

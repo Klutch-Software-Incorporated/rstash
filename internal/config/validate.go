@@ -66,14 +66,6 @@ func (c *Config) Validate() error {
 		errs = append(errs, fmt.Errorf("%s: must be one of: debug, info, warn, error — got %q", EnvLogLevel, c.LogLevel))
 	}
 
-	// WebMode
-	switch c.WebMode {
-	case "full", "oauth", "off":
-		// ok
-	default:
-		errs = append(errs, fmt.Errorf("%s: must be one of: full, oauth, off — got %q", EnvWebMode, c.WebMode))
-	}
-
 	// TLS mode-aware validation.
 	switch c.TLSMode {
 	case "manual":

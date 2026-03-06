@@ -49,6 +49,7 @@ func NewRenderer() *Renderer {
 		"templates/layout.html",
 		"templates/home.html",
 		"templates/setup.html",
+		"templates/setup_review.html",
 		"templates/login.html",
 		"templates/register.html",
 		"templates/admin_dashboard.html",

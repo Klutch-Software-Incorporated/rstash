@@ -88,7 +88,7 @@ func TestSetupCreatesAdmin(t *testing.T) {
 		return http.ErrUseLastResponse
 	}}
 
-	// GET /setup should render the form.
+	// GET /setup should render the review page.
 	resp, err := client.Get(ts.URL + "/setup")
 	if err != nil {
 		t.Fatalf("get /setup: %v", err)
@@ -96,6 +96,16 @@ func TestSetupCreatesAdmin(t *testing.T) {
 	resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("expected 200 for GET /setup, got %d", resp.StatusCode)
+	}
+
+	// GET /setup?step=account should render the account form.
+	resp, err = client.Get(ts.URL + "/setup?step=account")
+	if err != nil {
+		t.Fatalf("get /setup?step=account: %v", err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("expected 200 for GET /setup?step=account, got %d", resp.StatusCode)
 	}
 
 	// Extract CSRF token from the GET response cookies.
@@ -106,7 +116,7 @@ func TestSetupCreatesAdmin(t *testing.T) {
 		}
 	}
 	if csrfToken == "" {
-		t.Fatal("expected gosilo_csrf cookie from GET /setup")
+		t.Fatal("expected gosilo_csrf cookie from GET /setup?step=account")
 	}
 
 	// POST /setup to create admin.
@@ -310,7 +320,7 @@ func TestSetupValidation(t *testing.T) {
 		return http.ErrUseLastResponse
 	}}
 
-	csrfToken := getCSRFToken(t, client, ts.URL+"/setup")
+	csrfToken := getCSRFToken(t, client, ts.URL+"/setup?step=account")
 
 	// Password too short.
 	form := url.Values{

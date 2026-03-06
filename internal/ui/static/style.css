@@ -113,6 +113,7 @@ table{width:100%;border-collapse:collapse;font-size:.875rem;margin:.5rem 0 1rem}
 th{text-align:left;font-size:.7rem;text-transform:uppercase;letter-spacing:.04em;color:var(--fg-faint);padding:.4rem .5rem;border-bottom:1px solid var(--border)}
 td{padding:.4rem .5rem;border-bottom:1px solid var(--border-light)}
 th:last-child,td:last-child{text-align:right}
+.setup-review th{width:8rem;font-size:.8rem}.setup-review td:last-child{text-align:left}
 .file-table{table-layout:fixed}
 .file-table th:nth-child(3),.file-table td:nth-child(3){width:5rem}
 .file-table th:last-child,.file-table td:last-child{width:6rem}

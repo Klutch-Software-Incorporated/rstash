@@ -18,7 +18,6 @@ func validConfig() *Config {
 		RateLimitBurst:   20,
 		QuotaMode:        "off",
 		MaxUploadSize:    50 << 20, // 50MB
-		WebMode:          "full",
 	}
 }
 
@@ -163,26 +162,6 @@ func TestValidate_LogLevel(t *testing.T) {
 	}
 }
 
-func TestValidate_WebMode(t *testing.T) {
-	for _, mode := range []string{"full", "oauth", "off"} {
-		cfg := validConfig()
-		cfg.WebMode = mode
-		if err := cfg.Validate(); err != nil {
-			t.Errorf("web mode %q should be valid, got: %v", mode, err)
-		}
-	}
-
-	cfg := validConfig()
-	cfg.WebMode = "invalid"
-	err := cfg.Validate()
-	if err == nil {
-		t.Fatal("expected error for invalid web mode")
-	}
-	if !strings.Contains(err.Error(), "GOSILO_WEB_MODE") {
-		t.Fatalf("error should mention GOSILO_WEB_MODE, got: %v", err)
-	}
-}
-
 func TestValidate_TLS(t *testing.T) {
 	// Both set — valid.
 	cfg := validConfig()
@@ -211,7 +190,6 @@ func TestValidate_MultipleErrors(t *testing.T) {
 		DatabaseDSN: "redis:localhost",
 		BlobDSN:     "redis:localhost",
 		LogLevel:    "trace",
-		WebMode:     "full",
 	}
 	err := cfg.Validate()
 	if err == nil {

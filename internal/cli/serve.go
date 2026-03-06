@@ -32,11 +32,25 @@ import (
 	"golang.org/x/crypto/acme/autocert"
 )
 
+func parseLogLevel(s string) slog.Level {
+	switch s {
+	case "debug":
+		return slog.LevelDebug
+	case "warn":
+		return slog.LevelWarn
+	case "error":
+		return slog.LevelError
+	default:
+		return slog.LevelInfo
+	}
+}
+
 var serveCmd = &cobra.Command{
-	Use:   "serve",
-	Short: "Start the server",
-	Long:  "Start the HTTP server with storage API, OAuth, and web UI.",
-	RunE:  runServe,
+	Use:    "serve",
+	Short:  "Start the server",
+	Long:   "Start the HTTP server with storage API, OAuth, and web UI.",
+	RunE:   runServe,
+	Hidden: true, // Users just run "gosilo" directly; serve is an alias.
 }
 
 func init() {
@@ -95,22 +109,7 @@ func runServe(cmd *cobra.Command, args []string) error {
 
 	// Initialize blob storage from DSN.
 	blobScheme, blobPath, _ := config.ParseDSN(cfg.BlobDSN) // already validated
-	var blobs blob.Store
-	switch blobScheme {
-	case "fs":
-		blobs, err = blob.NewFSStore(blobPath)
-	case "sqlite":
-		blobs, err = blob.NewSQLiteStore(blobPath)
-	case "postgres", "mysql", "mssql":
-		// Use GORM-based blob store for non-SQLite databases.
-		blobGormDB, _, gormErr := db.OpenGORM(cfg.BlobDSN)
-		if gormErr != nil {
-			return fmt.Errorf("failed to open blob database: %w", gormErr)
-		}
-		blobs, err = blob.NewGORMStore(blobGormDB)
-	case "s3":
-		blobs, err = blob.NewS3Store(blobPath)
-	}
+	blobs, err := blob.OpenStore(blobScheme, blobPath, cfg.BlobDSN)
 	if err != nil {
 		return fmt.Errorf("failed to initialize blob store: %w", err)
 	}
@@ -203,41 +202,31 @@ func runServe(cmd *cobra.Command, args []string) error {
 		return runtimeSettings.Load().PublicWrites
 	})))
 
-	// Web UI routes.
-	if cfg.WebMode != "off" {
-		// Static file server from embedded assets.
-		staticFS, err := fs.Sub(ui.Static, "static")
-		if err != nil {
-			return fmt.Errorf("failed to create static sub-filesystem: %w", err)
-		}
-		mux.Handle("GET /static/", http.StripPrefix("/static/", http.FileServer(http.FS(staticFS))))
-
-		// OAuth authorize routes (need auth loader + setup guard for session cookie support).
-		oauthH := web.OAuthHandler(uiDeps)
-		oauthWrap := func(h http.HandlerFunc) http.Handler {
-			return web.AuthLoader(localAuth, secureCookies)(
-				web.SetupGuard(localAuth)(http.HandlerFunc(h)),
-			)
-		}
-		mux.Handle("GET /oauth/authorize", oauthWrap(oauthH.ShowAuthorize))
-		mux.Handle("POST /oauth/authorize", oauthWrap(web.RequireCSRF(oauthH.DoAuthorize)))
-
-		// Choose routes based on web mode.
-		var uiHandler http.Handler
-		if cfg.WebMode == "full" {
-			uiHandler = web.FullRoutes(uiDeps)
-		} else {
-			uiHandler = web.OAuthRoutes(uiDeps)
-		}
-
-		// Wrap UI handler with auth loader, CSRF cookie, and setup guard.
-		wrapped := web.AuthLoader(localAuth, secureCookies)(
-			web.EnsureCSRFCookie(secureCookies)(
-				web.SetupGuard(localAuth)(uiHandler),
-			),
-		)
-		mux.Handle("/", wrapped)
+	// Static file server from embedded assets.
+	staticFS, err := fs.Sub(ui.Static, "static")
+	if err != nil {
+		return fmt.Errorf("failed to create static sub-filesystem: %w", err)
 	}
+	mux.Handle("GET /static/", http.StripPrefix("/static/", http.FileServer(http.FS(staticFS))))
+
+	// OAuth authorize routes (need auth loader + setup guard for session cookie support).
+	oauthH := web.OAuthHandler(uiDeps)
+	oauthWrap := func(h http.HandlerFunc) http.Handler {
+		return web.AuthLoader(localAuth, secureCookies)(
+			web.SetupGuard(localAuth)(http.HandlerFunc(h)),
+		)
+	}
+	mux.Handle("GET /oauth/authorize", oauthWrap(oauthH.ShowAuthorize))
+	mux.Handle("POST /oauth/authorize", oauthWrap(web.RequireCSRF(oauthH.DoAuthorize)))
+
+	// Web UI routes.
+	uiHandler := web.FullRoutes(uiDeps)
+	wrapped := web.AuthLoader(localAuth, secureCookies)(
+		web.EnsureCSRFCookie(secureCookies)(
+			web.SetupGuard(localAuth)(uiHandler),
+		),
+	)
+	mux.Handle("/", wrapped)
 
 	// Always create rate limiter so it can be enabled/adjusted at runtime.
 	limiter := api.NewRateLimiter(snap.RateLimitRate, snap.RateLimitBurst)
@@ -368,7 +357,7 @@ func runServe(cmd *cobra.Command, args []string) error {
 			}
 
 		case "manual":
-			slog.Info("server starting (TLS)", "addr", cfg.Addr, "base_url", cfg.BaseURL, "web_mode", cfg.WebMode)
+			slog.Info("server starting (TLS)", "addr", cfg.Addr, "base_url", cfg.BaseURL)
 			if err := srv.ListenAndServeTLS(cfg.TLSCert, cfg.TLSKey); err != nil && err != http.ErrServerClosed {
 				slog.Error("server error", "error", err)
 				os.Exit(1)
@@ -380,7 +369,7 @@ func runServe(cmd *cobra.Command, args []string) error {
 					"addr", cfg.Addr,
 					"hint", "set GOSILO_TLS_MODE=auto for Let's Encrypt, or use a reverse proxy")
 			}
-			slog.Info("server starting", "addr", cfg.Addr, "base_url", cfg.BaseURL, "web_mode", cfg.WebMode)
+			slog.Info("server starting", "addr", cfg.Addr, "base_url", cfg.BaseURL)
 			if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 				slog.Error("server error", "error", err)
 				os.Exit(1)

@@ -39,6 +39,9 @@ func init() {
 	// Default to serve when run without a subcommand.
 	rootCmd.RunE = serveCmd.RunE
 	rootCmd.Flags().AddFlagSet(serveCmd.Flags())
+
+	// Disable the auto-generated completion subcommand.
+	rootCmd.CompletionOptions.DisableDefaultCmd = true
 }
 
 // Execute runs the root command.
