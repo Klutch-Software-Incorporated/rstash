@@ -10,7 +10,7 @@ Grab the latest release for your platform:
 
 ```bash
 # Linux (amd64)
-curl -LO https://fossil.klutch.software/rstash/releases/latest/rstash-linux-amd64
+curl -LO https://fossil.klutch.software/rstash/uv/rstash-linux-amd64
 chmod +x rstash-linux-amd64
 sudo mv rstash-linux-amd64 /usr/local/bin/rstash
 ```
@@ -25,8 +25,8 @@ Pre-built binaries are available for:
 You'll need Go 1.22 or later:
 
 ```bash
-git clone https://fossil.klutch.software/rstash
-cd rstash
+fossil clone https://fossil.klutch.software/rstash rstash.fossil
+fossil open rstash.fossil
 go build -o rstash .
 ```
 

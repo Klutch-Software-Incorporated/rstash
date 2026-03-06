@@ -1,0 +1,71 @@
+version: "3"
+
+tasks:
+  deploy:
+    desc: Build site + upload to server + restart caddy
+    interactive: true
+    vars:
+      IP:
+        sh: pulumi stack output ip --cwd pulumi
+    cmds:
+      - task: -site:build
+      - scp -r ../site/dist/* root@{{.IP}}:/srv/site/
+      - ssh root@{{.IP}} "chmod -R o+rX /srv/site/ && systemctl restart caddy"
+
+  -site:build:
+    internal: true
+    dir: ../site
+    cmds:
+      - npm run build
+
+  config:
+    desc: Push updated Caddyfile to server + restart caddy
+    vars:
+      IP:
+        sh: pulumi stack output ip --cwd pulumi
+    cmds:
+      - scp containers/caddy/Caddyfile root@{{.IP}}:/etc/caddy/Caddyfile
+      - ssh root@{{.IP}} "systemctl restart caddy"
+
+  quadlet:
+    desc: Push Quadlet files to server + reload systemd
+    vars:
+      IP:
+        sh: pulumi stack output ip --cwd pulumi
+    cmds:
+      - >
+        scp containers/caddy/caddy.container
+        containers/caddy/caddy-data.volume
+        containers/caddy/caddy-config.volume
+        root@{{.IP}}:/etc/containers/systemd/
+      - ssh root@{{.IP}} "systemctl daemon-reload && systemctl restart caddy"
+
+  ssh:
+    desc: SSH into server
+    interactive: true
+    vars:
+      IP:
+        sh: pulumi stack output ip --cwd pulumi
+    cmds:
+      - ssh root@{{.IP}}
+
+  status:
+    desc: Check server status
+    vars:
+      IP:
+        sh: pulumi stack output ip --cwd pulumi
+    cmds:
+      - ssh root@{{.IP}} "podman ps && echo '---' && systemctl status caddy --no-pager"
+
+  up:
+    desc: Run pulumi up
+    dir: pulumi
+    interactive: true
+    cmds:
+      - pulumi up
+
+  preview:
+    desc: Run pulumi preview
+    dir: pulumi
+    cmds:
+      - pulumi preview

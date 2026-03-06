@@ -18,12 +18,15 @@ A self-hosted [remoteStorage](https://remotestorage.io/) server written in Go, i
 ## Quick Start
 
 ```sh
-# Build from source
-task build
+# Download the latest binary (Linux amd64)
+curl -LO https://fossil.klutch.software/rstash/uv/rstash-linux-amd64
+chmod +x rstash-linux-amd64
 
 # Start the server
-./build/rstash
+./rstash-linux-amd64
 ```
+
+Pre-built binaries are available for Linux (amd64, arm64), macOS (amd64, arm64), and Windows (amd64) at `https://fossil.klutch.software/rstash/uv/`.
 
 On first run, rstash redirects to a setup wizard where you review settings and create the admin account. All further management happens through the web UI.
 

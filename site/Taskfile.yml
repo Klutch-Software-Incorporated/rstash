@@ -1,0 +1,29 @@
+version: '3'
+
+tasks:
+  install:
+    desc: Install site dependencies
+    cmds:
+      - npm install
+
+  dev:
+    desc: Start site dev server
+    cmds:
+      - npm run dev
+
+  build:
+    desc: Build static site
+    cmds:
+      - npm run build
+
+  deploy:
+    desc: Build and deploy site to server
+    interactive: true
+    deps:
+      - build
+    vars:
+      IP:
+        sh: pulumi stack output ip --cwd ../infra/pulumi
+    cmds:
+      - scp -r dist/* root@{{.IP}}:/srv/site/
+      - ssh root@{{.IP}} "chmod -R o+rX /srv/site/ && systemctl restart caddy"

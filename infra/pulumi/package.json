@@ -1,0 +1,12 @@
+{
+    "name": "rstash-cloud",
+    "main": "index.ts",
+    "devDependencies": {
+        "@types/node": "^18"
+    },
+    "dependencies": {
+        "@pulumi/pulumi": "^3",
+        "@pulumi/digitalocean": "^4",
+        "@pulumi/command": "^1"
+    }
+}

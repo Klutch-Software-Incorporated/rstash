@@ -1,5 +1,13 @@
 version: '3'
 
+includes:
+  infra:
+    taskfile: ./infra/Taskfile.yml
+    dir: ./infra
+  site:
+    taskfile: ./site/Taskfile.yml
+    dir: ./site
+
 tasks:
   collect-licenses:
     desc: Collect third-party license information
@@ -10,10 +18,7 @@ tasks:
     desc: Build the rstash binary
     deps: [collect-licenses]
     cmds:
-      - go build -ldflags "-X rstash/internal/config.Version={{.VERSION}}" -o ./build/rstash.exe .
-    vars:
-      VERSION:
-        sh: fossil info 2>/dev/null | grep "checkout:" | awk '{print substr($NF,1,10)}' || echo "dev"
+      - go build -o ./build/rstash.exe .
 
   run:
     desc: Run the server
@@ -42,43 +47,27 @@ tasks:
       - rm -f rstash.db rstash.db-wal rstash.db-shm
       - rm -rf ./dist
 
-  site:install:
-    desc: Install site dependencies
-    dir: site
-    cmds:
-      - npm install
-
-  site:dev:
-    desc: Start site dev server
-    dir: site
-    cmds:
-      - npm run dev
-
-  site:build:
-    desc: Build static site
-    dir: site
-    cmds:
-      - npm run build
-
-  site:deploy:
-    desc: Build and deploy site to server
-    deps:
-      - site:build
-    cmds:
-      - ssh {{.SITE_HOST}} "rm -rf /srv/site && mkdir -p /srv/site"
-      - scp -r site/dist/* {{.SITE_HOST}}:/srv/site/
-      - ssh {{.SITE_HOST}} "chmod -R o+rX /srv/site/"
-
   release:
     desc: Cross-compile release binaries for all platforms
+    env:
+      CGO_ENABLED: "0"
     cmds:
-      - mkdir -p dist
-      - GOOS=linux GOARCH=amd64 go build -ldflags "-s -w -X rstash/internal/config.Version={{.VERSION}}" -o dist/rstash-linux-amd64 .
-      - GOOS=linux GOARCH=arm64 go build -ldflags "-s -w -X rstash/internal/config.Version={{.VERSION}}" -o dist/rstash-linux-arm64 .
-      - GOOS=darwin GOARCH=amd64 go build -ldflags "-s -w -X rstash/internal/config.Version={{.VERSION}}" -o dist/rstash-darwin-amd64 .
-      - GOOS=darwin GOARCH=arm64 go build -ldflags "-s -w -X rstash/internal/config.Version={{.VERSION}}" -o dist/rstash-darwin-arm64 .
-      - GOOS=windows GOARCH=amd64 go build -ldflags "-s -w -X rstash/internal/config.Version={{.VERSION}}" -o dist/rstash-windows-amd64.exe .
-      - cd dist && sha256sum rstash-* > checksums.txt
-    vars:
-      VERSION:
-        sh: fossil info 2>/dev/null | grep "checkout:" | awk '{print substr($NF,1,10)}' || echo "dev"
+      - cmd: go build -ldflags "-s -w" -o dist/rstash-linux-amd64 .
+        env: { GOOS: linux, GOARCH: amd64 }
+      - cmd: go build -ldflags "-s -w" -o dist/rstash-linux-arm64 .
+        env: { GOOS: linux, GOARCH: arm64 }
+      - cmd: go build -ldflags "-s -w" -o dist/rstash-darwin-amd64 .
+        env: { GOOS: darwin, GOARCH: amd64 }
+      - cmd: go build -ldflags "-s -w" -o dist/rstash-darwin-arm64 .
+        env: { GOOS: darwin, GOARCH: arm64 }
+      - cmd: go build -ldflags "-s -w" -o dist/rstash-windows-amd64.exe .
+        env: { GOOS: windows, GOARCH: amd64 }
+
+  unversioned:
+    dir: dist/
+    desc: Upsert release binaries to the remote Fossil repo
+    aliases:
+      - uv
+    cmds:
+      - fossil uv add *
+      - fossil uv sync https://curti@fossil.klutch.software/rstash

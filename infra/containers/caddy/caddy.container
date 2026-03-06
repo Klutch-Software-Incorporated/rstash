@@ -1,0 +1,20 @@
+[Unit]
+Description=Caddy Web Server
+After=network-online.target
+
+[Container]
+Image=docker.io/library/caddy:2-alpine
+ContainerName=caddy
+PublishPort=80:80
+PublishPort=443:443
+PublishPort=443:443/udp
+Volume=/etc/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+Volume=/srv/site:/srv/site:ro
+Volume=caddy-data.volume:/data
+Volume=caddy-config.volume:/config
+
+[Service]
+Restart=always
+
+[Install]
+WantedBy=multi-user.target

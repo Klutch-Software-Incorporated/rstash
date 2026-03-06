@@ -144,6 +144,57 @@ const configVars = [
     </div>
   </section>
 
+  <!-- Screenshots -->
+  <section id="screenshots" class="py-20">
+    <div class="max-w-5xl mx-auto px-6">
+      <h2 class="text-2xl font-bold text-center mb-3">See it in action.</h2>
+      <p class="text-center mb-12" style="color: var(--color-text-muted);">
+        A clean web UI for managing users, files, and OAuth — no CLI required.
+      </p>
+      <div class="grid sm:grid-cols-3 gap-6">
+        {[
+          { src: "/screenshots/dashboard.png", caption: "Admin Dashboard" },
+          { src: "/screenshots/file-browser.png", caption: "File Browser" },
+          { src: "/screenshots/oauth-authorize.png", caption: "OAuth Authorize" },
+        ].map((s) => (
+          <div>
+            <img
+              src={s.src}
+              alt={s.caption}
+              class="rounded-lg w-full lightbox-trigger"
+              style={`border: 1px solid var(--color-border); cursor: zoom-in;`}
+              loading="lazy"
+            />
+            <p class="text-sm text-center mt-3 font-medium" style="color: var(--color-text-muted);">{s.caption}</p>
+          </div>
+        ))}
+      </div>
+
+      <!-- Lightbox overlay -->
+      <div id="lightbox" style="display:none; position:fixed; inset:0; z-index:100; background:rgba(0,0,0,0.85); cursor:zoom-out; justify-content:center; align-items:center;">
+        <img id="lightbox-img" style="max-width:90vw; max-height:90vh; border-radius:8px;" alt="" />
+      </div>
+
+      <script>
+        document.querySelectorAll('.lightbox-trigger').forEach(img => {
+          img.addEventListener('click', () => {
+            const lb = document.getElementById('lightbox');
+            const lbImg = document.getElementById('lightbox-img');
+            lbImg.src = img.src;
+            lbImg.alt = img.alt;
+            lb.style.display = 'flex';
+          });
+        });
+        document.getElementById('lightbox').addEventListener('click', (e) => {
+          e.currentTarget.style.display = 'none';
+        });
+        document.addEventListener('keydown', (e) => {
+          if (e.key === 'Escape') document.getElementById('lightbox').style.display = 'none';
+        });
+      </script>
+    </div>
+  </section>
+
   <!-- Quick Start -->
   <section id="quickstart" class="py-20">
     <div class="max-w-4xl mx-auto px-6">
@@ -165,7 +216,7 @@ const configVars = [
             style={`background: var(--color-code-bg); font-family: var(--font-mono);`}
           >
             <div style="color: var(--color-text-muted);"># Download the latest release</div>
-            <div>curl -LO https://fossil.klutch.software/rstash/releases/latest/rstash-linux-amd64</div>
+            <div>curl -LO https://fossil.klutch.software/rstash/uv/rstash-linux-amd64</div>
             <div>chmod +x rstash-linux-amd64</div>
             <br/>
             <div style="color: var(--color-text-muted);"># Start the server</div>
