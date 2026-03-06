@@ -1,5 +1,5 @@
 // Command collect-licenses scans Go module dependencies and collects their
-// license texts into a JSON file for embedding into the gosilo binary.
+// license texts into a JSON file for embedding into the rstash binary.
 //
 // It uses only the standard library — no external dependencies required.
 //
@@ -165,7 +165,7 @@ func main() {
 	output := LicenseData{
 		Generated: time.Now().UTC().Format(time.RFC3339),
 		Project: ProjectLicense{
-			Name:        "gosilo",
+			Name:        "rstash",
 			Version:     "dev",
 			LicenseType: "MIT",
 			LicenseText: projectLicense,

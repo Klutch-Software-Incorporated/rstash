@@ -1,6 +1,6 @@
-# gosilo - remoteStorage Server
+# rstash - remoteStorage Server
 
-`gosilo` is a self-hosted [remoteStorage](https://remotestorage.io/) server written in Go, implementing [draft-dejong-remotestorage-26](https://datatracker.ietf.org/doc/html/draft-dejong-remotestorage-26). It provides WebFinger discovery, OAuth 2.0 authorization, and the full storage API as a single binary with multi-database support (SQLite, PostgreSQL, MySQL, SQL Server).
+`rstash` is a self-hosted [remoteStorage](https://remotestorage.io/) server written in Go, implementing [draft-dejong-remotestorage-26](https://datatracker.ietf.org/doc/html/draft-dejong-remotestorage-26). It provides WebFinger discovery, OAuth 2.0 authorization, and the full storage API as a single binary with multi-database support (SQLite, PostgreSQL, MySQL, SQL Server).
 
 ## Key Features
 
@@ -21,7 +21,7 @@
 Requires Go 1.24+.
 
 ```sh
-go install gosilo@latest
+go install rstash@latest
 ```
 
 Or build from source:
@@ -30,24 +30,24 @@ Or build from source:
 task build
 ```
 
-The binary is output to `./build/gosilo.exe`.
+The binary is output to `./build/rstash.exe`.
 
 ## Quick Start
 
 ```sh
 # Initialize the database and create an admin user
-gosilo init
+rstash init
 
 # Start the server (listens on :8080 by default)
-gosilo serve
+rstash serve
 ```
 
 ## CLI Reference
 
-Running `gosilo` with no subcommand defaults to `serve`.
+Running `rstash` with no subcommand defaults to `serve`.
 
 ```
-gosilo [command]
+rstash [command]
 
 Commands:
   serve              Start the server (default)
@@ -76,23 +76,23 @@ Serve Flags:
 
 ## Configuration
 
-All configuration is via environment variables. Run `gosilo env` to generate a documented `.env` template.
+All configuration is via environment variables. Run `rstash env` to generate a documented `.env` template.
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `GOSILO_ADDR` | `:8080` | Listen address (host:port) |
-| `GOSILO_BASE_URL` | `http://localhost:8080` | Public URL for WebFinger and OAuth redirects |
-| `GOSILO_DB` | `sqlite:gosilo.db` | Metadata database DSN (see [Database DSN formats](#database-dsn-formats)) |
-| `GOSILO_BLOB` | `sqlite:gosilo-blobs.db` | Blob store DSN (`sqlite:path`, `fs:/path/to/dir`, `s3:bucket?params`, or any database DSN) |
-| `GOSILO_WEB_MODE` | `full` | Web UI mode: `full`, `oauth`, `off` |
-| `GOSILO_REGISTRATION` | `closed` | Registration mode: `open`, `closed` |
-| `GOSILO_LOG_LEVEL` | `info` | Log verbosity: `debug`, `info`, `warn`, `error` |
-| `GOSILO_RATE_LIMIT` | `10` | Per-IP rate limit in requests/sec (0 to disable) |
-| `GOSILO_RATE_BURST` | `20` | Max burst size for rate limiting |
-| `GOSILO_QUOTA_MODE` | `off` | Quota enforcement: `off`, `total`, `user` |
-| `GOSILO_QUOTA_TOTAL` | | Global storage limit (e.g. `10GB`, `500MB`) |
-| `GOSILO_QUOTA_USER` | | Per-user storage quota (e.g. `500MB`, `1GB`) |
-| `GOSILO_MAX_UPLOAD` | `50MB` | Maximum upload size per request |
+| `RSTASH_ADDR` | `:8080` | Listen address (host:port) |
+| `RSTASH_BASE_URL` | `http://localhost:8080` | Public URL for WebFinger and OAuth redirects |
+| `RSTASH_DB` | `sqlite:rstash.db` | Metadata database DSN (see [Database DSN formats](#database-dsn-formats)) |
+| `RSTASH_BLOB` | `sqlite:rstash-blobs.db` | Blob store DSN (`sqlite:path`, `fs:/path/to/dir`, `s3:bucket?params`, or any database DSN) |
+| `RSTASH_WEB_MODE` | `full` | Web UI mode: `full`, `oauth`, `off` |
+| `RSTASH_REGISTRATION` | `closed` | Registration mode: `open`, `closed` |
+| `RSTASH_LOG_LEVEL` | `info` | Log verbosity: `debug`, `info`, `warn`, `error` |
+| `RSTASH_RATE_LIMIT` | `10` | Per-IP rate limit in requests/sec (0 to disable) |
+| `RSTASH_RATE_BURST` | `20` | Max burst size for rate limiting |
+| `RSTASH_QUOTA_MODE` | `off` | Quota enforcement: `off`, `total`, `user` |
+| `RSTASH_QUOTA_TOTAL` | | Global storage limit (e.g. `10GB`, `500MB`) |
+| `RSTASH_QUOTA_USER` | | Per-user storage quota (e.g. `500MB`, `1GB`) |
+| `RSTASH_MAX_UPLOAD` | `50MB` | Maximum upload size per request |
 
 ### Web Modes
 
@@ -104,22 +104,22 @@ All configuration is via environment variables. Run `gosilo env` to generate a d
 
 | Database | DSN Format | Example |
 |----------|-----------|---------|
-| SQLite | `sqlite:path` | `sqlite:gosilo.db` or `sqlite::memory:` |
-| PostgreSQL | `postgres:host=... port=... user=... password=... dbname=... sslmode=...` | `postgres:host=localhost port=5432 user=gosilo password=secret dbname=gosilo sslmode=disable` |
-| MySQL | `mysql:user:password@tcp(host:port)/dbname?parseTime=true` | `mysql:gosilo:secret@tcp(localhost:3306)/gosilo?parseTime=true` |
-| SQL Server | `mssql:sqlserver://user:password@host:port?database=dbname` | `mssql:sqlserver://sa:Password1@localhost:1433?database=gosilo` |
+| SQLite | `sqlite:path` | `sqlite:rstash.db` or `sqlite::memory:` |
+| PostgreSQL | `postgres:host=... port=... user=... password=... dbname=... sslmode=...` | `postgres:host=localhost port=5432 user=rstash password=secret dbname=rstash sslmode=disable` |
+| MySQL | `mysql:user:password@tcp(host:port)/dbname?parseTime=true` | `mysql:rstash:secret@tcp(localhost:3306)/rstash?parseTime=true` |
+| SQL Server | `mssql:sqlserver://user:password@host:port?database=dbname` | `mssql:sqlserver://sa:Password1@localhost:1433?database=rstash` |
 
 ### Blob Store DSN Formats
 
-The `GOSILO_BLOB` variable controls where file content is stored:
+The `RSTASH_BLOB` variable controls where file content is stored:
 
 | Backend | DSN Format | Example |
 |---------|-----------|---------|
-| SQLite | `sqlite:path` | `sqlite:gosilo-blobs.db` |
-| Filesystem | `fs:/path/to/dir` | `fs:/var/lib/gosilo/blobs` |
+| SQLite | `sqlite:path` | `sqlite:rstash-blobs.db` |
+| Filesystem | `fs:/path/to/dir` | `fs:/var/lib/rstash/blobs` |
 | S3-compatible | `s3:bucket?params` | `s3:my-bucket?region=us-west-2` |
 | PostgreSQL | `postgres:connstring` | `postgres:host=localhost dbname=blobs` |
-| MySQL | `mysql:dsn` | `mysql:gosilo:secret@tcp(localhost:3306)/blobs?parseTime=true` |
+| MySQL | `mysql:dsn` | `mysql:rstash:secret@tcp(localhost:3306)/blobs?parseTime=true` |
 | SQL Server | `mssql:dsn` | `mssql:sqlserver://sa:Password1@localhost:1433?database=blobs` |
 
 ### S3-Compatible Blob Storage
@@ -137,7 +137,7 @@ The `s3:` backend works with AWS S3, MinIO, DigitalOcean Spaces, Backblaze B2, a
 | `secret_key` | `$AWS_SECRET_ACCESS_KEY` | Secret key (env var fallback) |
 | `tls` | `true` | Use HTTPS (`true`/`false`) |
 
-**Important:** The bucket must already exist before starting gosilo. The server verifies the bucket exists at startup and will refuse to start if it does not. Create the bucket using your provider's console, CLI, or API.
+**Important:** The bucket must already exist before starting rstash. The server verifies the bucket exists at startup and will refuse to start if it does not. Create the bucket using your provider's console, CLI, or API.
 
 **Examples:**
 
@@ -145,23 +145,23 @@ The `s3:` backend works with AWS S3, MinIO, DigitalOcean Spaces, Backblaze B2, a
 # AWS S3 (credentials via env vars)
 export AWS_ACCESS_KEY_ID=AKIA...
 export AWS_SECRET_ACCESS_KEY=...
-export GOSILO_BLOB="s3:my-bucket?region=us-west-2"
+export RSTASH_BLOB="s3:my-bucket?region=us-west-2"
 
 # DigitalOcean Spaces
-export GOSILO_BLOB="s3:my-space?region=nyc3&endpoint=nyc3.digitaloceanspaces.com"
+export RSTASH_BLOB="s3:my-space?region=nyc3&endpoint=nyc3.digitaloceanspaces.com"
 
 # MinIO (local development)
-export GOSILO_BLOB="s3:gosilo?endpoint=localhost:9000&tls=false&access_key=minioadmin&secret_key=minioadmin"
+export RSTASH_BLOB="s3:rstash?endpoint=localhost:9000&tls=false&access_key=minioadmin&secret_key=minioadmin"
 
 # Shared bucket with key prefix
-export GOSILO_BLOB="s3:shared-bucket?prefix=gosilo/prod&region=eu-west-1"
+export RSTASH_BLOB="s3:shared-bucket?prefix=rstash/prod&region=eu-west-1"
 ```
 
 Objects are stored with the key layout `{prefix}/{userID}/{path}` (prefix omitted if empty).
 
 ### Runtime Settings
 
-Settings like `registration_mode`, `log_level`, `rate_limit_rate`, `rate_limit_burst`, `quota_mode`, `quota_total`, `quota_user`, and `max_upload_size` can be overridden at runtime via `gosilo config set` without restarting the server. Use `gosilo config list` to see current values and their source (env or db override).
+Settings like `registration_mode`, `log_level`, `rate_limit_rate`, `rate_limit_burst`, `quota_mode`, `quota_total`, `quota_user`, and `max_upload_size` can be overridden at runtime via `rstash config set` without restarting the server. Use `rstash config list` to see current values and their source (env or db override).
 
 ## Development
 

@@ -13,19 +13,19 @@ const defaultPrivacyContent = "Privacy Policy\n\n1. Data Collected. This service
 
 // Config holds all application configuration, loaded from environment variables.
 type Config struct {
-	Addr             string  // GOSILO_ADDR — listen address
-	BaseURL          string  // GOSILO_BASE_URL — public URL of the server
-	DatabaseDSN      string  // GOSILO_DB — metadata database DSN (e.g. sqlite:gosilo.db)
-	BlobDSN          string  // GOSILO_BLOB — blob store DSN (e.g. sqlite:blobs.db, fs:/path)
-	RegistrationMode string  // GOSILO_REGISTRATION — "open" or "closed"
-	LogLevel         string  // GOSILO_LOG_LEVEL — "debug", "info", "warn", "error"
-	RateLimitRate    float64 // GOSILO_RATE_LIMIT — requests/sec per IP (0 = disabled)
-	RateLimitBurst   int     // GOSILO_RATE_BURST — max burst size
-	QuotaMode        string  // GOSILO_QUOTA_MODE — "off", "total", "user"
-	QuotaTotal       int64   // GOSILO_QUOTA_TOTAL — bytes (parsed from human-readable)
-	QuotaUser        int64   // GOSILO_QUOTA_USER — bytes (parsed from human-readable)
-	MaxUploadSize    int64   // GOSILO_MAX_UPLOAD — max request body size (parsed from human-readable)
-	TokenLifetime        string  // GOSILO_TOKEN_LIFETIME — OAuth token lifetime: "30d", "24h", "0" (no expiry)
+	Addr             string  // RSTASH_ADDR — listen address
+	BaseURL          string  // RSTASH_BASE_URL — public URL of the server
+	DatabaseDSN      string  // RSTASH_DB — metadata database DSN (e.g. sqlite:rstash.db)
+	BlobDSN          string  // RSTASH_BLOB — blob store DSN (e.g. sqlite:blobs.db, fs:/path)
+	RegistrationMode string  // RSTASH_REGISTRATION — "open" or "closed"
+	LogLevel         string  // RSTASH_LOG_LEVEL — "debug", "info", "warn", "error"
+	RateLimitRate    float64 // RSTASH_RATE_LIMIT — requests/sec per IP (0 = disabled)
+	RateLimitBurst   int     // RSTASH_RATE_BURST — max burst size
+	QuotaMode        string  // RSTASH_QUOTA_MODE — "off", "total", "user"
+	QuotaTotal       int64   // RSTASH_QUOTA_TOTAL — bytes (parsed from human-readable)
+	QuotaUser        int64   // RSTASH_QUOTA_USER — bytes (parsed from human-readable)
+	MaxUploadSize    int64   // RSTASH_MAX_UPLOAD — max request body size (parsed from human-readable)
+	TokenLifetime        string  // RSTASH_TOKEN_LIFETIME — OAuth token lifetime: "30d", "24h", "0" (no expiry)
 	RefreshTokens        string  // "enabled" or "disabled"
 	RefreshTokenLifetime string  // refresh token lifetime: "90d", "0" (no expiry)
 	MetricsMode          string  // "public", "admin", or "off"
@@ -34,15 +34,15 @@ type Config struct {
 	TOSContent           string
 	PrivacyMode          string  // "off", "text", "url"
 	PrivacyContent       string
-	LogFile              string  // GOSILO_LOG_FILE — path to log file (empty = stderr only)
-	TLSCert              string  // GOSILO_TLS_CERT — path to TLS certificate file
-	TLSKey               string  // GOSILO_TLS_KEY — path to TLS private key file
-	TLSMode              string  // GOSILO_TLS_MODE — "off", "manual", "auto", or "" (auto-detect)
-	TLSCacheDir          string  // GOSILO_TLS_CACHE — autocert cache directory
+	LogFile              string  // RSTASH_LOG_FILE — path to log file (empty = stderr only)
+	TLSCert              string  // RSTASH_TLS_CERT — path to TLS certificate file
+	TLSKey               string  // RSTASH_TLS_KEY — path to TLS private key file
+	TLSMode              string  // RSTASH_TLS_MODE — "off", "manual", "auto", or "" (auto-detect)
+	TLSCacheDir          string  // RSTASH_TLS_CACHE — autocert cache directory
 }
 
 // ParseDSN splits a DSN string into its scheme and path components.
-// For example, "sqlite:gosilo.db" returns ("sqlite", "gosilo.db", nil).
+// For example, "sqlite:rstash.db" returns ("sqlite", "rstash.db", nil).
 func ParseDSN(dsn string) (scheme, path string, err error) {
 	i := strings.Index(dsn, ":")
 	if i < 1 {
@@ -63,8 +63,8 @@ func Load() *Config {
 		// Boot-critical: read from env vars.
 		Addr:        envOrDefault(EnvAddr, ":8080"),
 		BaseURL:     envOrDefault(EnvBaseURL, "http://localhost:8080"),
-		DatabaseDSN: envOrDefault(EnvDB, "sqlite:gosilo.db"),
-		BlobDSN:     envOrDefault(EnvBlob, "sqlite:gosilo-blobs.db"),
+		DatabaseDSN: envOrDefault(EnvDB, "sqlite:rstash.db"),
+		BlobDSN:     envOrDefault(EnvBlob, "sqlite:rstash-blobs.db"),
 		LogLevel:    envOrDefault(EnvLogLevel, "info"),
 		LogFile:     os.Getenv(EnvLogFile),
 		TLSCert:     os.Getenv(EnvTLSCert),

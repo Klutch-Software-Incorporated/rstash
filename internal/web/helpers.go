@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"strings"
 
-	"gosilo/internal/ui"
+	"rstash/internal/ui"
 )
 
 // formatBytes returns a human-readable string for a byte count.

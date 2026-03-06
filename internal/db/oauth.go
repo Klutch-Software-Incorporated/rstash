@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"gosilo/internal/model"
+	"rstash/internal/model"
 
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"

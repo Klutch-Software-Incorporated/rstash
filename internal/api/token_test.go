@@ -11,8 +11,8 @@ import (
 	"strings"
 	"testing"
 
-	"gosilo/internal/api"
-	"gosilo/internal/db"
+	"rstash/internal/api"
+	"rstash/internal/db"
 )
 
 func tokenTestServer(t *testing.T) (*httptest.Server, *tokenTestEnv) {

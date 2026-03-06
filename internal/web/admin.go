@@ -7,9 +7,9 @@ import (
 	"strconv"
 	"time"
 
-	"gosilo/internal/config"
-	"gosilo/internal/db"
-	"gosilo/internal/ui"
+	"rstash/internal/config"
+	"rstash/internal/db"
+	"rstash/internal/ui"
 )
 
 type adminHandler struct {
@@ -191,7 +191,7 @@ func (h *adminHandler) ShowDashboard(w http.ResponseWriter, r *http.Request) {
 		content.RecentAudit = aRows
 	}
 
-	h.deps.Renderer.Render(w, "admin_dashboard", h.deps.adminPageData(w, r, "Admin — Gosilo", "overview", content))
+	h.deps.Renderer.Render(w, "admin_dashboard", h.deps.adminPageData(w, r, "Admin — rstash", "overview", content))
 }
 
 // ShowUsers handles GET /admin/users — user list with actions.

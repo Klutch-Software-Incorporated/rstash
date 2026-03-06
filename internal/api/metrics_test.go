@@ -6,10 +6,10 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"gosilo/internal/api"
-	"gosilo/internal/auth"
-	"gosilo/internal/db"
-	"gosilo/internal/metrics"
+	"rstash/internal/api"
+	"rstash/internal/auth"
+	"rstash/internal/db"
+	"rstash/internal/metrics"
 )
 
 func TestRouteGroup(t *testing.T) {

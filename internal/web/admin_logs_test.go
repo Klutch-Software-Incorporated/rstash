@@ -7,7 +7,7 @@ import (
 )
 
 func TestTailFile_BasicRead(t *testing.T) {
-	f, err := os.CreateTemp("", "gosilo-test-log-*.log")
+	f, err := os.CreateTemp("", "rstash-test-log-*.log")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -29,7 +29,7 @@ func TestTailFile_BasicRead(t *testing.T) {
 }
 
 func TestTailFile_TailLimitsLines(t *testing.T) {
-	f, err := os.CreateTemp("", "gosilo-test-log-*.log")
+	f, err := os.CreateTemp("", "rstash-test-log-*.log")
 	if err != nil {
 		t.Fatal(err)
 	}

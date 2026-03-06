@@ -7,8 +7,8 @@ import (
 	"strconv"
 	"strings"
 
-	"gosilo/internal/db"
-	"gosilo/internal/ui"
+	"rstash/internal/db"
+	"rstash/internal/ui"
 )
 
 type abuseHandler struct {
@@ -32,7 +32,7 @@ func (h *abuseHandler) ShowReportForm(w http.ResponseWriter, r *http.Request) {
 		Path:      r.URL.Query().Get("path"),
 		Submitted: r.URL.Query().Get("submitted") == "1",
 	}
-	h.deps.Renderer.Render(w, "abuse_report", h.deps.pageData(w, r, "Report Abuse — Gosilo", content))
+	h.deps.Renderer.Render(w, "abuse_report", h.deps.pageData(w, r, "Report Abuse — rstash", content))
 }
 
 // DoReport handles POST /abuse/report.
@@ -43,7 +43,7 @@ func (h *abuseHandler) DoReport(w http.ResponseWriter, r *http.Request) {
 	description := strings.TrimSpace(r.FormValue("description"))
 
 	renderErr := func(msg string) {
-		h.deps.Renderer.Render(w, "abuse_report", h.deps.pageData(w, r, "Report Abuse — Gosilo", &abuseReportContent{
+		h.deps.Renderer.Render(w, "abuse_report", h.deps.pageData(w, r, "Report Abuse — rstash", &abuseReportContent{
 			Path:  path,
 			Error: msg,
 		}))

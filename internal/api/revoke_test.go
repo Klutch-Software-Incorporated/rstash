@@ -9,8 +9,8 @@ import (
 	"testing"
 	"time"
 
-	"gosilo/internal/api"
-	"gosilo/internal/db"
+	"rstash/internal/api"
+	"rstash/internal/db"
 )
 
 func revokeTestServer(t *testing.T) (*httptest.Server, *revokeTestEnv) {

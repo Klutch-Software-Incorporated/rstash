@@ -8,9 +8,9 @@ import (
 	"net/http"
 	"sync/atomic"
 
-	"gosilo/internal/auth"
-	"gosilo/internal/model"
-	"gosilo/internal/ui"
+	"rstash/internal/auth"
+	"rstash/internal/model"
+	"rstash/internal/ui"
 )
 
 type contextKey string
@@ -23,7 +23,7 @@ const (
 	ctxKeyCSRFCookie contextKey = "csrfCookie"
 )
 
-const csrfCookieName = "gosilo_csrf"
+const csrfCookieName = "rstash_csrf"
 
 // AuthLoader returns middleware that reads the session cookie and loads
 // the user into the request context.
@@ -80,7 +80,7 @@ func CurrentSession(r *http.Request) *model.Session {
 	return s
 }
 
-// EnsureCSRFCookie is middleware that sets a gosilo_csrf cookie on every response
+// EnsureCSRFCookie is middleware that sets a rstash_csrf cookie on every response
 // if one is not already present. The cookie value is stored in context so that
 // CSRFToken() can return it for template rendering on pre-auth pages.
 func EnsureCSRFCookie(secureCookies bool) func(http.Handler) http.Handler {

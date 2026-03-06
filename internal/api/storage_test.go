@@ -10,10 +10,10 @@ import (
 	"strings"
 	"testing"
 
-	"gosilo/internal/api"
-	"gosilo/internal/blob"
-	"gosilo/internal/db"
-	"gosilo/internal/storage"
+	"rstash/internal/api"
+	"rstash/internal/blob"
+	"rstash/internal/db"
+	"rstash/internal/storage"
 )
 
 // testSetup creates an in-memory database, blob store, storage service,

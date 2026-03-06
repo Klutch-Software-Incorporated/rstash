@@ -6,29 +6,29 @@ order: 4
 
 All configuration starts with environment variables. Many settings can also be changed at runtime via the [admin panel](/docs/web-ui/) — database overrides take precedence over env vars.
 
-Run `gosilo env` to generate a documented `.env` template:
+Run `rstash env` to generate a documented `.env` template:
 
 ```bash
-gosilo env > .env
+rstash env > .env
 ```
 
 ## Server
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `GOSILO_ADDR` | `:8080` | Listen address (`host:port`) |
-| `GOSILO_BASE_URL` | `http://localhost:8080` | Public-facing URL of the server |
-| `GOSILO_LOG_LEVEL` | `info` | Log level: `debug`, `info`, `warn`, `error` |
-| `GOSILO_LOG_FILE` | *(none)* | Path to log file (empty = stderr only) |
+| `RSTASH_ADDR` | `:8080` | Listen address (`host:port`) |
+| `RSTASH_BASE_URL` | `http://localhost:8080` | Public-facing URL of the server |
+| `RSTASH_LOG_LEVEL` | `info` | Log level: `debug`, `info`, `warn`, `error` |
+| `RSTASH_LOG_FILE` | *(none)* | Path to log file (empty = stderr only) |
 
-`GOSILO_BASE_URL` is important — it's used in WebFinger responses and OAuth redirects. Set it to your actual public URL in production.
+`RSTASH_BASE_URL` is important — it's used in WebFinger responses and OAuth redirects. Set it to your actual public URL in production.
 
 ## Database
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `GOSILO_DB` | `sqlite:gosilo.db` | Metadata database DSN |
-| `GOSILO_BLOB` | `sqlite:gosilo-blobs.db` | Blob store DSN |
+| `RSTASH_DB` | `sqlite:rstash.db` | Metadata database DSN |
+| `RSTASH_BLOB` | `sqlite:rstash-blobs.db` | Blob store DSN |
 
 Both support these DSN prefixes:
 
@@ -46,16 +46,16 @@ The blob store also supports:
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `GOSILO_TLS_MODE` | *(auto-detect)* | TLS mode: `off`, `manual`, `auto` |
-| `GOSILO_TLS_CERT` | | Path to TLS certificate file |
-| `GOSILO_TLS_KEY` | | Path to TLS private key file |
-| `GOSILO_TLS_CACHE` | `./certs` | Autocert certificate cache directory |
+| `RSTASH_TLS_MODE` | *(auto-detect)* | TLS mode: `off`, `manual`, `auto` |
+| `RSTASH_TLS_CERT` | | Path to TLS certificate file |
+| `RSTASH_TLS_KEY` | | Path to TLS private key file |
+| `RSTASH_TLS_CACHE` | `./certs` | Autocert certificate cache directory |
 
-When `GOSILO_TLS_MODE` is empty, gosilo auto-detects:
-- If `GOSILO_TLS_CERT` and `GOSILO_TLS_KEY` are set → `manual` mode
+When `RSTASH_TLS_MODE` is empty, rstash auto-detects:
+- If `RSTASH_TLS_CERT` and `RSTASH_TLS_KEY` are set → `manual` mode
 - Otherwise → TLS disabled
 
-Set `GOSILO_TLS_MODE=auto` for automatic HTTPS via Let's Encrypt. Your `GOSILO_BASE_URL` must use a real domain and port 443 must be reachable.
+Set `RSTASH_TLS_MODE=auto` for automatic HTTPS via Let's Encrypt. Your `RSTASH_BASE_URL` must use a real domain and port 443 must be reachable.
 
 ## Runtime Settings
 
@@ -75,11 +75,11 @@ The following settings have sensible defaults and can be changed at any time thr
 ## Example Production Config
 
 ```bash
-export GOSILO_ADDR=":443"
-export GOSILO_BASE_URL="https://storage.example.com"
-export GOSILO_DB="postgres:host=localhost dbname=gosilo sslmode=disable"
-export GOSILO_BLOB="fs:/var/lib/gosilo/blobs"
-export GOSILO_TLS_MODE="auto"
+export RSTASH_ADDR=":443"
+export RSTASH_BASE_URL="https://storage.example.com"
+export RSTASH_DB="postgres:host=localhost dbname=rstash sslmode=disable"
+export RSTASH_BLOB="fs:/var/lib/rstash/blobs"
+export RSTASH_TLS_MODE="auto"
 
-gosilo
+rstash
 ```

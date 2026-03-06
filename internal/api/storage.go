@@ -10,8 +10,8 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	"gosilo/internal/db"
-	"gosilo/internal/storage"
+	"rstash/internal/db"
+	"rstash/internal/storage"
 )
 
 // ValidatePath checks that a storage path conforms to the remoteStorage spec

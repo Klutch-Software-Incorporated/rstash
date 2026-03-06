@@ -8,9 +8,9 @@ import (
 	"sort"
 	"strings"
 
-	"gosilo/internal/api"
-	"gosilo/internal/config"
-	"gosilo/internal/ui"
+	"rstash/internal/api"
+	"rstash/internal/config"
+	"rstash/internal/ui"
 )
 
 type oauthHandler struct {
@@ -189,7 +189,7 @@ func (h *oauthHandler) ShowAuthorize(w http.ResponseWriter, r *http.Request) {
 	}
 
 	h.deps.Renderer.Render(w, "oauth_authorize", ui.PageData{
-		Title:       "Authorize — Gosilo",
+		Title:       "Authorize — rstash",
 		CurrentUser: userInfo(user),
 		CSRFToken:   CSRFToken(r),
 		Content: &authorizeContent{

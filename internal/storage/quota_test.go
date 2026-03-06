@@ -4,8 +4,8 @@ import (
 	"context"
 	"testing"
 
-	"gosilo/internal/db"
-	"gosilo/internal/model"
+	"rstash/internal/db"
+	"rstash/internal/model"
 )
 
 // testRepo creates an in-memory Repository with all migrations applied.

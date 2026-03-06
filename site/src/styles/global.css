@@ -1,6 +1,6 @@
 @import "tailwindcss";
 
-/* Match the gosilo app's warm color palette */
+/* Match the rstash app's warm color palette */
 :root {
   --color-bg: #fafaf8;
   --color-bg-alt: #f5f5f0;

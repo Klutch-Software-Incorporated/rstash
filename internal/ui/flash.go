@@ -14,7 +14,7 @@ type FlashData struct {
 // SetFlash sets a flash message cookie (success/info severity).
 func SetFlash(w http.ResponseWriter, message string) {
 	http.SetCookie(w, &http.Cookie{
-		Name:     "gosilo_flash",
+		Name:     "rstash_flash",
 		Value:    message,
 		Path:     "/",
 		MaxAge:   60,
@@ -30,13 +30,13 @@ func SetFlashError(w http.ResponseWriter, message string) {
 
 // GetFlash reads and clears the flash message cookie.
 func GetFlash(w http.ResponseWriter, r *http.Request) *FlashData {
-	cookie, err := r.Cookie("gosilo_flash")
+	cookie, err := r.Cookie("rstash_flash")
 	if err != nil {
 		return nil
 	}
 	// Clear it.
 	http.SetCookie(w, &http.Cookie{
-		Name:     "gosilo_flash",
+		Name:     "rstash_flash",
 		Value:    "",
 		Path:     "/",
 		MaxAge:   -1,

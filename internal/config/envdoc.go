@@ -34,8 +34,8 @@ func EnvVars() []EnvVar {
 // All values are commented out so defaults take effect.
 func GenerateEnvFile() string {
 	var b strings.Builder
-	b.WriteString("# Gosilo configuration\n")
-	b.WriteString("# See: gosilo help\n")
+	b.WriteString("# rstash configuration\n")
+	b.WriteString("# See: rstash help\n")
 
 	for _, v := range EnvVars() {
 		b.WriteString("\n")

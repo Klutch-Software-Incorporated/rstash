@@ -4,19 +4,19 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Gosilo is a remoteStorage server (draft-dejong-remotestorage-26) written in Go.
+rstash is a remoteStorage server (draft-dejong-remotestorage-26) written in Go.
 It implements the remoteStorage protocol including WebFinger discovery, OAuth 2.0
 authorization, and the storage API (GET/PUT/DELETE/HEAD for documents and folders).
 
 The target audience is technical self-hosters running personal or small family/friends
-servers. The design prioritizes a "just run it and go" experience — run `gosilo` to
+servers. The design prioritizes a "just run it and go" experience — run `rstash` to
 start the server and complete setup through the web UI.
 
 Source control is managed via Fossil, not git.
 
 ## Build & Run Commands
 
-- **Build:** `task build` (or `go build -o ./build/gosilo.exe .`)
+- **Build:** `task build` (or `go build -o ./build/rstash.exe .`)
 - **Run:** `task run` (or `go run .`)
 - **Run tests:** `task test` (or `go test ./...`)
 - **Run a single test:** `go test -run TestName ./internal/package`
@@ -25,30 +25,30 @@ Source control is managed via Fossil, not git.
 
 ## CLI
 
-The CLI is intentionally minimal. Running `gosilo` starts the server (default command).
+The CLI is intentionally minimal. Running `rstash` starts the server (default command).
 
-- `gosilo` — start the HTTP server (same as `gosilo serve`)
-- `gosilo env` — print a documented .env configuration template to stdout
-- `gosilo check` — validate configuration and test database/blob store connectivity
+- `rstash` — start the HTTP server (same as `rstash serve`)
+- `rstash env` — print a documented .env configuration template to stdout
+- `rstash check` — validate configuration and test database/blob store connectivity
 
 All server management (users, settings, etc.) is done through the web UI.
 
 ## Configuration
 
-All configuration is via environment variables (see `gosilo env` for a documented template):
+All configuration is via environment variables (see `rstash env` for a documented template):
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| GOSILO_ADDR | :8080 | Listen address (host:port) |
-| GOSILO_BASE_URL | http://localhost:8080 | Public URL of the server |
-| GOSILO_DB | sqlite:gosilo.db | Metadata database DSN (sqlite:, postgres:, mysql:, mssql:) |
-| GOSILO_BLOB | sqlite:gosilo-blobs.db | Blob store DSN (sqlite:path, fs:/path, s3:bucket, or database DSN) |
-| GOSILO_LOG_LEVEL | info | Log level: debug, info, warn, error |
-| GOSILO_LOG_FILE | | Path to log file (empty = stderr only) |
-| GOSILO_TLS_CERT | | TLS certificate file path |
-| GOSILO_TLS_KEY | | TLS private key file path |
-| GOSILO_TLS_MODE | *(empty)* | TLS mode: off, manual, auto (empty=auto-detect) |
-| GOSILO_TLS_CACHE | ./certs | Autocert certificate cache directory |
+| RSTASH_ADDR | :8080 | Listen address (host:port) |
+| RSTASH_BASE_URL | http://localhost:8080 | Public URL of the server |
+| RSTASH_DB | sqlite:rstash.db | Metadata database DSN (sqlite:, postgres:, mysql:, mssql:) |
+| RSTASH_BLOB | sqlite:rstash-blobs.db | Blob store DSN (sqlite:path, fs:/path, s3:bucket, or database DSN) |
+| RSTASH_LOG_LEVEL | info | Log level: debug, info, warn, error |
+| RSTASH_LOG_FILE | | Path to log file (empty = stderr only) |
+| RSTASH_TLS_CERT | | TLS certificate file path |
+| RSTASH_TLS_KEY | | TLS private key file path |
+| RSTASH_TLS_MODE | *(empty)* | TLS mode: off, manual, auto (empty=auto-detect) |
+| RSTASH_TLS_CACHE | ./certs | Autocert certificate cache directory |
 
 Additional settings (registration mode, rate limits, quotas, OAuth token lifetime, etc.)
 are managed at runtime through the admin web UI and stored in the database.

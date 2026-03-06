@@ -11,7 +11,7 @@
             <div class="oauth-consent-header">
                 <p class="oauth-title">Authorize access</p>
                 <p class="oauth-subtitle">An application wants to access
-                    {{if .LoggedIn}}your storage{{else}}a Gosilo account{{end}}.</p>
+                    {{if .LoggedIn}}your storage{{else}}a rstash account{{end}}.</p>
             </div>
 
             <div class="oauth-app-identity">
@@ -93,7 +93,7 @@
 
         <p class="oauth-trust-note">
             Only authorize applications you trust.
-            This application is not affiliated with Gosilo.
+            This application is not affiliated with rstash.
         </p>
         {{if or .TOSUrl .PrivacyUrl}}
         <p style="text-align:center;font-size:.75rem;color:var(--fg-faint);margin-top:.5rem">

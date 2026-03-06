@@ -5,10 +5,10 @@ import (
 	"log/slog"
 	"net/http"
 
-	"gosilo/internal/auth"
-	"gosilo/internal/db"
-	"gosilo/internal/settings"
-	"gosilo/internal/ui"
+	"rstash/internal/auth"
+	"rstash/internal/db"
+	"rstash/internal/settings"
+	"rstash/internal/ui"
 )
 
 type registerHandler struct {
@@ -43,7 +43,7 @@ func (h *registerHandler) ShowRegister(w http.ResponseWriter, r *http.Request) {
 	}
 	content.TOSUrl, content.PrivacyUrl = h.legalURLs(snap)
 
-	h.deps.Renderer.Render(w, "register", h.deps.pageData(w, r, "Register — Gosilo", content))
+	h.deps.Renderer.Render(w, "register", h.deps.pageData(w, r, "Register — rstash", content))
 }
 
 func (h *registerHandler) DoRegister(w http.ResponseWriter, r *http.Request) {
@@ -63,7 +63,7 @@ func (h *registerHandler) DoRegister(w http.ResponseWriter, r *http.Request) {
 
 	renderErr := func(msg string) {
 		h.deps.Renderer.Render(w, "register", ui.PageData{
-			Title: "Register — Gosilo",
+			Title: "Register — rstash",
 			Content: &registerContent{
 				Username:   username,
 				Error:      msg,
@@ -125,7 +125,7 @@ func (h *registerHandler) DoRegister(w http.ResponseWriter, r *http.Request) {
 	if !approved {
 		// Approval mode: show success message, don't create a session.
 		h.deps.Repo.Audit(r.Context(), user.ID, "user.registered_pending", "user", fmt.Sprintf("%d", user.ID), username)
-		h.deps.Renderer.Render(w, "register", h.deps.pageData(w, r, "Register — Gosilo", &registerContent{
+		h.deps.Renderer.Render(w, "register", h.deps.pageData(w, r, "Register — rstash", &registerContent{
 			ApprovalMode: true,
 			Success:      true,
 			TOSUrl:       tosUrl,

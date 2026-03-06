@@ -35,16 +35,16 @@ const features = [
 ];
 
 const configVars = [
-  { name: "GOSILO_ADDR", default: ":8080", desc: "Listen address" },
-  { name: "GOSILO_BASE_URL", default: "http://localhost:8080", desc: "Public URL" },
-  { name: "GOSILO_DB", default: "sqlite:gosilo.db", desc: "Database DSN" },
-  { name: "GOSILO_BLOB", default: "sqlite:gosilo-blobs.db", desc: "Blob store DSN" },
-  { name: "GOSILO_LOG_LEVEL", default: "info", desc: "Log level" },
-  { name: "GOSILO_TLS_MODE", default: "auto-detect", desc: "TLS mode" },
+  { name: "RSTASH_ADDR", default: ":8080", desc: "Listen address" },
+  { name: "RSTASH_BASE_URL", default: "http://localhost:8080", desc: "Public URL" },
+  { name: "RSTASH_DB", default: "sqlite:rstash.db", desc: "Database DSN" },
+  { name: "RSTASH_BLOB", default: "sqlite:rstash-blobs.db", desc: "Blob store DSN" },
+  { name: "RSTASH_LOG_LEVEL", default: "info", desc: "Log level" },
+  { name: "RSTASH_TLS_MODE", default: "auto-detect", desc: "TLS mode" },
 ];
 ---
 
-<Base title="gosilo — A remoteStorage server written in Go">
+<Base title="rstash — A remoteStorage server written in Go">
 
   <!-- Hero -->
   <section class="py-20 md:py-32">
@@ -54,7 +54,7 @@ const configVars = [
           Your data,<br/>your server.
         </h1>
         <p class="text-lg mb-8" style="color: var(--color-text-muted); max-width: 480px;">
-          gosilo is a <a href="https://remotestorage.io" class="underline" style="color: var(--color-accent);">remoteStorage</a> server
+          rstash is a <a href="https://remotestorage.io" class="underline" style="color: var(--color-accent);">remoteStorage</a> server
           written in Go. Deploy a single binary and give your apps a personal data backend.
         </p>
         <div class="flex flex-wrap gap-3 justify-center md:justify-start">
@@ -66,7 +66,7 @@ const configVars = [
             Get Started
           </a>
           <a
-            href="https://code.lag.dev/gosilo"
+            href="https://fossil.klutch.software/rstash"
             class="inline-flex items-center px-5 py-2.5 rounded-md font-semibold text-sm transition-colors"
             style={`border: 1px solid var(--color-border); color: var(--color-text);`}
             target="_blank"
@@ -86,7 +86,7 @@ const configVars = [
             <span class="w-2.5 h-2.5 rounded-full" style="background: var(--color-danger); opacity: 0.6;"></span>
             <span class="w-2.5 h-2.5 rounded-full" style="background: var(--color-accent); opacity: 0.6;"></span>
             <span class="w-2.5 h-2.5 rounded-full" style="background: #4a9a4a; opacity: 0.6;"></span>
-            <span class="ml-2 text-xs" style="color: var(--color-text-muted); font-family: var(--font-mono);">gosilo</span>
+            <span class="ml-2 text-xs" style="color: var(--color-text-muted); font-family: var(--font-mono);">rstash</span>
           </div>
           <div class="p-4 space-y-3">
             <div class="flex items-center gap-2">
@@ -165,11 +165,11 @@ const configVars = [
             style={`background: var(--color-code-bg); font-family: var(--font-mono);`}
           >
             <div style="color: var(--color-text-muted);"># Download the latest release</div>
-            <div>curl -LO https://code.lag.dev/gosilo/releases/latest/gosilo-linux-amd64</div>
-            <div>chmod +x gosilo-linux-amd64</div>
+            <div>curl -LO https://fossil.klutch.software/rstash/releases/latest/rstash-linux-amd64</div>
+            <div>chmod +x rstash-linux-amd64</div>
             <br/>
             <div style="color: var(--color-text-muted);"># Start the server</div>
-            <div>./gosilo-linux-amd64</div>
+            <div>./rstash-linux-amd64</div>
             <div style="color: var(--color-text-muted);">
               <br/>
               # → listening on http://localhost:8080<br/>
@@ -186,7 +186,7 @@ const configVars = [
     <div class="max-w-4xl mx-auto px-6">
       <h2 class="text-2xl font-bold text-center mb-3">Configure with environment variables.</h2>
       <p class="text-center mb-10" style="color: var(--color-text-muted);">
-        No config files needed — everything is a <code class="text-xs px-1.5 py-0.5 rounded" style="background: var(--color-code-bg); font-family: var(--font-mono);">GOSILO_*</code> env var.
+        No config files needed — everything is a <code class="text-xs px-1.5 py-0.5 rounded" style="background: var(--color-code-bg); font-family: var(--font-mono);">RSTASH_*</code> env var.
       </p>
       <div class="overflow-x-auto">
         <table class="w-full text-sm" style={`border: 1px solid var(--color-border); border-collapse: collapse;`}>
@@ -266,7 +266,7 @@ const configVars = [
     <div class="max-w-2xl mx-auto px-6 text-center">
       <h2 class="text-2xl font-bold mb-4">Ready to take control of your data?</h2>
       <p class="mb-8" style="color: var(--color-text-muted);">
-        gosilo is free, open source, and built for self-hosting.
+        rstash is free, open source, and built for self-hosting.
       </p>
       <div class="flex flex-wrap gap-3 justify-center">
         <a
@@ -277,7 +277,7 @@ const configVars = [
           Get Started
         </a>
         <a
-          href="https://code.lag.dev/gosilo"
+          href="https://fossil.klutch.software/rstash"
           class="inline-flex items-center px-6 py-3 rounded-md font-semibold text-sm transition-colors"
           style={`border: 1px solid var(--color-border); color: var(--color-text);`}
           target="_blank"

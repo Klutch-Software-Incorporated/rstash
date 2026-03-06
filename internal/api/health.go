@@ -3,7 +3,7 @@ package api
 import (
 	"net/http"
 
-	"gosilo/internal/db"
+	"rstash/internal/db"
 )
 
 // Health returns a handler that checks database connectivity and returns

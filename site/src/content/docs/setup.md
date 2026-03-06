@@ -6,7 +6,7 @@ order: 2
 
 ## Initial Setup
 
-When you first run `gosilo`, it starts the server and redirects you to the setup wizard at `/setup`. The wizard has two steps:
+When you first run `rstash`, it starts the server and redirects you to the setup wizard at `/setup`. The wizard has two steps:
 
 1. **Review settings** — shows your current server configuration: base URL, database type (e.g., "SQLite (default)" or "PostgreSQL"), file storage type, and TLS status. If the database or file storage is using SQLite defaults, a warning explains what that means and how to change it before continuing.
 
@@ -14,7 +14,7 @@ When you first run `gosilo`, it starts the server and redirects you to the setup
 
 After setup, you're logged in and taken to the admin panel.
 
-> **Tip:** If you want to use PostgreSQL, MySQL, or a different storage backend, set the `GOSILO_DB` and `GOSILO_BLOB` environment variables *before* running gosilo for the first time. Run `gosilo env` to see all available options, or `gosilo check` to verify your configuration.
+> **Tip:** If you want to use PostgreSQL, MySQL, or a different storage backend, set the `RSTASH_DB` and `RSTASH_BLOB` environment variables *before* running rstash for the first time. Run `rstash env` to see all available options, or `rstash check` to verify your configuration.
 
 ## Creating Users
 
@@ -32,7 +32,7 @@ Control how new users can sign up. Change this in the admin panel under Settings
 
 ## Storage Quotas
 
-gosilo can limit how much data users store. Configure this under Settings in the admin panel:
+rstash can limit how much data users store. Configure this under Settings in the admin panel:
 
 - **`off`** — No limits, anyone can store as much as they want.
 - **`total`** — All users share one global storage pool (default: 50 GB).

@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"strings"
 
-	"gosilo/internal/config"
+	"rstash/internal/config"
 )
 
 // WebFinger handles GET /.well-known/webfinger requests for remoteStorage discovery.

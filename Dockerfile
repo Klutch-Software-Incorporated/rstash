@@ -4,9 +4,9 @@ COPY go.mod go.sum ./
 RUN go mod download
 COPY . .
 ARG VERSION=dev
-RUN CGO_ENABLED=0 go build -ldflags "-s -w -X gosilo/internal/config.Version=${VERSION}" -o /gosilo .
+RUN CGO_ENABLED=0 go build -ldflags "-s -w -X rstash/internal/config.Version=${VERSION}" -o /rstash .
 
 FROM gcr.io/distroless/static-debian12
-COPY --from=build /gosilo /gosilo
+COPY --from=build /rstash /rstash
 EXPOSE 8080
-ENTRYPOINT ["/gosilo"]
+ENTRYPOINT ["/rstash"]

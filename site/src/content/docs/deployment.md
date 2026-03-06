@@ -1,19 +1,19 @@
 ---
 title: Deployment
-description: Run gosilo in production with TLS, reverse proxies, and systemd.
+description: Run rstash in production with TLS, reverse proxies, and systemd.
 order: 6
 ---
 
 ## Automatic TLS
 
-The simplest production setup — gosilo handles HTTPS directly via Let's Encrypt:
+The simplest production setup — rstash handles HTTPS directly via Let's Encrypt:
 
 ```bash
-export GOSILO_ADDR=":443"
-export GOSILO_BASE_URL="https://storage.example.com"
-export GOSILO_TLS_MODE="auto"
+export RSTASH_ADDR=":443"
+export RSTASH_BASE_URL="https://storage.example.com"
+export RSTASH_TLS_MODE="auto"
 
-gosilo
+rstash
 ```
 
 Requirements:
@@ -28,19 +28,19 @@ Certificates are automatically obtained and renewed.
 If you have your own certificates:
 
 ```bash
-export GOSILO_TLS_MODE="manual"
-export GOSILO_TLS_CERT="/etc/ssl/certs/storage.example.com.pem"
-export GOSILO_TLS_KEY="/etc/ssl/private/storage.example.com.key"
+export RSTASH_TLS_MODE="manual"
+export RSTASH_TLS_CERT="/etc/ssl/certs/storage.example.com.pem"
+export RSTASH_TLS_KEY="/etc/ssl/private/storage.example.com.key"
 ```
 
 ## Behind a Reverse Proxy
 
-Run gosilo behind nginx, Caddy, or another proxy. Disable TLS in gosilo and let the proxy handle it:
+Run rstash behind nginx, Caddy, or another proxy. Disable TLS in rstash and let the proxy handle it:
 
 ```bash
-export GOSILO_ADDR="127.0.0.1:8080"
-export GOSILO_BASE_URL="https://storage.example.com"
-export GOSILO_TLS_MODE="off"
+export RSTASH_ADDR="127.0.0.1:8080"
+export RSTASH_BASE_URL="https://storage.example.com"
+export RSTASH_TLS_MODE="off"
 ```
 
 ### nginx
@@ -77,28 +77,28 @@ Caddy handles TLS automatically — no certificate configuration needed.
 
 ## systemd
 
-Create `/etc/systemd/system/gosilo.service`:
+Create `/etc/systemd/system/rstash.service`:
 
 ```ini
 [Unit]
-Description=gosilo remoteStorage server
+Description=rstash remoteStorage server
 After=network.target
 
 [Service]
 Type=simple
-User=gosilo
-Group=gosilo
-WorkingDirectory=/opt/gosilo
-ExecStart=/usr/local/bin/gosilo
+User=rstash
+Group=rstash
+WorkingDirectory=/opt/rstash
+ExecStart=/usr/local/bin/rstash
 Restart=on-failure
 RestartSec=5
-EnvironmentFile=/opt/gosilo/.env
+EnvironmentFile=/opt/rstash/.env
 
 # Security hardening
 NoNewPrivileges=true
 ProtectSystem=strict
 ProtectHome=true
-ReadWritePaths=/opt/gosilo
+ReadWritePaths=/opt/rstash
 
 [Install]
 WantedBy=multi-user.target
@@ -107,43 +107,43 @@ WantedBy=multi-user.target
 Set up the service user and directory, then enable it:
 
 ```bash
-sudo useradd -r -s /usr/sbin/nologin gosilo
-sudo mkdir -p /opt/gosilo
-sudo chown gosilo:gosilo /opt/gosilo
-sudo cp gosilo /usr/local/bin/
-sudo cp .env /opt/gosilo/.env
+sudo useradd -r -s /usr/sbin/nologin rstash
+sudo mkdir -p /opt/rstash
+sudo chown rstash:rstash /opt/rstash
+sudo cp rstash /usr/local/bin/
+sudo cp .env /opt/rstash/.env
 
 sudo systemctl daemon-reload
-sudo systemctl enable --now gosilo
+sudo systemctl enable --now rstash
 ```
 
 ## Docker
 
 ```dockerfile
 FROM alpine:latest
-COPY gosilo-linux-amd64 /usr/local/bin/gosilo
-RUN chmod +x /usr/local/bin/gosilo
+COPY rstash-linux-amd64 /usr/local/bin/rstash
+RUN chmod +x /usr/local/bin/rstash
 EXPOSE 8080
 VOLUME ["/data"]
 WORKDIR /data
-CMD ["gosilo"]
+CMD ["rstash"]
 ```
 
 ```bash
-docker build -t gosilo .
+docker build -t rstash .
 docker run -d \
   -p 8080:8080 \
-  -v gosilo-data:/data \
-  -e GOSILO_BASE_URL="https://storage.example.com" \
-  gosilo
+  -v rstash-data:/data \
+  -e RSTASH_BASE_URL="https://storage.example.com" \
+  rstash
 ```
 
 ## Verify Your Setup
 
-Before going to production, run `gosilo check` to verify your configuration:
+Before going to production, run `rstash check` to verify your configuration:
 
 ```bash
-gosilo check
+rstash check
 ```
 
 This validates all settings and tests connectivity to the database and blob store.
@@ -159,8 +159,8 @@ Works well for personal and small-group use. Make sure the database directory is
 For larger deployments or when you need high availability:
 
 ```bash
-export GOSILO_DB="postgres:host=db.example.com dbname=gosilo user=gosilo password=secret sslmode=require"
-export GOSILO_BLOB="fs:/var/lib/gosilo/blobs"
+export RSTASH_DB="postgres:host=db.example.com dbname=rstash user=rstash password=secret sslmode=require"
+export RSTASH_BLOB="fs:/var/lib/rstash/blobs"
 ```
 
 Using `fs:` for blob storage alongside PostgreSQL keeps large files on disk instead of in the database.
@@ -172,8 +172,8 @@ Using `fs:` for blob storage alongside PostgreSQL keeps large files on disk inst
 Back up the database files (stop the server first for a consistent snapshot, or use SQLite's backup API):
 
 ```bash
-cp /opt/gosilo/gosilo.db /backups/gosilo-$(date +%F).db
-cp /opt/gosilo/gosilo-blobs.db /backups/gosilo-blobs-$(date +%F).db
+cp /opt/rstash/rstash.db /backups/rstash-$(date +%F).db
+cp /opt/rstash/rstash-blobs.db /backups/rstash-blobs-$(date +%F).db
 ```
 
 ### Filesystem Blob Storage

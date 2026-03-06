@@ -3,7 +3,7 @@ package db
 import (
 	"fmt"
 
-	"gosilo/internal/model"
+	"rstash/internal/model"
 
 	"gorm.io/gorm"
 )

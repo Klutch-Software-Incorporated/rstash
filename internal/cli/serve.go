@@ -16,16 +16,16 @@ import (
 	"syscall"
 	"time"
 
-	"gosilo/internal/api"
-	"gosilo/internal/auth"
-	"gosilo/internal/blob"
-	"gosilo/internal/config"
-	"gosilo/internal/db"
-	"gosilo/internal/metrics"
-	"gosilo/internal/settings"
-	"gosilo/internal/storage"
-	"gosilo/internal/ui"
-	"gosilo/internal/web"
+	"rstash/internal/api"
+	"rstash/internal/auth"
+	"rstash/internal/blob"
+	"rstash/internal/config"
+	"rstash/internal/db"
+	"rstash/internal/metrics"
+	"rstash/internal/settings"
+	"rstash/internal/storage"
+	"rstash/internal/ui"
+	"rstash/internal/web"
 
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/spf13/cobra"
@@ -50,7 +50,7 @@ var serveCmd = &cobra.Command{
 	Short:  "Start the server",
 	Long:   "Start the HTTP server with storage API, OAuth, and web UI.",
 	RunE:   runServe,
-	Hidden: true, // Users just run "gosilo" directly; serve is an alias.
+	Hidden: true, // Users just run "rstash" directly; serve is an alias.
 }
 
 func init() {
@@ -367,7 +367,7 @@ func runServe(cmd *cobra.Command, args []string) error {
 			if !isLocalhost(cfg.Addr) && !strings.HasPrefix(cfg.BaseURL, "https://") {
 				slog.Warn("running without TLS on a non-localhost address",
 					"addr", cfg.Addr,
-					"hint", "set GOSILO_TLS_MODE=auto for Let's Encrypt, or use a reverse proxy")
+					"hint", "set RSTASH_TLS_MODE=auto for Let's Encrypt, or use a reverse proxy")
 			}
 			slog.Info("server starting", "addr", cfg.Addr, "base_url", cfg.BaseURL)
 			if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {

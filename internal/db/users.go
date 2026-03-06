@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"gosilo/internal/model"
+	"rstash/internal/model"
 
 	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"

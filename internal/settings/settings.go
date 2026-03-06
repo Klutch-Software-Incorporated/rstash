@@ -9,8 +9,8 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"gosilo/internal/config"
-	"gosilo/internal/db"
+	"rstash/internal/config"
+	"rstash/internal/db"
 )
 
 // Snapshot holds the current resolved settings (DB overrides merged with env defaults).

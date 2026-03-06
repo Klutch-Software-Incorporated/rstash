@@ -4,7 +4,7 @@ import (
 	"errors"
 	"os"
 
-	"gosilo/internal/config"
+	"rstash/internal/config"
 
 	"github.com/spf13/cobra"
 )
@@ -24,14 +24,14 @@ func (e *SystemError) Error() string { return e.Err.Error() }
 func (e *SystemError) Unwrap() error { return e.Err }
 
 var rootCmd = &cobra.Command{
-	Use:   "gosilo",
-	Short: "Gosilo — remoteStorage server",
-	Long: `Gosilo is a remoteStorage server implementing draft-dejong-remotestorage-26.
+	Use:   "rstash",
+	Short: "rstash — remoteStorage server",
+	Long: `rstash is a remoteStorage server implementing draft-dejong-remotestorage-26.
 
 It provides WebFinger discovery, OAuth 2.0 authorization (implicit + PKCE),
 and the full storage API (GET/PUT/DELETE/HEAD for documents and folders).
 
-Running gosilo starts the HTTP server.`,
+Running rstash starts the HTTP server.`,
 	Version: config.Version,
 }
 

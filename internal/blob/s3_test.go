@@ -153,7 +153,7 @@ func TestS3_ObjectKey(t *testing.T) {
 		want   string
 	}{
 		{"no prefix", "", 42, "docs/hello.txt", "42/docs/hello.txt"},
-		{"with prefix", "gosilo/prod", 7, "photos/cat.jpg", "gosilo/prod/7/photos/cat.jpg"},
+		{"with prefix", "rstash/prod", 7, "photos/cat.jpg", "rstash/prod/7/photos/cat.jpg"},
 		{"root path", "", 1, "file.bin", "1/file.bin"},
 		{"leading slash stripped", "", 42, "/test/file.txt", "42/test/file.txt"},
 		{"leading slash with prefix", "pfx", 3, "/a/b.txt", "pfx/3/a/b.txt"},
@@ -170,14 +170,14 @@ func TestS3_ObjectKey(t *testing.T) {
 	}
 }
 
-// Integration tests — skipped unless GOSILO_TEST_S3_DSN is set.
-// Example: GOSILO_TEST_S3_DSN="gosilo-test?endpoint=localhost:9000&tls=false&access_key=minioadmin&secret_key=minioadmin"
+// Integration tests — skipped unless RSTASH_TEST_S3_DSN is set.
+// Example: RSTASH_TEST_S3_DSN="rstash-test?endpoint=localhost:9000&tls=false&access_key=minioadmin&secret_key=minioadmin"
 
 func newTestS3Store(t *testing.T) *S3Store {
 	t.Helper()
-	dsn := os.Getenv("GOSILO_TEST_S3_DSN")
+	dsn := os.Getenv("RSTASH_TEST_S3_DSN")
 	if dsn == "" {
-		t.Skip("GOSILO_TEST_S3_DSN not set, skipping S3 integration test")
+		t.Skip("RSTASH_TEST_S3_DSN not set, skipping S3 integration test")
 	}
 	store, err := NewS3Store(dsn)
 	if err != nil {

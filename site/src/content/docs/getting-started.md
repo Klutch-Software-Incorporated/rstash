@@ -1,6 +1,6 @@
 ---
 title: Getting Started
-description: Download gosilo and get it running in under a minute.
+description: Download rstash and get it running in under a minute.
 order: 1
 ---
 
@@ -10,9 +10,9 @@ Grab the latest release for your platform:
 
 ```bash
 # Linux (amd64)
-curl -LO https://code.lag.dev/gosilo/releases/latest/gosilo-linux-amd64
-chmod +x gosilo-linux-amd64
-sudo mv gosilo-linux-amd64 /usr/local/bin/gosilo
+curl -LO https://fossil.klutch.software/rstash/releases/latest/rstash-linux-amd64
+chmod +x rstash-linux-amd64
+sudo mv rstash-linux-amd64 /usr/local/bin/rstash
 ```
 
 Pre-built binaries are available for:
@@ -25,9 +25,9 @@ Pre-built binaries are available for:
 You'll need Go 1.22 or later:
 
 ```bash
-git clone https://code.lag.dev/gosilo
-cd gosilo
-go build -o gosilo .
+git clone https://fossil.klutch.software/rstash
+cd rstash
+go build -o rstash .
 ```
 
 ## First Run
@@ -35,15 +35,15 @@ go build -o gosilo .
 Start the server:
 
 ```bash
-gosilo
+rstash
 ```
 
-Visit `http://localhost:8080` in your browser. Since no users exist yet, gosilo shows the setup wizard:
+Visit `http://localhost:8080` in your browser. Since no users exist yet, rstash shows the setup wizard:
 
-1. **Review settings** — gosilo shows your current server configuration (database, storage backend, base URL, TLS). If you're using the SQLite defaults, a note explains what that means and how to change it.
+1. **Review settings** — rstash shows your current server configuration (database, storage backend, base URL, TLS). If you're using the SQLite defaults, a note explains what that means and how to change it.
 2. **Create admin account** — pick a username and password for the first admin user.
 
-That's it — you're in. gosilo creates a SQLite database in the current directory on first start.
+That's it — you're in. rstash creates a SQLite database in the current directory on first start.
 
 ## Connect a remoteStorage App
 

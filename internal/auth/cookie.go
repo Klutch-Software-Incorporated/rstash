@@ -6,7 +6,7 @@ import (
 )
 
 // SessionCookieName is the name of the session cookie.
-const SessionCookieName = "gosilo_session"
+const SessionCookieName = "rstash_session"
 
 // SetSessionCookie sets the session cookie. When secure is true, the Secure
 // flag is set (should be true when serving over HTTPS).

@@ -5,8 +5,8 @@ import (
 	"strconv"
 	"time"
 
-	"gosilo/internal/auth"
-	"gosilo/internal/metrics"
+	"rstash/internal/auth"
+	"rstash/internal/metrics"
 )
 
 // MetricsMiddleware records HTTP request counts and durations.

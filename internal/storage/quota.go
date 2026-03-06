@@ -5,7 +5,7 @@ import (
 	"errors"
 	"sync"
 
-	"gosilo/internal/db"
+	"rstash/internal/db"
 )
 
 // ErrQuotaExceeded is returned when a write would exceed the configured quota.

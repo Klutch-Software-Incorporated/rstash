@@ -7,10 +7,10 @@ tasks:
       - go run ./cmd/collect-licenses
 
   build:
-    desc: Build the gosilo binary
+    desc: Build the rstash binary
     deps: [collect-licenses]
     cmds:
-      - go build -ldflags "-X gosilo/internal/config.Version={{.VERSION}}" -o ./build/gosilo.exe .
+      - go build -ldflags "-X rstash/internal/config.Version={{.VERSION}}" -o ./build/rstash.exe .
     vars:
       VERSION:
         sh: fossil info 2>/dev/null | grep "checkout:" | awk '{print substr($NF,1,10)}' || echo "dev"
@@ -38,8 +38,8 @@ tasks:
   clean:
     desc: Remove build artifacts and local database
     cmds:
-      - rm -f ./build/gosilo.exe
-      - rm -f gosilo.db gosilo.db-wal gosilo.db-shm
+      - rm -f ./build/rstash.exe
+      - rm -f rstash.db rstash.db-wal rstash.db-shm
       - rm -rf ./dist
 
   site:install:
@@ -73,12 +73,12 @@ tasks:
     desc: Cross-compile release binaries for all platforms
     cmds:
       - mkdir -p dist
-      - GOOS=linux GOARCH=amd64 go build -ldflags "-s -w -X gosilo/internal/config.Version={{.VERSION}}" -o dist/gosilo-linux-amd64 .
-      - GOOS=linux GOARCH=arm64 go build -ldflags "-s -w -X gosilo/internal/config.Version={{.VERSION}}" -o dist/gosilo-linux-arm64 .
-      - GOOS=darwin GOARCH=amd64 go build -ldflags "-s -w -X gosilo/internal/config.Version={{.VERSION}}" -o dist/gosilo-darwin-amd64 .
-      - GOOS=darwin GOARCH=arm64 go build -ldflags "-s -w -X gosilo/internal/config.Version={{.VERSION}}" -o dist/gosilo-darwin-arm64 .
-      - GOOS=windows GOARCH=amd64 go build -ldflags "-s -w -X gosilo/internal/config.Version={{.VERSION}}" -o dist/gosilo-windows-amd64.exe .
-      - cd dist && sha256sum gosilo-* > checksums.txt
+      - GOOS=linux GOARCH=amd64 go build -ldflags "-s -w -X rstash/internal/config.Version={{.VERSION}}" -o dist/rstash-linux-amd64 .
+      - GOOS=linux GOARCH=arm64 go build -ldflags "-s -w -X rstash/internal/config.Version={{.VERSION}}" -o dist/rstash-linux-arm64 .
+      - GOOS=darwin GOARCH=amd64 go build -ldflags "-s -w -X rstash/internal/config.Version={{.VERSION}}" -o dist/rstash-darwin-amd64 .
+      - GOOS=darwin GOARCH=arm64 go build -ldflags "-s -w -X rstash/internal/config.Version={{.VERSION}}" -o dist/rstash-darwin-arm64 .
+      - GOOS=windows GOARCH=amd64 go build -ldflags "-s -w -X rstash/internal/config.Version={{.VERSION}}" -o dist/rstash-windows-amd64.exe .
+      - cd dist && sha256sum rstash-* > checksums.txt
     vars:
       VERSION:
         sh: fossil info 2>/dev/null | grep "checkout:" | awk '{print substr($NF,1,10)}' || echo "dev"

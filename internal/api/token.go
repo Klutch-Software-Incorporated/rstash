@@ -8,8 +8,8 @@ import (
 	"net/http"
 	"strings"
 
-	"gosilo/internal/config"
-	"gosilo/internal/db"
+	"rstash/internal/config"
+	"rstash/internal/db"
 )
 
 // OAuthToken handles POST /oauth/token for the authorization code + PKCE exchange

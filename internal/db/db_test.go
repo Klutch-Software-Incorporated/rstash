@@ -3,7 +3,7 @@ package db_test
 import (
 	"testing"
 
-	"gosilo/internal/db"
+	"rstash/internal/db"
 )
 
 // testDB creates an in-memory SQLite database for testing.

@@ -1,6 +1,6 @@
 package main
 
-import "gosilo/internal/cli"
+import "rstash/internal/cli"
 
 func main() {
 	cli.Execute()

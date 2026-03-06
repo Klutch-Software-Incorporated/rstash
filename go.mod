@@ -1,4 +1,4 @@
-module gosilo
+module rstash
 
 go 1.24.0
 

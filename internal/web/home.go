@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"sort"
 
-	"gosilo/internal/db"
+	"rstash/internal/db"
 )
 
 type homeHandler struct {
@@ -54,7 +54,7 @@ func (h *homeHandler) Show(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	h.deps.Renderer.Render(w, "home", h.deps.pageData(w, r, "Gosilo", nil))
+	h.deps.Renderer.Render(w, "home", h.deps.pageData(w, r, "rstash", nil))
 }
 
 func buildActivityFeed(ctx context.Context, repo *db.Repository, userID int64) []*activityEvent {

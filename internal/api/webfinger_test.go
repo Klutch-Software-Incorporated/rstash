@@ -6,8 +6,8 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"gosilo/internal/api"
-	"gosilo/internal/config"
+	"rstash/internal/api"
+	"rstash/internal/config"
 )
 
 func webfingerServer() *httptest.Server {

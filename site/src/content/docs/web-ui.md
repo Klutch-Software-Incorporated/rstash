@@ -4,7 +4,7 @@ description: Dashboard, file browser, admin panel, and OAuth authorization.
 order: 3
 ---
 
-gosilo includes a full web interface — no separate frontend to install. Everything is embedded in the single binary.
+rstash includes a full web interface — no separate frontend to install. Everything is embedded in the single binary.
 
 ## User Dashboard
 
@@ -40,7 +40,7 @@ Your settings page at `/~yourname/settings` lets you:
 
 ## OAuth Authorization
 
-When a remoteStorage app wants to access your data, it redirects you to gosilo's OAuth consent screen. You'll see:
+When a remoteStorage app wants to access your data, it redirects you to rstash's OAuth consent screen. You'll see:
 
 - Which app is requesting access (identified by its origin URL)
 - What scopes it's requesting (e.g., "Read & write your documents data")

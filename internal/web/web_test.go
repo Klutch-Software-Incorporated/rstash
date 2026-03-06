@@ -8,12 +8,12 @@ import (
 	"strings"
 	"testing"
 
-	"gosilo/internal/auth"
-	"gosilo/internal/config"
-	"gosilo/internal/db"
-	"gosilo/internal/settings"
-	"gosilo/internal/ui"
-	"gosilo/internal/web"
+	"rstash/internal/auth"
+	"rstash/internal/config"
+	"rstash/internal/db"
+	"rstash/internal/settings"
+	"rstash/internal/ui"
+	"rstash/internal/web"
 )
 
 func setupTestServer(t *testing.T, regMode string) (*httptest.Server, *web.UIDeps) {
@@ -111,12 +111,12 @@ func TestSetupCreatesAdmin(t *testing.T) {
 	// Extract CSRF token from the GET response cookies.
 	var csrfToken string
 	for _, c := range resp.Cookies() {
-		if c.Name == "gosilo_csrf" {
+		if c.Name == "rstash_csrf" {
 			csrfToken = c.Value
 		}
 	}
 	if csrfToken == "" {
-		t.Fatal("expected gosilo_csrf cookie from GET /setup?step=account")
+		t.Fatal("expected rstash_csrf cookie from GET /setup?step=account")
 	}
 
 	// POST /setup to create admin.
@@ -135,12 +135,12 @@ func TestSetupCreatesAdmin(t *testing.T) {
 	// Should have a session cookie.
 	var hasCookie bool
 	for _, c := range resp.Cookies() {
-		if c.Name == "gosilo_session" && c.Value != "" {
+		if c.Name == "rstash_session" && c.Value != "" {
 			hasCookie = true
 		}
 	}
 	if !hasCookie {
-		t.Fatal("expected gosilo_session cookie after setup")
+		t.Fatal("expected rstash_session cookie after setup")
 	}
 }
 
@@ -179,7 +179,7 @@ func TestLoginLogoutCycle(t *testing.T) {
 	// Verify we have a session cookie.
 	var sessionToken string
 	for _, c := range resp.Cookies() {
-		if c.Name == "gosilo_session" {
+		if c.Name == "rstash_session" {
 			sessionToken = c.Value
 		}
 	}
@@ -304,7 +304,7 @@ func TestRegistrationOpen(t *testing.T) {
 
 	var hasCookie bool
 	for _, c := range resp.Cookies() {
-		if c.Name == "gosilo_session" && c.Value != "" {
+		if c.Name == "rstash_session" && c.Value != "" {
 			hasCookie = true
 		}
 	}
@@ -359,11 +359,11 @@ func getCSRFToken(t *testing.T, client *http.Client, url string) string {
 	}
 	resp.Body.Close()
 	for _, c := range resp.Cookies() {
-		if c.Name == "gosilo_csrf" {
+		if c.Name == "rstash_csrf" {
 			return c.Value
 		}
 	}
-	t.Fatal("no gosilo_csrf cookie in response")
+	t.Fatal("no rstash_csrf cookie in response")
 	return ""
 }
 
@@ -376,7 +376,7 @@ func postWithCSRF(t *testing.T, client *http.Client, targetURL string, csrfToken
 		t.Fatalf("create request: %v", err)
 	}
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	req.AddCookie(&http.Cookie{Name: "gosilo_csrf", Value: csrfToken})
+	req.AddCookie(&http.Cookie{Name: "rstash_csrf", Value: csrfToken})
 	resp, err := client.Do(req)
 	if err != nil {
 		t.Fatalf("post with csrf: %v", err)

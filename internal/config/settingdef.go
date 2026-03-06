@@ -16,23 +16,23 @@ const (
 // These are the only settings with env var support; all others use
 // sane defaults and are managed at runtime via CLI or admin UI.
 const (
-	EnvAddr     = "GOSILO_ADDR"
-	EnvBaseURL  = "GOSILO_BASE_URL"
-	EnvDB       = "GOSILO_DB"
-	EnvBlob     = "GOSILO_BLOB"
-	EnvLogLevel = "GOSILO_LOG_LEVEL"
-	EnvLogFile  = "GOSILO_LOG_FILE"
-	EnvTLSCert  = "GOSILO_TLS_CERT"
-	EnvTLSKey   = "GOSILO_TLS_KEY"
-	EnvTLSMode  = "GOSILO_TLS_MODE"
-	EnvTLSCache = "GOSILO_TLS_CACHE"
+	EnvAddr     = "RSTASH_ADDR"
+	EnvBaseURL  = "RSTASH_BASE_URL"
+	EnvDB       = "RSTASH_DB"
+	EnvBlob     = "RSTASH_BLOB"
+	EnvLogLevel = "RSTASH_LOG_LEVEL"
+	EnvLogFile  = "RSTASH_LOG_FILE"
+	EnvTLSCert  = "RSTASH_TLS_CERT"
+	EnvTLSKey   = "RSTASH_TLS_KEY"
+	EnvTLSMode  = "RSTASH_TLS_MODE"
+	EnvTLSCache = "RSTASH_TLS_CACHE"
 )
 
 // SettingDef describes one configurable setting — the single source of truth
 // for env-file generation, admin UI rendering, CLI listing, and validation.
 type SettingDef struct {
 	Key             string    // internal key, e.g. "registration_mode"
-	EnvVar          string    // env var name, e.g. "GOSILO_ADDR" (empty = no env var)
+	EnvVar          string    // env var name, e.g. "RSTASH_ADDR" (empty = no env var)
 	Group           string    // UI grouping, e.g. "Access", "Storage"
 	Label           string    // human label for grid
 	Description     string    // one-line description (grid + env file)
@@ -72,7 +72,7 @@ func SettingDefs() []SettingDef {
 			Group:           "Server",
 			Label:           "Base URL",
 			Description:     "Public URL of the server. Used for WebFinger and OAuth redirects.",
-			Help:            "The externally reachable URL of your Gosilo instance, set via the " + EnvBaseURL + " environment variable. This is used to generate WebFinger responses, OAuth redirect URIs, and links in the web UI. Must include the scheme (http or https) and host. Do not include a trailing slash. If you are behind a reverse proxy, this should be the proxy's public URL, not the internal address.",
+			Help:            "The externally reachable URL of your rstash instance, set via the " + EnvBaseURL + " environment variable. This is used to generate WebFinger responses, OAuth redirect URIs, and links in the web UI. Must include the scheme (http or https) and host. Do not include a trailing slash. If you are behind a reverse proxy, this should be the proxy's public URL, not the internal address.",
 			Default:         "http://localhost:8080",
 			InputType:       InputText,
 			RuntimeEditable: false,
@@ -83,8 +83,8 @@ func SettingDefs() []SettingDef {
 			Group:           "Server",
 			Label:           "Database DSN",
 			Description:     "Metadata database DSN. Supported: sqlite:, postgres:, mysql:, mssql:.",
-			Help:            "The Data Source Name for the metadata database, set via the " + EnvDB + " environment variable. Stores users, sessions, OAuth tokens, audit entries, and file metadata (nodes). Supported formats: sqlite:path (e.g. sqlite:gosilo.db), sqlite::memory:, postgres:host=localhost dbname=gosilo user=gosilo password=secret sslmode=disable, mysql:user:pass@tcp(host:3306)/dbname?parseTime=true, mssql:sqlserver://user:pass@host:1433?database=dbname. Changing this setting requires a server restart.",
-			Default:         "sqlite:gosilo.db",
+			Help:            "The Data Source Name for the metadata database, set via the " + EnvDB + " environment variable. Stores users, sessions, OAuth tokens, audit entries, and file metadata (nodes). Supported formats: sqlite:path (e.g. sqlite:rstash.db), sqlite::memory:, postgres:host=localhost dbname=rstash user=rstash password=secret sslmode=disable, mysql:user:pass@tcp(host:3306)/dbname?parseTime=true, mssql:sqlserver://user:pass@host:1433?database=dbname. Changing this setting requires a server restart.",
+			Default:         "sqlite:rstash.db",
 			InputType:       InputText,
 			RuntimeEditable: false,
 		},
@@ -95,7 +95,7 @@ func SettingDefs() []SettingDef {
 			Label:           "Blob store DSN",
 			Description:     "Blob store DSN. Supported: sqlite:, fs:, postgres:, mysql:, mssql:, s3:.",
 			Help:            "The Data Source Name for the blob (file content) store, set via the " + EnvBlob + " environment variable. Supported backends: sqlite:path stores blobs in a SQLite database (simple, single-file), fs:/path/to/dir stores blobs as individual files on the filesystem (better for large deployments), postgres:/mysql:/mssql: store blobs in the corresponding database (useful when running on a non-SQLite metadata database), and s3:bucket?region=us-east-1&endpoint=s3.amazonaws.com&prefix=optional/prefix stores blobs in an S3-compatible object store. S3 credentials can be set via access_key/secret_key query parameters or AWS_ACCESS_KEY_ID/AWS_SECRET_ACCESS_KEY environment variables. S3 examples: s3:my-bucket?region=us-west-2 (AWS), s3:my-space?region=nyc3&endpoint=nyc3.digitaloceanspaces.com (DigitalOcean Spaces), s3:data?endpoint=minio.local:9000&tls=false&access_key=minioadmin&secret_key=minioadmin (MinIO). Changing this setting requires a server restart.",
-			Default:         "sqlite:gosilo-blobs.db",
+			Default:         "sqlite:rstash-blobs.db",
 			InputType:       InputText,
 			RuntimeEditable: false,
 		},

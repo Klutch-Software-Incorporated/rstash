@@ -6,10 +6,10 @@ import (
 	"net/http"
 	"strings"
 
-	"gosilo/internal/auth"
-	"gosilo/internal/config"
-	"gosilo/internal/db"
-	"gosilo/internal/ui"
+	"rstash/internal/auth"
+	"rstash/internal/config"
+	"rstash/internal/db"
+	"rstash/internal/ui"
 )
 
 type setupHandler struct {
@@ -51,7 +51,7 @@ func (h *setupHandler) ShowSetup(w http.ResponseWriter, r *http.Request) {
 
 	if r.URL.Query().Get("step") == "account" {
 		h.deps.Renderer.Render(w, "setup", ui.PageData{
-			Title:     "Setup — Gosilo",
+			Title:     "Setup — rstash",
 			CSRFToken: CSRFToken(r),
 			Content:   &setupContent{},
 		})
@@ -59,7 +59,7 @@ func (h *setupHandler) ShowSetup(w http.ResponseWriter, r *http.Request) {
 	}
 
 	h.deps.Renderer.Render(w, "setup_review", ui.PageData{
-		Title:   "Setup — Gosilo",
+		Title:   "Setup — rstash",
 		Content: h.buildReview(),
 	})
 }
@@ -79,10 +79,10 @@ func (h *setupHandler) buildReview() *setupReviewContent {
 
 	var warnings []string
 	if strings.HasPrefix(cfg.DatabaseDSN, "sqlite:") {
-		warnings = append(warnings, "The database is set to SQLite (the default). This works well for personal and small-group use. If you plan to use PostgreSQL, MySQL, or SQL Server instead, stop the server now and set the GOSILO_DB environment variable before continuing.")
+		warnings = append(warnings, "The database is set to SQLite (the default). This works well for personal and small-group use. If you plan to use PostgreSQL, MySQL, or SQL Server instead, stop the server now and set the RSTASH_DB environment variable before continuing.")
 	}
 	if strings.HasPrefix(cfg.BlobDSN, "sqlite:") {
-		warnings = append(warnings, "File storage is set to SQLite (the default). For larger deployments, consider using filesystem storage (fs:) or S3 by setting the GOSILO_BLOB environment variable.")
+		warnings = append(warnings, "File storage is set to SQLite (the default). For larger deployments, consider using filesystem storage (fs:) or S3 by setting the RSTASH_BLOB environment variable.")
 	}
 
 	return &setupReviewContent{
@@ -155,7 +155,7 @@ func (h *setupHandler) DoSetup(w http.ResponseWriter, r *http.Request) {
 
 	renderErr := func(msg string) {
 		h.deps.Renderer.Render(w, "setup", ui.PageData{
-			Title:     "Setup — Gosilo",
+			Title:     "Setup — rstash",
 			CSRFToken: CSRFToken(r),
 			Content:   &setupContent{Username: username, Error: msg},
 		})
@@ -195,6 +195,6 @@ func (h *setupHandler) DoSetup(w http.ResponseWriter, r *http.Request) {
 
 	h.deps.Repo.Audit(r.Context(), user.ID, "setup.completed", "user", fmt.Sprintf("%d", user.ID), username)
 	auth.SetSessionCookie(w, sess.Token, h.deps.SecureCookies)
-	ui.SetFlash(w, "Welcome to Gosilo! Your admin account has been created.")
+	ui.SetFlash(w, "Welcome to rstash! Your admin account has been created.")
 	http.Redirect(w, r, "/admin", http.StatusSeeOther)
 }

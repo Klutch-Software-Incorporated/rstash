@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 
-	"gosilo/internal/model"
+	"rstash/internal/model"
 )
 
 // SystemActorID is the user ID of the _system sentinel user, used as the

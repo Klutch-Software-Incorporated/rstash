@@ -7,9 +7,9 @@ import (
 	"net/http"
 	"strings"
 
-	"gosilo/internal/auth"
-	"gosilo/internal/db"
-	"gosilo/internal/ui"
+	"rstash/internal/auth"
+	"rstash/internal/db"
+	"rstash/internal/ui"
 )
 
 type authHandler struct {
@@ -35,7 +35,7 @@ func (h *authHandler) ShowLogin(w http.ResponseWriter, r *http.Request) {
 
 	redirectTo := r.URL.Query().Get("redirect")
 
-	h.deps.Renderer.Render(w, "login", h.deps.pageData(w, r, "Login — Gosilo", &loginContent{RedirectTo: redirectTo}))
+	h.deps.Renderer.Render(w, "login", h.deps.pageData(w, r, "Login — rstash", &loginContent{RedirectTo: redirectTo}))
 }
 
 func (h *authHandler) DoLogin(w http.ResponseWriter, r *http.Request) {
@@ -44,7 +44,7 @@ func (h *authHandler) DoLogin(w http.ResponseWriter, r *http.Request) {
 
 	renderErr := func(msg string) {
 		h.deps.Renderer.Render(w, "login", ui.PageData{
-			Title:            "Login — Gosilo",
+			Title:            "Login — rstash",
 			Content:          &loginContent{Username: username, Error: msg},
 			RegistrationMode: h.deps.Config.RegistrationMode,
 		})

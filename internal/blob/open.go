@@ -3,7 +3,7 @@ package blob
 import (
 	"fmt"
 
-	"gosilo/internal/db"
+	"rstash/internal/db"
 )
 
 // OpenStore opens a blob store from a DSN scheme and path.

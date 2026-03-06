@@ -1,4 +1,4 @@
-# Contributing to gosilo
+# Contributing to rstash
 
 ## Prerequisites
 
@@ -46,13 +46,13 @@ podman run -d --name minio -p 9000:9000 -p 9001:9001 \
 
 # Create the test bucket
 podman exec minio mc alias set local http://localhost:9000 minioadmin minioadmin
-podman exec minio mc mb local/gosilo-test
+podman exec minio mc mb local/rstash-test
 ```
 
 Then run the tests:
 
 ```sh
-export GOSILO_TEST_S3_DSN="gosilo-test?endpoint=localhost:9000&tls=false&access_key=minioadmin&secret_key=minioadmin"
+export RSTASH_TEST_S3_DSN="rstash-test?endpoint=localhost:9000&tls=false&access_key=minioadmin&secret_key=minioadmin"
 go test ./internal/blob/ -run TestS3_Integration -v
 ```
 
@@ -68,17 +68,17 @@ To test the full server with S3-backed blob storage:
 
 ```sh
 # Start MinIO as above, then create a bucket
-podman exec minio mc mb local/gosilo
+podman exec minio mc mb local/rstash
 
-# Start gosilo with S3 blob storage
-export GOSILO_DB="sqlite:gosilo.db"
-export GOSILO_BLOB="s3:gosilo?endpoint=localhost:9000&tls=false&access_key=minioadmin&secret_key=minioadmin"
+# Start rstash with S3 blob storage
+export RSTASH_DB="sqlite:rstash.db"
+export RSTASH_BLOB="s3:rstash?endpoint=localhost:9000&tls=false&access_key=minioadmin&secret_key=minioadmin"
 go run . serve
 ```
 
 You can browse objects in the MinIO console at `http://localhost:9001` (login: minioadmin/minioadmin).
 
-**Note:** The S3 bucket must exist before starting the server. Gosilo checks for the bucket at startup and will exit with a clear error if it's missing.
+**Note:** The S3 bucket must exist before starting the server. rstash checks for the bucket at startup and will exit with a clear error if it's missing.
 
 ## Project Structure
 

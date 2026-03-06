@@ -4,7 +4,7 @@ import (
 	"log/slog"
 	"net/http"
 
-	"gosilo/internal/licenses"
+	"rstash/internal/licenses"
 )
 
 type legalHandler struct {
@@ -37,7 +37,7 @@ func (h *legalHandler) ShowTerms(w http.ResponseWriter, r *http.Request) {
 			Title: "Terms of Service",
 			Body:  snap.TOSContent,
 		}
-		h.deps.Renderer.Render(w, "legal", h.deps.pageData(w, r, "Terms of Service — Gosilo", content))
+		h.deps.Renderer.Render(w, "legal", h.deps.pageData(w, r, "Terms of Service — rstash", content))
 	}
 }
 
@@ -73,7 +73,7 @@ func (h *legalHandler) ShowLicenses(w http.ResponseWriter, r *http.Request) {
 		Total:    len(data.Dependencies),
 	}
 	h.deps.Renderer.Render(w, "licenses",
-		h.deps.pageData(w, r, "Open Source Licenses — Gosilo", content))
+		h.deps.pageData(w, r, "Open Source Licenses — rstash", content))
 }
 
 // ShowPrivacy handles GET /legal/privacy.
@@ -92,6 +92,6 @@ func (h *legalHandler) ShowPrivacy(w http.ResponseWriter, r *http.Request) {
 			Title: "Privacy Policy",
 			Body:  snap.PrivacyContent,
 		}
-		h.deps.Renderer.Render(w, "legal", h.deps.pageData(w, r, "Privacy Policy — Gosilo", content))
+		h.deps.Renderer.Render(w, "legal", h.deps.pageData(w, r, "Privacy Policy — rstash", content))
 	}
 }

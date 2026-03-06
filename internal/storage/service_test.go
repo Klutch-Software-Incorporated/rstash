@@ -6,9 +6,9 @@ import (
 	"strings"
 	"testing"
 
-	"gosilo/internal/blob"
-	"gosilo/internal/db"
-	"gosilo/internal/storage"
+	"rstash/internal/blob"
+	"rstash/internal/db"
+	"rstash/internal/storage"
 )
 
 func setup(t *testing.T) (*storage.Service, int64) {

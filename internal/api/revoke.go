@@ -5,7 +5,7 @@ import (
 	"log/slog"
 	"net/http"
 
-	"gosilo/internal/db"
+	"rstash/internal/db"
 )
 
 // OAuthRevoke handles POST /oauth/revoke per RFC 7009.

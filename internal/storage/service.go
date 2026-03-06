@@ -9,9 +9,9 @@ import (
 	"net/http"
 	"strings"
 
-	"gosilo/api"
-	"gosilo/internal/blob"
-	"gosilo/internal/db"
+	"rstash/api"
+	"rstash/internal/blob"
+	"rstash/internal/db"
 )
 
 // Sentinel errors returned by service methods.

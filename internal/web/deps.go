@@ -1,12 +1,12 @@
 package web
 
 import (
-	"gosilo/internal/auth"
-	"gosilo/internal/config"
-	"gosilo/internal/db"
-	"gosilo/internal/settings"
-	"gosilo/internal/storage"
-	"gosilo/internal/ui"
+	"rstash/internal/auth"
+	"rstash/internal/config"
+	"rstash/internal/db"
+	"rstash/internal/settings"
+	"rstash/internal/storage"
+	"rstash/internal/ui"
 )
 
 // UIDeps holds the dependencies needed by UI handlers.

@@ -1,38 +1,38 @@
 ---
 title: CLI Reference
-description: All gosilo commands and their usage.
+description: All rstash commands and their usage.
 order: 5
 ---
 
-gosilo's CLI is intentionally minimal. The server is managed through the web UI — the CLI just starts it and provides a couple of diagnostic tools.
+rstash's CLI is intentionally minimal. The server is managed through the web UI — the CLI just starts it and provides a couple of diagnostic tools.
 
-## `gosilo`
+## `rstash`
 
-Start the remoteStorage server. This is the default command — just run `gosilo` with no arguments.
+Start the remoteStorage server. This is the default command — just run `rstash` with no arguments.
 
 ```bash
-gosilo
+rstash
 ```
 
 On first run, visit the server in your browser to complete setup (create admin account). All configuration is via environment variables.
 
-## `gosilo env`
+## `rstash env`
 
 Print a documented `.env` template with all available configuration variables.
 
 ```bash
-gosilo env          # print to stdout
-gosilo env > .env   # save to file
+rstash env          # print to stdout
+rstash env > .env   # save to file
 ```
 
 Useful for seeing every available setting with its default value and description.
 
-## `gosilo check`
+## `rstash check`
 
 Validate your configuration and test connectivity to the database and blob store.
 
 ```bash
-gosilo check
+rstash check
 ```
 
 Output:

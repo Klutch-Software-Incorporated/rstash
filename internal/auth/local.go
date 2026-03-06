@@ -3,8 +3,8 @@ package auth
 import (
 	"context"
 
-	"gosilo/internal/db"
-	"gosilo/internal/model"
+	"rstash/internal/db"
+	"rstash/internal/model"
 )
 
 // LocalService implements Service using the local database via Repository.

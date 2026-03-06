@@ -6,9 +6,9 @@ import (
 	"os"
 	"time"
 
-	"gosilo/internal/blob"
-	"gosilo/internal/config"
-	"gosilo/internal/db"
+	"rstash/internal/blob"
+	"rstash/internal/config"
+	"rstash/internal/db"
 
 	"github.com/spf13/cobra"
 )

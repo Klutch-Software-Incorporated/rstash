@@ -3,7 +3,7 @@ package cli
 import (
 	"fmt"
 
-	"gosilo/internal/config"
+	"rstash/internal/config"
 
 	"github.com/spf13/cobra"
 )

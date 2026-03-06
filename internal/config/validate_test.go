@@ -10,8 +10,8 @@ func validConfig() *Config {
 	return &Config{
 		Addr:             ":8080",
 		BaseURL:          "http://localhost:8080",
-		DatabaseDSN:      "sqlite:gosilo.db",
-		BlobDSN:          "sqlite:gosilo-blobs.db",
+		DatabaseDSN:      "sqlite:rstash.db",
+		BlobDSN:          "sqlite:rstash-blobs.db",
 		RegistrationMode: "closed",
 		LogLevel:         "info",
 		RateLimitRate:    10,
@@ -35,8 +35,8 @@ func TestValidate_InvalidAddr(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error for invalid addr")
 	}
-	if !strings.Contains(err.Error(), "GOSILO_ADDR") {
-		t.Fatalf("error should mention GOSILO_ADDR, got: %v", err)
+	if !strings.Contains(err.Error(), "RSTASH_ADDR") {
+		t.Fatalf("error should mention RSTASH_ADDR, got: %v", err)
 	}
 }
 
@@ -59,7 +59,7 @@ func TestValidate_BaseURL(t *testing.T) {
 		{"valid http", "http://example.com", ""},
 		{"valid https", "https://example.com", ""},
 		{"ftp scheme", "ftp://example.com", "scheme must be http or https"},
-		{"empty scheme", "://example.com", "GOSILO_BASE_URL"},
+		{"empty scheme", "://example.com", "RSTASH_BASE_URL"},
 		{"empty host", "http://", "host must not be empty"},
 	}
 	for _, tt := range tests {
@@ -97,11 +97,11 @@ func TestValidate_BaseURL_TrailingSlash(t *testing.T) {
 func TestValidate_DatabaseDSN(t *testing.T) {
 	// Valid DSNs for all supported databases.
 	for _, dsn := range []string{
-		"sqlite:gosilo.db",
+		"sqlite:rstash.db",
 		"sqlite::memory:",
-		"postgres:host=localhost dbname=gosilo",
-		"mysql:user:pass@tcp(localhost:3306)/gosilo",
-		"mssql:sqlserver://sa:pass@localhost:1433?database=gosilo",
+		"postgres:host=localhost dbname=rstash",
+		"mysql:user:pass@tcp(localhost:3306)/rstash",
+		"mssql:sqlserver://sa:pass@localhost:1433?database=rstash",
 	} {
 		cfg := validConfig()
 		cfg.DatabaseDSN = dsn
@@ -117,8 +117,8 @@ func TestValidate_DatabaseDSN(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error for unsupported database DSN scheme")
 	}
-	if !strings.Contains(err.Error(), "GOSILO_DB") {
-		t.Fatalf("error should mention GOSILO_DB, got: %v", err)
+	if !strings.Contains(err.Error(), "RSTASH_DB") {
+		t.Fatalf("error should mention RSTASH_DB, got: %v", err)
 	}
 }
 
@@ -137,8 +137,8 @@ func TestValidate_BlobDSN(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error for unsupported blob backend scheme")
 	}
-	if !strings.Contains(err.Error(), "GOSILO_BLOB") {
-		t.Fatalf("error should mention GOSILO_BLOB, got: %v", err)
+	if !strings.Contains(err.Error(), "RSTASH_BLOB") {
+		t.Fatalf("error should mention RSTASH_BLOB, got: %v", err)
 	}
 }
 
@@ -178,7 +178,7 @@ func TestValidate_TLS(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error when only TLS cert is set")
 	}
-	if !strings.Contains(err.Error(), "GOSILO_TLS_CERT") {
+	if !strings.Contains(err.Error(), "RSTASH_TLS_CERT") {
 		t.Fatalf("error should mention TLS, got: %v", err)
 	}
 }
@@ -196,7 +196,7 @@ func TestValidate_MultipleErrors(t *testing.T) {
 		t.Fatal("expected multiple errors")
 	}
 	msg := err.Error()
-	for _, want := range []string{"GOSILO_ADDR", "GOSILO_BASE_URL", "GOSILO_DB", "GOSILO_BLOB", "GOSILO_LOG_LEVEL"} {
+	for _, want := range []string{"RSTASH_ADDR", "RSTASH_BASE_URL", "RSTASH_DB", "RSTASH_BLOB", "RSTASH_LOG_LEVEL"} {
 		if !strings.Contains(msg, want) {
 			t.Errorf("expected error to contain %q, got: %v", want, msg)
 		}

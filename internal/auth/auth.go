@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 
-	"gosilo/internal/model"
+	"rstash/internal/model"
 )
 
 // Sentinel errors returned by Service implementations.

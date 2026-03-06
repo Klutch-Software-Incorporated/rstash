@@ -14,10 +14,10 @@ import (
 	"strconv"
 	"strings"
 
-	"gosilo/internal/auth"
-	"gosilo/internal/config"
-	"gosilo/internal/storage"
-	"gosilo/internal/ui"
+	"rstash/internal/auth"
+	"rstash/internal/config"
+	"rstash/internal/storage"
+	"rstash/internal/ui"
 )
 
 var moduleNameRe = regexp.MustCompile(`^[a-zA-Z0-9_-]+$`)
@@ -291,7 +291,7 @@ func (h *profileHandler) ShowDashboard(w http.ResponseWriter, r *http.Request) {
 		content.AuditLog = aRows
 	}
 
-	title := target.Username + " — Gosilo"
+	title := target.Username + " — rstash"
 	h.deps.Renderer.Render(w, "profile_dashboard", h.deps.pageData(w, r, title, content))
 }
 
