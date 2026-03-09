@@ -49,19 +49,12 @@ tasks:
 
   release:
     desc: Cross-compile release binaries for all platforms
-    env:
-      CGO_ENABLED: "0"
     cmds:
-      - cmd: go build -ldflags "-s -w" -o dist/rstash-linux-amd64 .
-        env: { GOOS: linux, GOARCH: amd64 }
-      - cmd: go build -ldflags "-s -w" -o dist/rstash-linux-arm64 .
-        env: { GOOS: linux, GOARCH: arm64 }
-      - cmd: go build -ldflags "-s -w" -o dist/rstash-darwin-amd64 .
-        env: { GOOS: darwin, GOARCH: amd64 }
-      - cmd: go build -ldflags "-s -w" -o dist/rstash-darwin-arm64 .
-        env: { GOOS: darwin, GOARCH: arm64 }
-      - cmd: go build -ldflags "-s -w" -o dist/rstash-windows-amd64.exe .
-        env: { GOOS: windows, GOARCH: amd64 }
+      - CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags "-s -w" -o dist/rstash-linux-amd64 .
+      - CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -ldflags "-s -w" -o dist/rstash-linux-arm64 .
+      - CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 go build -ldflags "-s -w" -o dist/rstash-darwin-amd64 .
+      - CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 go build -ldflags "-s -w" -o dist/rstash-darwin-arm64 .
+      - CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -ldflags "-s -w" -o dist/rstash-windows-amd64.exe .
 
   unversioned:
     dir: dist/
