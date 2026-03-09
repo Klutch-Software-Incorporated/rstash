@@ -28,6 +28,7 @@ type PageData struct {
 	TOSUrl           string
 	PrivacyUrl       string
 	OpenAbuseReports int64
+	Version          string
 }
 
 // Renderer parses and renders HTML templates from the embedded filesystem.

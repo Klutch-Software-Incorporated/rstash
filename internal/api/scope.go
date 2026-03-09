@@ -29,7 +29,10 @@ func ParseScopes(scopeStr string) ([]string, bool) {
 func CheckScope(scopes []string, storagePath string, write bool) bool {
 	// Extract module from path: first segment after leading "/".
 	// e.g. "/contacts/foo" → "contacts", "/" → ""
+	// Per spec, paths under "public/<module>" belong to <module>,
+	// so "photos:rw" also grants access to "public/photos/".
 	trimmed := strings.TrimPrefix(storagePath, "/")
+	trimmed = strings.TrimPrefix(trimmed, "public/")
 	module := trimmed
 	if idx := strings.Index(trimmed, "/"); idx >= 0 {
 		module = trimmed[:idx]

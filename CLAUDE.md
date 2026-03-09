@@ -16,7 +16,7 @@ Source control is managed via Fossil, not git.
 
 ## Build & Run Commands
 
-- **Build:** `task build` (or `go build -o ./build/rstash.exe .`)
+- **Build:** `task build` (cross-compiles release binaries to `dist/`)
 - **Run:** `task run` (or `go run .`)
 - **Run tests:** `task test` (or `go test ./...`)
 - **Run a single test:** `go test -run TestName ./internal/package`

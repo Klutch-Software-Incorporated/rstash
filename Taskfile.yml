@@ -1,5 +1,8 @@
 version: '3'
 
+env:
+  TASK_CORE_UTILS: "1"
+
 includes:
   infra:
     taskfile: ./infra/Taskfile.yml
@@ -8,17 +11,14 @@ includes:
     taskfile: ./site/Taskfile.yml
     dir: ./site
 
+vars:
+  VERSION: '{{now | date "2006.01.02"}}'
+
 tasks:
   collect-licenses:
     desc: Collect third-party license information
     cmds:
       - go run ./cmd/collect-licenses
-
-  build:
-    desc: Build the rstash binary
-    deps: [collect-licenses]
-    cmds:
-      - go build -o ./build/rstash.exe .
 
   run:
     desc: Run the server
@@ -43,18 +43,32 @@ tasks:
   clean:
     desc: Remove build artifacts and local database
     cmds:
-      - rm -f ./build/rstash.exe
-      - rm -f rstash.db rstash.db-wal rstash.db-shm
       - rm -rf ./dist
+      - rm -f rstash.db rstash.db-wal rstash.db-shm
 
-  release:
+  build:
     desc: Cross-compile release binaries for all platforms
+    deps: [collect-licenses]
+    sources:
+      - "**/*.go"
+      - go.mod
+      - go.sum
+      - "internal/ui/templates/**/*"
+      - "internal/ui/static/**/*"
+      - "internal/licenses/licenses.json"
+    generates:
+      - dist/rstash-linux-amd64
+      - dist/rstash-linux-arm64
+      - dist/rstash-darwin-amd64
+      - dist/rstash-darwin-arm64
+      - dist/rstash-windows-amd64.exe
+    method: checksum
     cmds:
-      - CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags "-s -w" -o dist/rstash-linux-amd64 .
-      - CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -ldflags "-s -w" -o dist/rstash-linux-arm64 .
-      - CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 go build -ldflags "-s -w" -o dist/rstash-darwin-amd64 .
-      - CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 go build -ldflags "-s -w" -o dist/rstash-darwin-arm64 .
-      - CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -ldflags "-s -w" -o dist/rstash-windows-amd64.exe .
+      - CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags "-s -w -X rstash/internal/config.Version={{.VERSION}}" -o dist/rstash-linux-amd64 .
+      - CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -ldflags "-s -w -X rstash/internal/config.Version={{.VERSION}}" -o dist/rstash-linux-arm64 .
+      - CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 go build -ldflags "-s -w -X rstash/internal/config.Version={{.VERSION}}" -o dist/rstash-darwin-amd64 .
+      - CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 go build -ldflags "-s -w -X rstash/internal/config.Version={{.VERSION}}" -o dist/rstash-darwin-arm64 .
+      - CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -ldflags "-s -w -X rstash/internal/config.Version={{.VERSION}}" -o dist/rstash-windows-amd64.exe .
 
   unversioned:
     dir: dist/

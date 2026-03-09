@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strings"
 
+	"rstash/internal/config"
 	"rstash/internal/ui"
 )
 
@@ -37,6 +38,7 @@ func (d *UIDeps) pageData(w http.ResponseWriter, r *http.Request, title string, 
 		ActiveNav:        activeNavFromPath(r.URL.Path),
 		TOSUrl:           legalURL(snap.TOSMode, snap.TOSContent, "/legal/terms"),
 		PrivacyUrl:       legalURL(snap.PrivacyMode, snap.PrivacyContent, "/legal/privacy"),
+		Version:          config.Version,
 	}
 }
 
