@@ -6,6 +6,8 @@
     <a href="/admin/audit" {{if eq $.ActiveAdminNav "audit"}}class="active"{{end}}>Audit Log</a>
     <a href="/admin/logs" {{if eq $.ActiveAdminNav "logs"}}class="active"{{end}}>Logs</a>
     <a href="/admin/abuse" {{if eq $.ActiveAdminNav "abuse"}}class="active"{{end}}>Reports{{if $.OpenAbuseReports}} ({{$.OpenAbuseReports}}){{end}}</a>
+    <a href="/admin/status" {{if eq $.ActiveAdminNav "status"}}class="active"{{end}}>Status</a>
+    <a href="/admin/email" {{if eq $.ActiveAdminNav "email"}}class="active"{{end}}>Email</a>
     <a href="/admin/oauth-test" {{if eq $.ActiveAdminNav "oauth-test"}}class="active"{{end}}>OAuth Test</a>
 </nav>
 {{if and $.OpenAbuseReports (ne $.ActiveAdminNav "abuse")}}

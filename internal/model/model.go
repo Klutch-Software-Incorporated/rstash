@@ -15,6 +15,14 @@ type User struct {
 	LastLoginIP  *string    `gorm:"size:45"` // NULL until first login
 	TOSAcceptedAt     *time.Time // NULL until TOS accepted
 	PrivacyAcceptedAt *time.Time // NULL until Privacy Policy accepted
+
+	// Email fields (Phase 1: Email Foundation)
+	Email              *string    `gorm:"size:254;uniqueIndex"`
+	EmailVerified      bool       `gorm:"not null;default:false"`
+	EmailVerifyToken   *string    `gorm:"size:255"`
+	EmailVerifyExpiry  *time.Time
+	PasswordResetToken  *string    `gorm:"size:255"`
+	PasswordResetExpiry *time.Time
 }
 
 type OAuthClient struct {
@@ -106,4 +114,14 @@ type Setting struct {
 	Key       string    `gorm:"primaryKey;size:255"`
 	Value     string    `gorm:"size:4096;not null"`
 	UpdatedAt time.Time `gorm:"not null;autoUpdateTime"`
+}
+
+type EmailSend struct {
+	ID        uint      `gorm:"primaryKey"`
+	To        string    `gorm:"size:254;not null;index"`
+	Type      string    `gorm:"size:32;not null;index"` // "test", "verification", "reset", "announcement"
+	Subject   string    `gorm:"size:512;not null"`
+	Status    string    `gorm:"size:16;not null"` // "sent", "failed"
+	Error     string    `gorm:"size:1024"`
+	CreatedAt time.Time `gorm:"not null;index"`
 }

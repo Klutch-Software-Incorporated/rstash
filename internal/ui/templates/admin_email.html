@@ -1,0 +1,81 @@
+{{define "admin_email"}}
+{{template "admin_nav" $}}
+{{with .Content}}
+
+<h2>Email</h2>
+
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:2rem;align-items:start">
+
+<div>
+    <h3>Configuration</h3>
+    {{if not .HasMailer}}
+    <div role="alert" class="alert-warning">
+        No email provider configured. Set the <code>RSTASH_EMAIL</code> environment variable to enable email delivery.
+    </div>
+    {{else}}
+    <div role="alert" class="alert-success">
+        Email is configured via <strong>{{.Provider}}</strong>
+    </div>
+    <dl>
+        <dt>Provider</dt>
+        <dd>{{.Provider}}</dd>
+        <dt>From Address</dt>
+        <dd><code>{{.FromAddress}}</code></dd>
+        <dt>Users with email</dt>
+        <dd>{{.UserCount}}</dd>
+    </dl>
+    {{end}}
+</div>
+
+<div>
+    <h3>Send Statistics</h3>
+    <dl>
+        <dt>Today</dt>
+        <dd>{{.CountToday}}</dd>
+        <dt>This Week</dt>
+        <dd>{{.CountWeek}}</dd>
+        <dt>This Month</dt>
+        <dd>{{.CountMonth}}</dd>
+    </dl>
+</div>
+
+</div>
+
+{{if .HasMailer}}
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:2rem;align-items:start;margin-top:1.5rem">
+
+<div>
+    <h3>Send Test Email</h3>
+    <p style="font-size:.85rem;color:var(--muted)">Send a test email to verify that email delivery is working correctly.</p>
+    <form method="POST" action="/admin/email/test">
+        <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
+        <div>
+            <label for="recipient">Recipient Email</label>
+            <input type="email" id="recipient" name="recipient" required placeholder="test@example.com">
+        </div>
+        <button type="submit" class="btn-primary">Send Test Email</button>
+    </form>
+</div>
+
+<div>
+    <h3>Send Announcement</h3>
+    <p style="font-size:.85rem;color:var(--muted)">Send an email to all {{.UserCount}} user(s) who have an email address on file, including unverified addresses.</p>
+    <form method="POST" action="/admin/email/announce" onsubmit="return confirm('Send this announcement to {{.UserCount}} user(s)?')">
+        <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
+        <div>
+            <label for="subject">Subject</label>
+            <input type="text" id="subject" name="subject" required placeholder="Announcement subject">
+        </div>
+        <div>
+            <label for="body">Body (plain text)</label>
+            <textarea id="body" name="body" required rows="6" style="width:100%" placeholder="Write your announcement here..."></textarea>
+        </div>
+        <button type="submit" class="btn-primary">Send to {{.UserCount}} user(s)</button>
+    </form>
+</div>
+
+</div>
+{{end}}
+
+{{end}}
+{{end}}

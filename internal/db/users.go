@@ -3,6 +3,7 @@ package db
 import (
 	"context"
 	"fmt"
+	"net/mail"
 	"regexp"
 	"strings"
 	"time"
@@ -32,9 +33,28 @@ func ValidateUsername(input string) (string, error) {
 	return name, nil
 }
 
+// ValidateEmail normalizes and validates an email address.
+// It lowercases, trims whitespace, and validates format via net/mail.ParseAddress.
+// Returns the normalized email or an error.
+func ValidateEmail(input string) (string, error) {
+	email := strings.ToLower(strings.TrimSpace(input))
+	if email == "" {
+		return "", fmt.Errorf("email is required")
+	}
+	if len(email) > 254 {
+		return "", fmt.Errorf("email must be 254 characters or fewer")
+	}
+	addr, err := mail.ParseAddress(email)
+	if err != nil {
+		return "", fmt.Errorf("invalid email address")
+	}
+	return addr.Address, nil
+}
+
 // CreateUser inserts a new user with a bcrypt-hashed password.
 // The username is normalized to lowercase as a safety net.
-func (r *Repository) CreateUser(ctx context.Context, username, password string, isAdmin, approved bool) (*model.User, error) {
+// If email is non-empty, it is normalized and stored on the user.
+func (r *Repository) CreateUser(ctx context.Context, username, password, email string, isAdmin, approved bool) (*model.User, error) {
 	username = strings.ToLower(strings.TrimSpace(username))
 	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 	if err != nil {
@@ -46,6 +66,10 @@ func (r *Repository) CreateUser(ctx context.Context, username, password string, 
 		PasswordHash: string(hash),
 		IsAdmin:      isAdmin,
 		Approved:     approved,
+	}
+	if email != "" {
+		normalized := strings.ToLower(strings.TrimSpace(email))
+		u.Email = &normalized
 	}
 	if err := r.db.WithContext(ctx).Create(&u).Error; err != nil {
 		return nil, fmt.Errorf("create user: %w", err)
@@ -205,6 +229,101 @@ func (r *Repository) UpdateUserLastLogin(ctx context.Context, userID int64, ip s
 		return fmt.Errorf("update user last login: %w", err)
 	}
 	return nil
+}
+
+// UpdateUserEmail sets the email column for a user (normalized to lowercase).
+func (r *Repository) UpdateUserEmail(ctx context.Context, userID int64, email string) error {
+	normalized := strings.ToLower(strings.TrimSpace(email))
+	if err := r.db.WithContext(ctx).Model(&model.User{}).Where("id = ?", userID).Update("email", normalized).Error; err != nil {
+		return fmt.Errorf("update user email: %w", err)
+	}
+	return nil
+}
+
+// GetUserByEmail returns the user with the given email, or nil if not found.
+func (r *Repository) GetUserByEmail(ctx context.Context, email string) (*model.User, error) {
+	normalized := strings.ToLower(strings.TrimSpace(email))
+	var u model.User
+	err := r.db.WithContext(ctx).Where("email = ?", normalized).First(&u).Error
+	if err == gorm.ErrRecordNotFound {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("get user by email: %w", err)
+	}
+	return &u, nil
+}
+
+// SetEmailVerifyToken stores a verification token and expiry for a user.
+func (r *Repository) SetEmailVerifyToken(ctx context.Context, userID int64, token string, expiry time.Time) error {
+	if err := r.db.WithContext(ctx).Model(&model.User{}).Where("id = ?", userID).Updates(map[string]any{
+		"email_verify_token":  token,
+		"email_verify_expiry": expiry,
+		"email_verified":      false,
+	}).Error; err != nil {
+		return fmt.Errorf("set email verify token: %w", err)
+	}
+	return nil
+}
+
+// VerifyUserEmail sets email_verified=true and clears the verify token.
+func (r *Repository) VerifyUserEmail(ctx context.Context, userID int64) error {
+	if err := r.db.WithContext(ctx).Model(&model.User{}).Where("id = ?", userID).Updates(map[string]any{
+		"email_verified":      true,
+		"email_verify_token":  nil,
+		"email_verify_expiry": nil,
+	}).Error; err != nil {
+		return fmt.Errorf("verify user email: %w", err)
+	}
+	return nil
+}
+
+// GetUserByEmailVerifyToken returns the user with the given verify token, or nil if not found or expired.
+func (r *Repository) GetUserByEmailVerifyToken(ctx context.Context, token string) (*model.User, error) {
+	var u model.User
+	err := r.db.WithContext(ctx).Where("email_verify_token = ? AND email_verify_expiry > ?", token, time.Now().UTC()).First(&u).Error
+	if err == gorm.ErrRecordNotFound {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("get user by email verify token: %w", err)
+	}
+	return &u, nil
+}
+
+// SetPasswordResetToken stores a password reset token and expiry for a user.
+func (r *Repository) SetPasswordResetToken(ctx context.Context, userID int64, token string, expiry time.Time) error {
+	if err := r.db.WithContext(ctx).Model(&model.User{}).Where("id = ?", userID).Updates(map[string]any{
+		"password_reset_token":  token,
+		"password_reset_expiry": expiry,
+	}).Error; err != nil {
+		return fmt.Errorf("set password reset token: %w", err)
+	}
+	return nil
+}
+
+// ClearPasswordResetToken removes the password reset token from a user.
+func (r *Repository) ClearPasswordResetToken(ctx context.Context, userID int64) error {
+	if err := r.db.WithContext(ctx).Model(&model.User{}).Where("id = ?", userID).Updates(map[string]any{
+		"password_reset_token":  nil,
+		"password_reset_expiry": nil,
+	}).Error; err != nil {
+		return fmt.Errorf("clear password reset token: %w", err)
+	}
+	return nil
+}
+
+// GetUserByPasswordResetToken returns the user with the given reset token, or nil if not found or expired.
+func (r *Repository) GetUserByPasswordResetToken(ctx context.Context, token string) (*model.User, error) {
+	var u model.User
+	err := r.db.WithContext(ctx).Where("password_reset_token = ? AND password_reset_expiry > ?", token, time.Now().UTC()).First(&u).Error
+	if err == gorm.ErrRecordNotFound {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("get user by password reset token: %w", err)
+	}
+	return &u, nil
 }
 
 // TopUserRow holds a user's storage usage for ranking.

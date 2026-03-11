@@ -32,12 +32,14 @@ type Service interface {
 	CleanupExpiredSessions(ctx context.Context) error
 
 	// User CRUD
-	CreateUser(ctx context.Context, username, password string, isAdmin, approved bool) (*model.User, error)
+	CreateUser(ctx context.Context, username, password, email string, isAdmin, approved bool) (*model.User, error)
 	GetUser(ctx context.Context, id int64) (*model.User, error)
 	GetUserByUsername(ctx context.Context, username string) (*model.User, error)
+	GetUserByEmail(ctx context.Context, email string) (*model.User, error)
 	ListUsers(ctx context.Context) ([]*model.User, error)
 	DeleteUser(ctx context.Context, id int64) error
 	UpdatePassword(ctx context.Context, userID int64, newPassword string) error
+	UpdateEmail(ctx context.Context, userID int64, email string) error
 	UserCount(ctx context.Context) (int64, error)
 
 	// Admin user management

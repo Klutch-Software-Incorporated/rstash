@@ -9,6 +9,7 @@ import (
 	"rstash/internal/blob"
 	"rstash/internal/config"
 	"rstash/internal/db"
+	"rstash/internal/email"
 
 	"github.com/spf13/cobra"
 )
@@ -71,6 +72,13 @@ func runCheck(cmd *cobra.Command, args []string) error {
 		defer store.Close()
 		return nil
 	})
+
+	if cfg.EmailDSN != "" {
+		check("Email provider", func() error {
+			_, err := email.Open(cfg.EmailDSN)
+			return err
+		})
+	}
 
 	if cfg.TLSMode == "manual" || (cfg.TLSMode == "" && cfg.TLSCert != "") {
 		check("TLS certificate file", func() error {

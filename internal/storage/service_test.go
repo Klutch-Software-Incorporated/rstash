@@ -28,7 +28,7 @@ func setup(t *testing.T) (*storage.Service, int64) {
 
 	svc := storage.NewService(repo, blobs, nil)
 
-	user, err := repo.CreateUser(context.Background(), "alice", "secret", false, true)
+	user, err := repo.CreateUser(context.Background(), "alice", "secret", "", false, true)
 	if err != nil {
 		t.Fatal(err)
 	}

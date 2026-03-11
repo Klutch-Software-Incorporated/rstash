@@ -9,7 +9,7 @@ func TestUpdateUserLastLogin(t *testing.T) {
 	database := testDB(t)
 	ctx := context.Background()
 
-	user, err := database.CreateUser(ctx, "loginuser", "password", false, true)
+	user, err := database.CreateUser(ctx, "loginuser", "password", "", false, true)
 	if err != nil {
 		t.Fatalf("create user: %v", err)
 	}
@@ -44,7 +44,7 @@ func TestUserLastLoginNilByDefault(t *testing.T) {
 	database := testDB(t)
 	ctx := context.Background()
 
-	user, err := database.CreateUser(ctx, "nillogin", "password", false, true)
+	user, err := database.CreateUser(ctx, "nillogin", "password", "", false, true)
 	if err != nil {
 		t.Fatalf("create user: %v", err)
 	}

@@ -10,7 +10,7 @@ func TestCreateAndGetRefreshToken(t *testing.T) {
 	database := testDB(t)
 	ctx := context.Background()
 
-	user, err := database.CreateUser(ctx, "refreshuser", "password", false, true)
+	user, err := database.CreateUser(ctx, "refreshuser", "password", "", false, true)
 	if err != nil {
 		t.Fatalf("create user: %v", err)
 	}
@@ -59,7 +59,7 @@ func TestDeleteRefreshTokenByAccessToken(t *testing.T) {
 	database := testDB(t)
 	ctx := context.Background()
 
-	user, err := database.CreateUser(ctx, "refreshuser2", "password", false, true)
+	user, err := database.CreateUser(ctx, "refreshuser2", "password", "", false, true)
 	if err != nil {
 		t.Fatalf("create user: %v", err)
 	}
@@ -98,7 +98,7 @@ func TestDeleteExpiredRefreshTokens(t *testing.T) {
 	database := testDB(t)
 	ctx := context.Background()
 
-	user, err := database.CreateUser(ctx, "refreshuser3", "password", false, true)
+	user, err := database.CreateUser(ctx, "refreshuser3", "password", "", false, true)
 	if err != nil {
 		t.Fatalf("create user: %v", err)
 	}

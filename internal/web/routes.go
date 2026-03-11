@@ -29,6 +29,17 @@ func FullRoutes(deps *UIDeps) http.Handler {
 	mux.HandleFunc("GET /register", registerHandler.ShowRegister)
 	mux.HandleFunc("POST /register", RequireCSRF(registerHandler.DoRegister))
 
+	// Account management (add email, verification, password reset).
+	accountH := AccountHandler(deps)
+	mux.HandleFunc("GET /account/email", accountH.ShowAddEmail)
+	mux.HandleFunc("POST /account/email", RequireCSRF(accountH.DoAddEmail))
+	mux.HandleFunc("GET /verify-email", accountH.VerifyEmail)
+	mux.HandleFunc("POST /account/resend-verification", RequireCSRF(accountH.ResendVerification))
+	mux.HandleFunc("GET /forgot-password", accountH.ShowForgotPassword)
+	mux.HandleFunc("POST /forgot-password", RequireCSRF(accountH.DoForgotPassword))
+	mux.HandleFunc("GET /reset-password", accountH.ShowResetPassword)
+	mux.HandleFunc("POST /reset-password", RequireCSRF(accountH.DoResetPassword))
+
 	// Legal pages (public, no auth).
 	legalH := LegalHandler(deps)
 	mux.HandleFunc("GET /legal/terms", legalH.ShowTerms)
@@ -49,6 +60,10 @@ func FullRoutes(deps *UIDeps) http.Handler {
 	mux.HandleFunc("GET /admin/audit", AdminGuard(adminHandler.ShowAudit))
 	logsH := LogsHandler(deps)
 	mux.HandleFunc("GET /admin/logs", AdminGuard(logsH.ShowLogs))
+	mux.HandleFunc("GET /admin/status", AdminGuard(adminHandler.ShowStatus))
+	mux.HandleFunc("GET /admin/email", AdminGuard(adminHandler.ShowEmail))
+	mux.HandleFunc("POST /admin/email/test", AdminGuard(RequireCSRF(adminHandler.DoTestEmail)))
+	mux.HandleFunc("POST /admin/email/announce", AdminGuard(RequireCSRF(adminHandler.DoAnnouncement)))
 	mux.HandleFunc("GET /admin/oauth-test", AdminGuard(adminHandler.ShowOAuthTest))
 	mux.HandleFunc("POST /admin/users/create", AdminGuard(RequireCSRF(adminHandler.CreateUser)))
 	mux.HandleFunc("POST /admin/users/{id}/delete", AdminGuard(RequireCSRF(adminHandler.DeleteUser)))
@@ -134,6 +149,8 @@ func profileRouter(deps *UIDeps) http.Handler {
 			scope(RequireCSRF(ph.CreateFolder))(w, r)
 
 		// --- POST routes: settings operations ---
+		case method == "POST" && sub == "/settings/email":
+			scope(RequireCSRF(ph.ChangeEmail))(w, r)
 		case method == "POST" && sub == "/settings/password":
 			scope(RequireCSRF(ph.ChangePassword))(w, r)
 		case method == "POST" && sub == "/settings/sessions/terminate-all":

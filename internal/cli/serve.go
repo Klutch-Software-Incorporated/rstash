@@ -21,6 +21,7 @@ import (
 	"rstash/internal/blob"
 	"rstash/internal/config"
 	"rstash/internal/db"
+	"rstash/internal/email"
 	"rstash/internal/metrics"
 	"rstash/internal/settings"
 	"rstash/internal/storage"
@@ -140,6 +141,15 @@ func runServe(cmd *cobra.Command, args []string) error {
 	})
 	storageSvc.SetScanner(mimeScanner)
 
+	// Initialize email mailer (nil if not configured).
+	mailer, err := email.Open(cfg.EmailDSN)
+	if err != nil {
+		return fmt.Errorf("failed to initialize email: %w", err)
+	}
+	if mailer != nil {
+		slog.Info("email delivery enabled")
+	}
+
 	// Initialize auth service.
 	localAuth := auth.NewLocalService(repo)
 
@@ -167,6 +177,7 @@ func runServe(cmd *cobra.Command, args []string) error {
 		Config:        cfg,
 		Storage:       storageSvc,
 		Settings:      runtimeSettings,
+		Mailer:        mailer,
 		SecureCookies: secureCookies,
 		LogFile:       cfg.LogFile,
 	}
@@ -223,7 +234,9 @@ func runServe(cmd *cobra.Command, args []string) error {
 	uiHandler := web.FullRoutes(uiDeps)
 	wrapped := web.AuthLoader(localAuth, secureCookies)(
 		web.EnsureCSRFCookie(secureCookies)(
-			web.SetupGuard(localAuth)(uiHandler),
+			web.SetupGuard(localAuth)(
+				web.AccountGuard()(uiHandler),
+			),
 		),
 	)
 	mux.Handle("/", wrapped)

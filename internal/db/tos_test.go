@@ -9,7 +9,7 @@ func TestAcceptTOS(t *testing.T) {
 	database := testDB(t)
 	ctx := context.Background()
 
-	user, err := database.CreateUser(ctx, "alice", "password123", false, true)
+	user, err := database.CreateUser(ctx, "alice", "password123", "", false, true)
 	if err != nil {
 		t.Fatalf("create user: %v", err)
 	}
@@ -38,7 +38,7 @@ func TestAcceptPrivacy(t *testing.T) {
 	database := testDB(t)
 	ctx := context.Background()
 
-	user, err := database.CreateUser(ctx, "bob", "password123", false, true)
+	user, err := database.CreateUser(ctx, "bob", "password123", "", false, true)
 	if err != nil {
 		t.Fatalf("create user: %v", err)
 	}
@@ -67,7 +67,7 @@ func TestAcceptTOSAndPrivacy_BothSet(t *testing.T) {
 	database := testDB(t)
 	ctx := context.Background()
 
-	user, err := database.CreateUser(ctx, "carol", "password123", false, true)
+	user, err := database.CreateUser(ctx, "carol", "password123", "", false, true)
 	if err != nil {
 		t.Fatalf("create user: %v", err)
 	}

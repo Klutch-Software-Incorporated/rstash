@@ -9,6 +9,7 @@ import (
 
 	"rstash/internal/auth"
 	"rstash/internal/db"
+	"rstash/internal/metrics"
 	"rstash/internal/ui"
 )
 
@@ -53,6 +54,7 @@ func (h *authHandler) DoLogin(w http.ResponseWriter, r *http.Request) {
 	user, err := h.deps.Auth.Authenticate(r.Context(), username, password)
 	if err != nil {
 		if errors.Is(err, auth.ErrInvalidCredentials) {
+			metrics.LoginFailuresTotal.Inc()
 			h.deps.Repo.Audit(r.Context(), db.SystemActorID, "auth.login_failed", "user", username, "invalid credentials")
 			renderErr("Invalid username or password.")
 		} else if errors.Is(err, auth.ErrAccountPendingApproval) {

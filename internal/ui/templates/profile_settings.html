@@ -9,6 +9,21 @@
 <dl>
     <dt>Username</dt>
     <dd>{{.Username}}</dd>
+    {{if .Email}}
+    <dt>Email</dt>
+    <dd>
+        {{.Email}}
+        {{if .EmailVerified}}<span class="badge badge-active">verified</span>
+        {{else}}<span class="badge badge-warning">unverified</span>
+            {{if $.HasMailer}}
+            <form method="POST" action="/account/resend-verification" style="display:inline">
+                <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
+                <button type="submit" class="btn-secondary" style="font-size:.75rem;padding:.15rem .4rem">Resend verification</button>
+            </form>
+            {{end}}
+        {{end}}
+    </dd>
+    {{end}}
     <dt>Created</dt>
     <dd><time datetime="{{.CreatedAt}}">{{.CreatedAt}}</time></dd>
     <dt>User address</dt>
@@ -22,23 +37,38 @@
 </dl>
 
 {{if .IsSelf}}
-<h2>Change Password</h2>
-<form method="POST" action="{{.URLPrefix}}/settings/password" style="max-width:28rem">
-    <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
-    <div>
-        <label for="current_password">Current Password</label>
-        <input type="password" id="current_password" name="current_password" required autocomplete="current-password">
+<div class="settings-grid">
+    <div class="settings-card">
+        <h3>Change Email</h3>
+        <form method="POST" action="{{.URLPrefix}}/settings/email">
+            <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
+            <div>
+                <label for="new_email">Email</label>
+                <input type="email" id="new_email" name="email" required value="{{.Email}}" placeholder="you@example.com">
+            </div>
+            <button type="submit">Update Email</button>
+        </form>
     </div>
-    <div>
-        <label for="new_password">New Password</label>
-        <input type="password" id="new_password" name="new_password" required minlength="8" autocomplete="new-password">
+    <div class="settings-card">
+        <h3>Change Password</h3>
+        <form method="POST" action="{{.URLPrefix}}/settings/password">
+            <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
+            <div>
+                <label for="current_password">Current Password</label>
+                <input type="password" id="current_password" name="current_password" required autocomplete="current-password">
+            </div>
+            <div>
+                <label for="new_password">New Password</label>
+                <input type="password" id="new_password" name="new_password" required minlength="8" autocomplete="new-password">
+            </div>
+            <div>
+                <label for="confirm_password">Confirm New Password</label>
+                <input type="password" id="confirm_password" name="confirm_password" required minlength="8" autocomplete="new-password">
+            </div>
+            <button type="submit">Change Password</button>
+        </form>
     </div>
-    <div>
-        <label for="confirm_password">Confirm New Password</label>
-        <input type="password" id="confirm_password" name="confirm_password" required minlength="8" autocomplete="new-password">
-    </div>
-    <button type="submit">Change Password</button>
-</form>
+</div>
 {{end}}
 
 <h2>Active Sessions</h2>

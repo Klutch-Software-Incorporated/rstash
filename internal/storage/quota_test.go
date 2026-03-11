@@ -21,7 +21,7 @@ func testRepo(t *testing.T) *db.Repository {
 
 func createTestUser(t *testing.T, repo *db.Repository, username string, quota int64) int64 {
 	t.Helper()
-	user, err := repo.CreateUser(context.Background(), username, "hash", false, true)
+	user, err := repo.CreateUser(context.Background(), username, "hash", "", false, true)
 	if err != nil {
 		t.Fatal(err)
 	}
