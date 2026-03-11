@@ -64,8 +64,8 @@ func (s *LocalService) CleanupExpiredSessions(ctx context.Context) error {
 
 // --- User CRUD ---
 
-func (s *LocalService) CreateUser(ctx context.Context, username, password string, isAdmin, approved bool) (*model.User, error) {
-	return s.repo.CreateUser(ctx, username, password, isAdmin, approved)
+func (s *LocalService) CreateUser(ctx context.Context, username, password, email string, isAdmin, approved bool) (*model.User, error) {
+	return s.repo.CreateUser(ctx, username, password, email, isAdmin, approved)
 }
 
 func (s *LocalService) GetUser(ctx context.Context, id int64) (*model.User, error) {
@@ -74,6 +74,14 @@ func (s *LocalService) GetUser(ctx context.Context, id int64) (*model.User, erro
 
 func (s *LocalService) GetUserByUsername(ctx context.Context, username string) (*model.User, error) {
 	return s.repo.GetUserByUsername(ctx, username)
+}
+
+func (s *LocalService) GetUserByEmail(ctx context.Context, email string) (*model.User, error) {
+	return s.repo.GetUserByEmail(ctx, email)
+}
+
+func (s *LocalService) UpdateEmail(ctx context.Context, userID int64, email string) error {
+	return s.repo.UpdateUserEmail(ctx, userID, email)
 }
 
 func (s *LocalService) ListUsers(ctx context.Context) ([]*model.User, error) {

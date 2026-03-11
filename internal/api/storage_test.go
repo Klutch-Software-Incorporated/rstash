@@ -44,7 +44,7 @@ func testSetup(t *testing.T) (*httptest.Server, *testEnv) {
 
 	// Create a test user.
 	ctx := context.Background()
-	user, err := repo.CreateUser(ctx, "testuser", "password", false, true)
+	user, err := repo.CreateUser(ctx, "testuser", "password", "", false, true)
 	if err != nil {
 		t.Fatalf("create user: %v", err)
 	}
@@ -859,7 +859,7 @@ func TestPublicWrites_Off_RejectsPUT(t *testing.T) {
 	t.Cleanup(ts.Close)
 
 	ctx := context.Background()
-	user, err := repo.CreateUser(ctx, "testuser", "password", false, true)
+	user, err := repo.CreateUser(ctx, "testuser", "password", "", false, true)
 	if err != nil {
 		t.Fatalf("create user: %v", err)
 	}

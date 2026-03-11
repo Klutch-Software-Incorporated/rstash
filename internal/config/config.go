@@ -39,6 +39,7 @@ type Config struct {
 	TLSKey               string  // RSTASH_TLS_KEY — path to TLS private key file
 	TLSMode              string  // RSTASH_TLS_MODE — "off", "manual", "auto", or "" (auto-detect)
 	TLSCacheDir          string  // RSTASH_TLS_CACHE — autocert cache directory
+	EmailDSN             string  // RSTASH_EMAIL — email provider DSN
 }
 
 // ParseDSN splits a DSN string into its scheme and path components.
@@ -71,6 +72,7 @@ func Load() *Config {
 		TLSKey:      os.Getenv(EnvTLSKey),
 		TLSMode:     os.Getenv(EnvTLSMode),
 		TLSCacheDir: envOrDefault(EnvTLSCache, "./certs"),
+		EmailDSN:    os.Getenv(EnvEmail),
 
 		// Runtime-editable: sane defaults, changed via CLI/admin UI.
 		MetricsMode:      "public",
@@ -143,5 +145,6 @@ func (c *Config) ValueMap() map[string]string {
 		"tls_key":                c.TLSKey,
 		"tls_mode":               c.TLSMode,
 		"tls_cache":              c.TLSCacheDir,
+		"email_dsn":              c.EmailDSN,
 	}
 }

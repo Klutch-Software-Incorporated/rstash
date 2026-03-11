@@ -122,6 +122,7 @@ func TestSetupCreatesAdmin(t *testing.T) {
 	// POST /setup to create admin.
 	form := url.Values{
 		"username":         {"admin"},
+		"email":            {"admin@example.com"},
 		"password":         {"secretpassword"},
 		"password_confirm": {"secretpassword"},
 	}
@@ -148,7 +149,7 @@ func TestLoginLogoutCycle(t *testing.T) {
 	ts, deps := setupTestServer(t, "closed")
 
 	// Create a user directly.
-	_, err := deps.Repo.CreateUser(context.Background(), "testuser", "password123", false, true)
+	_, err := deps.Repo.CreateUser(context.Background(), "testuser", "password123", "", false, true)
 	if err != nil {
 		t.Fatalf("create user: %v", err)
 	}
@@ -191,7 +192,7 @@ func TestLoginLogoutCycle(t *testing.T) {
 func TestLoginInvalidCredentials(t *testing.T) {
 	ts, deps := setupTestServer(t, "closed")
 
-	_, _ = deps.Repo.CreateUser(context.Background(), "badloginuser", "password123", false, true)
+	_, _ = deps.Repo.CreateUser(context.Background(), "badloginuser", "password123", "", false, true)
 
 	client := &http.Client{CheckRedirect: func(req *http.Request, via []*http.Request) error {
 		return http.ErrUseLastResponse
@@ -216,7 +217,7 @@ func TestAdminRequiresAuth(t *testing.T) {
 	ts, deps := setupTestServer(t, "closed")
 
 	// Create a user so setup guard doesn't redirect.
-	_, _ = deps.Repo.CreateUser(context.Background(), "adminauthuser", "password123", true, true)
+	_, _ = deps.Repo.CreateUser(context.Background(), "adminauthuser", "password123", "", true, true)
 
 	client := &http.Client{CheckRedirect: func(req *http.Request, via []*http.Request) error {
 		return http.ErrUseLastResponse
@@ -237,7 +238,7 @@ func TestAdminRequiresAuth(t *testing.T) {
 func TestRegistrationClosed(t *testing.T) {
 	ts, deps := setupTestServer(t, "closed")
 
-	_, _ = deps.Repo.CreateUser(context.Background(), "regcloseduser", "password123", false, true)
+	_, _ = deps.Repo.CreateUser(context.Background(), "regcloseduser", "password123", "", false, true)
 
 	client := &http.Client{CheckRedirect: func(req *http.Request, via []*http.Request) error {
 		return http.ErrUseLastResponse
@@ -256,7 +257,7 @@ func TestRegistrationClosed(t *testing.T) {
 func TestRegistrationClosedPostReturns403(t *testing.T) {
 	ts, deps := setupTestServer(t, "closed")
 
-	_, _ = deps.Repo.CreateUser(context.Background(), "closedpostuser", "password123", false, true)
+	_, _ = deps.Repo.CreateUser(context.Background(), "closedpostuser", "password123", "", false, true)
 
 	client := &http.Client{CheckRedirect: func(req *http.Request, via []*http.Request) error {
 		return http.ErrUseLastResponse
@@ -281,7 +282,7 @@ func TestRegistrationClosedPostReturns403(t *testing.T) {
 func TestRegistrationOpen(t *testing.T) {
 	ts, deps := setupTestServer(t, "open")
 
-	_, _ = deps.Repo.CreateUser(context.Background(), "openreguser", "password123", false, true)
+	_, _ = deps.Repo.CreateUser(context.Background(), "openreguser", "password123", "", false, true)
 
 	client := &http.Client{CheckRedirect: func(req *http.Request, via []*http.Request) error {
 		return http.ErrUseLastResponse
@@ -291,6 +292,7 @@ func TestRegistrationOpen(t *testing.T) {
 
 	form := url.Values{
 		"username":         {"newuser"},
+		"email":            {"newuser@example.com"},
 		"password":         {"newpassword123"},
 		"password_confirm": {"newpassword123"},
 		"tos_accept":       {"on"},

@@ -29,7 +29,7 @@ func tokenTestServer(t *testing.T) (*httptest.Server, *tokenTestEnv) {
 	t.Cleanup(ts.Close)
 
 	ctx := context.Background()
-	user, err := repo.CreateUser(ctx, "tokenuser", "password", false, true)
+	user, err := repo.CreateUser(ctx, "tokenuser", "password", "", false, true)
 	if err != nil {
 		t.Fatalf("create user: %v", err)
 	}
@@ -287,7 +287,7 @@ func refreshTokenTestServer(t *testing.T) (*httptest.Server, *tokenTestEnv) {
 	t.Cleanup(ts.Close)
 
 	ctx := context.Background()
-	user, err := repo.CreateUser(ctx, "refreshuser", "password", false, true)
+	user, err := repo.CreateUser(ctx, "refreshuser", "password", "", false, true)
 	if err != nil {
 		t.Fatalf("create user: %v", err)
 	}

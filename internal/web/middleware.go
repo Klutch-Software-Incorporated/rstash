@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"log/slog"
 	"net/http"
+	"strings"
 	"sync/atomic"
 
 	"rstash/internal/auth"
@@ -216,6 +217,34 @@ func SetupGuard(authSvc auth.Service) func(http.Handler) http.Handler {
 				hasUsers.Store(true)
 			}
 
+			next.ServeHTTP(w, r)
+		})
+	}
+}
+
+// AccountGuard returns middleware that redirects logged-in users with no email
+// to /account/email. Routes that must remain accessible are exempted.
+func AccountGuard() func(http.Handler) http.Handler {
+	exempt := []string{
+		"/account/email", "/login", "/logout", "/setup", "/register",
+		"/static/", "/storage/", "/.well-known/", "/oauth/", "/abuse/",
+		"/legal/", "/verify-email",
+	}
+
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			user := CurrentUser(r)
+			if user != nil && (user.Email == nil || *user.Email == "") {
+				path := r.URL.Path
+				for _, prefix := range exempt {
+					if path == prefix || strings.HasPrefix(path, prefix) {
+						next.ServeHTTP(w, r)
+						return
+					}
+				}
+				http.Redirect(w, r, "/account/email", http.StatusSeeOther)
+				return
+			}
 			next.ServeHTTP(w, r)
 		})
 	}

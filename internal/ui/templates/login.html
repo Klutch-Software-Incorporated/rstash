@@ -24,5 +24,8 @@
         </div>
         <button type="submit">Log In</button>
     </form>
+    {{if $.HasMailer}}
+    <p style="text-align:center;margin-top:1rem"><a href="/forgot-password">Forgot password?</a></p>
+    {{end}}
 </div>
 {{end}}

@@ -13,9 +13,11 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 
 	"rstash/internal/auth"
 	"rstash/internal/config"
+	"rstash/internal/db"
 	"rstash/internal/storage"
 	"rstash/internal/ui"
 )
@@ -298,17 +300,19 @@ func (h *profileHandler) ShowDashboard(w http.ResponseWriter, r *http.Request) {
 // --- Settings ---
 
 type profileSettingsContent struct {
-	BaseURL   string
-	Host      string
-	Username  string
-	CreatedAt string
-	Tokens    []*tokenRow
-	Sessions  []*sessionRow
-	QuotaMode string
-	Stats     *homeStats
-	URLPrefix string
-	IsSelf    bool
-	IsAdmin   bool
+	BaseURL       string
+	Host          string
+	Username      string
+	Email         string
+	EmailVerified bool
+	CreatedAt     string
+	Tokens        []*tokenRow
+	Sessions      []*sessionRow
+	QuotaMode     string
+	Stats         *homeStats
+	URLPrefix     string
+	IsSelf        bool
+	IsAdmin       bool
 
 	// Admin-only when viewing another user
 	TargetUser *profileTargetUser
@@ -396,11 +400,18 @@ func (h *profileHandler) ShowSettings(w http.ResponseWriter, r *http.Request) {
 		host = parsed.Host
 	}
 
+	var emailStr string
+	if target.Email != nil {
+		emailStr = *target.Email
+	}
+
 	content := &profileSettingsContent{
-		BaseURL:   h.deps.Config.BaseURL,
-		Host:      host,
-		Username:  target.Username,
-		CreatedAt: target.CreatedAt.Format("2006-01-02 15:04:05"),
+		BaseURL:       h.deps.Config.BaseURL,
+		Host:          host,
+		Username:      target.Username,
+		Email:         emailStr,
+		EmailVerified: target.EmailVerified,
+		CreatedAt:     target.CreatedAt.Format("2006-01-02 15:04:05"),
 		Tokens:    tokenRows,
 		Sessions:  sessRows,
 		QuotaMode: snap.QuotaMode,
@@ -808,6 +819,63 @@ func (h *profileHandler) CreateFolder(w http.ResponseWriter, r *http.Request) {
 }
 
 // --- Settings POST handlers ---
+
+func (h *profileHandler) ChangeEmail(w http.ResponseWriter, r *http.Request) {
+	if !IsSelf(r) {
+		http.Error(w, "Forbidden", http.StatusForbidden)
+		return
+	}
+
+	target := TargetUser(r)
+	prefix := urlPrefix(r)
+	emailRaw := r.FormValue("email")
+
+	emailAddr, err := db.ValidateEmail(emailRaw)
+	if err != nil {
+		ui.SetFlashError(w, err.Error())
+		http.Redirect(w, r, prefix+"/settings", http.StatusSeeOther)
+		return
+	}
+
+	// If same as current, no-op.
+	if target.Email != nil && *target.Email == emailAddr {
+		ui.SetFlash(w, "Email unchanged.")
+		http.Redirect(w, r, prefix+"/settings", http.StatusSeeOther)
+		return
+	}
+
+	// Check uniqueness.
+	existing, err := h.deps.Auth.GetUserByEmail(r.Context(), emailAddr)
+	if err != nil {
+		slog.Error("failed to check email uniqueness", "error", err)
+		ui.SetFlashError(w, "An error occurred. Please try again.")
+		http.Redirect(w, r, prefix+"/settings", http.StatusSeeOther)
+		return
+	}
+	if existing != nil && existing.ID != target.ID {
+		ui.SetFlashError(w, "An account with this email already exists.")
+		http.Redirect(w, r, prefix+"/settings", http.StatusSeeOther)
+		return
+	}
+
+	if err := h.deps.Auth.UpdateEmail(r.Context(), target.ID, emailAddr); err != nil {
+		slog.Error("failed to update email", "error", err)
+		ui.SetFlashError(w, "Failed to update email.")
+		http.Redirect(w, r, prefix+"/settings", http.StatusSeeOther)
+		return
+	}
+
+	// Mark as unverified and send verification if mailer configured.
+	_ = h.deps.Repo.SetEmailVerifyToken(r.Context(), target.ID, "", time.Time{})
+	if h.deps.Mailer != nil {
+		acctH := AccountHandler(h.deps)
+		acctH.sendVerificationEmail(r, target.ID, emailAddr)
+	}
+
+	h.audit(r, "user.email_changed", "user", fmt.Sprintf("%d", target.ID), emailAddr)
+	ui.SetFlash(w, "Email updated.")
+	http.Redirect(w, r, prefix+"/settings", http.StatusSeeOther)
+}
 
 func (h *profileHandler) ChangePassword(w http.ResponseWriter, r *http.Request) {
 	if !IsSelf(r) {

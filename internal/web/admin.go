@@ -4,11 +4,14 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"runtime"
 	"strconv"
 	"time"
 
 	"rstash/internal/config"
 	"rstash/internal/db"
+	"rstash/internal/email"
+	"rstash/internal/metrics"
 	"rstash/internal/ui"
 )
 
@@ -76,6 +79,7 @@ type adminSettingRow struct {
 type userRow struct {
 	ID              int64
 	Username        string
+	Email           string
 	IsAdmin         bool
 	Disabled        bool
 	Approved        bool
@@ -208,9 +212,14 @@ func (h *adminHandler) ShowUsers(w http.ResponseWriter, r *http.Request) {
 
 	rows := make([]*userRow, len(users))
 	for i, u := range users {
+		var email string
+		if u.Email != nil {
+			email = *u.Email
+		}
 		row := &userRow{
 			ID:              u.ID,
 			Username:        u.Username,
+			Email:           email,
 			IsAdmin:         u.IsAdmin,
 			Disabled:        u.Disabled,
 			Approved:        u.Approved,
@@ -442,6 +451,7 @@ func (h *adminHandler) CreateUser(w http.ResponseWriter, r *http.Request) {
 
 	password := r.FormValue("password")
 	isAdmin := r.FormValue("is_admin") == "on"
+	emailRaw := r.FormValue("email")
 
 	username, valErr := db.ValidateUsername(r.FormValue("username"))
 	if valErr != nil {
@@ -461,7 +471,14 @@ func (h *adminHandler) CreateUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	newUser, err := h.deps.Auth.CreateUser(r.Context(), username, password, isAdmin, true)
+	email, emailErr := db.ValidateEmail(emailRaw)
+	if emailErr != nil {
+		ui.SetFlashError(w, emailErr.Error())
+		http.Redirect(w, r, "/admin/users", http.StatusSeeOther)
+		return
+	}
+
+	newUser, err := h.deps.Auth.CreateUser(r.Context(), username, password, email, isAdmin, true)
 	if err != nil {
 		slog.Error("failed to create user", "error", err)
 		ui.SetFlashError(w, "Failed to create user. Username may already exist.")
@@ -746,6 +763,223 @@ func (h *adminHandler) ShowSettingDetail(w http.ResponseWriter, r *http.Request)
 	}
 
 	h.deps.Renderer.Render(w, "admin_setting_detail", h.deps.adminPageData(w, r, def.Label+" — Settings", "settings", content))
+}
+
+// --- Status page ---
+
+type adminStatusContent struct {
+	// Server info
+	Version     string
+	GoVersion   string
+	GOOS        string
+	GOARCH      string
+	TLSMode     string
+
+	// Infrastructure
+	DBDialect   string
+	BlobBackend string
+	EmailStatus string
+	BaseURL     string
+	ListenAddr  string
+
+	// Users
+	TotalUsers      int64
+	PendingApproval int64
+	UsersWithEmail  int
+	ActiveUsers24h  int64
+	ActiveUsers7d   int64
+
+	// Storage
+	DocumentCount int64
+	StorageUsed   string
+	AuditEntries  int64
+
+	// Sessions & tokens
+	ActiveSessions int64
+	ActiveTokens   int64
+
+	// Email
+	HasMailer      bool
+	EmailsToday    int
+	EmailsThisWeek int
+}
+
+// ShowStatus handles GET /admin/status — server info page.
+func (h *adminHandler) ShowStatus(w http.ResponseWriter, r *http.Request) {
+	cfg := h.deps.Config
+	ctx := r.Context()
+	now := time.Now().UTC()
+
+	dbType := friendlyDSNType(cfg.DatabaseDSN)
+	blobType := friendlyDSNType(cfg.BlobDSN)
+	tlsMode := friendlyTLS(cfg)
+
+	var emailStatus string
+	if h.deps.Mailer != nil {
+		emailStatus = "Configured"
+	} else {
+		emailStatus = "Not configured"
+	}
+
+	content := &adminStatusContent{
+		Version:     config.Version,
+		GoVersion:   runtime.Version(),
+		GOOS:        runtime.GOOS,
+		GOARCH:      runtime.GOARCH,
+		DBDialect:   dbType,
+		BlobBackend: blobType,
+		EmailStatus: emailStatus,
+		TLSMode:     tlsMode,
+		BaseURL:     cfg.BaseURL,
+		ListenAddr:  cfg.Addr,
+		HasMailer:   h.deps.Mailer != nil,
+	}
+
+	content.TotalUsers, _ = h.deps.Repo.UserCount(ctx)
+	content.PendingApproval, _ = h.deps.Repo.CountPendingUsers(ctx)
+	content.UsersWithEmail, _ = h.deps.Repo.CountUsersWithEmail(ctx)
+	content.ActiveUsers24h, _ = h.deps.Repo.ActiveUserCount(ctx, now.Add(-24*time.Hour))
+	content.ActiveUsers7d, _ = h.deps.Repo.ActiveUserCount(ctx, now.Add(-7*24*time.Hour))
+	content.ActiveSessions, _ = h.deps.Repo.CountActiveSessions(ctx)
+	content.ActiveTokens, _ = h.deps.Repo.CountActiveOAuthTokens(ctx)
+	content.DocumentCount, _ = h.deps.Repo.CountDocumentNodes(ctx)
+	content.AuditEntries, _ = h.deps.Repo.CountAuditEntries(ctx)
+	content.EmailsToday, _ = h.deps.Repo.CountEmailSends(ctx, now.Truncate(24*time.Hour))
+	content.EmailsThisWeek, _ = h.deps.Repo.CountEmailSends(ctx, now.AddDate(0, 0, -7))
+	if used, err := h.deps.Repo.GetTotalStorageUsed(ctx); err == nil {
+		content.StorageUsed = formatBytes(used)
+	}
+
+	h.deps.Renderer.Render(w, "admin_status", h.deps.adminPageData(w, r, "Status — Admin", "status", content))
+}
+
+// --- Email page ---
+
+type adminEmailContent struct {
+	HasMailer   bool
+	Provider    string
+	FromAddress string
+	UserCount   int
+	CountToday  int
+	CountWeek   int
+	CountMonth  int
+}
+
+// ShowEmail handles GET /admin/email.
+func (h *adminHandler) ShowEmail(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	now := time.Now().UTC()
+
+	provider, from := email.ParseDSN(h.deps.Config.EmailDSN)
+
+	countToday, _ := h.deps.Repo.CountEmailSends(ctx, now.Truncate(24*time.Hour))
+	countWeek, _ := h.deps.Repo.CountEmailSends(ctx, now.AddDate(0, 0, -7))
+	countMonth, _ := h.deps.Repo.CountEmailSends(ctx, now.AddDate(0, 0, -30))
+	userCount, _ := h.deps.Repo.CountUsersWithEmail(ctx)
+
+	content := &adminEmailContent{
+		HasMailer:   h.deps.Mailer != nil,
+		Provider:    provider,
+		FromAddress: from,
+		UserCount:   userCount,
+		CountToday:  countToday,
+		CountWeek:   countWeek,
+		CountMonth:  countMonth,
+	}
+	h.deps.Renderer.Render(w, "admin_email", h.deps.adminPageData(w, r, "Email — Admin", "email", content))
+}
+
+// DoTestEmail handles POST /admin/email/test — send test email.
+func (h *adminHandler) DoTestEmail(w http.ResponseWriter, r *http.Request) {
+	if h.deps.Mailer == nil {
+		ui.SetFlashError(w, "No email provider configured.")
+		http.Redirect(w, r, "/admin/email", http.StatusSeeOther)
+		return
+	}
+
+	recipient := r.FormValue("recipient")
+	if recipient == "" {
+		ui.SetFlashError(w, "Recipient email is required.")
+		http.Redirect(w, r, "/admin/email", http.StatusSeeOther)
+		return
+	}
+
+	msg := email.TestEmail(recipient)
+	if err := h.deps.Mailer.Send(r.Context(), msg); err != nil {
+		slog.Error("failed to send test email", "error", err, "recipient", recipient)
+		metrics.EmailsSentTotal.WithLabelValues("test", "failed").Inc()
+		_ = h.deps.Repo.LogEmailSend(r.Context(), recipient, "test", msg.Subject, "failed", err.Error())
+		ui.SetFlashError(w, fmt.Sprintf("Failed to send: %v", err))
+		http.Redirect(w, r, "/admin/email", http.StatusSeeOther)
+		return
+	}
+
+	metrics.EmailsSentTotal.WithLabelValues("test", "sent").Inc()
+	_ = h.deps.Repo.LogEmailSend(r.Context(), recipient, "test", msg.Subject, "sent", "")
+	h.audit(r, "email.test_sent", "email", recipient, "")
+	ui.SetFlash(w, fmt.Sprintf("Test email sent to %s.", recipient))
+	http.Redirect(w, r, "/admin/email", http.StatusSeeOther)
+}
+
+// DoAnnouncement handles POST /admin/email/announce — send announcement to all users with email.
+func (h *adminHandler) DoAnnouncement(w http.ResponseWriter, r *http.Request) {
+	if h.deps.Mailer == nil {
+		ui.SetFlashError(w, "No email provider configured.")
+		http.Redirect(w, r, "/admin/email", http.StatusSeeOther)
+		return
+	}
+
+	subject := r.FormValue("subject")
+	body := r.FormValue("body")
+	if subject == "" || body == "" {
+		ui.SetFlashError(w, "Subject and body are required.")
+		http.Redirect(w, r, "/admin/email", http.StatusSeeOther)
+		return
+	}
+
+	users, err := h.deps.Auth.ListUsers(r.Context())
+	if err != nil {
+		slog.Error("failed to list users for announcement", "error", err)
+		ui.SetFlashError(w, "Failed to load user list.")
+		http.Redirect(w, r, "/admin/email", http.StatusSeeOther)
+		return
+	}
+
+	var recipients []string
+	for _, u := range users {
+		if u.Email != nil && *u.Email != "" {
+			recipients = append(recipients, *u.Email)
+		}
+	}
+
+	if len(recipients) == 0 {
+		ui.SetFlashError(w, "No users with email addresses found.")
+		http.Redirect(w, r, "/admin/email", http.StatusSeeOther)
+		return
+	}
+
+	h.audit(r, "email.announcement_sent", "email", subject, fmt.Sprintf("%d recipients", len(recipients)))
+
+	// Send in background goroutine.
+	mailer := h.deps.Mailer
+	repo := h.deps.Repo
+	go func() {
+		for _, addr := range recipients {
+			msg := email.AnnouncementEmail(addr, subject, body)
+			if err := mailer.Send(r.Context(), msg); err != nil {
+				slog.Error("failed to send announcement", "to", addr, "error", err)
+				metrics.EmailsSentTotal.WithLabelValues("announcement", "failed").Inc()
+				_ = repo.LogEmailSend(r.Context(), addr, "announcement", subject, "failed", err.Error())
+			} else {
+				metrics.EmailsSentTotal.WithLabelValues("announcement", "sent").Inc()
+				_ = repo.LogEmailSend(r.Context(), addr, "announcement", subject, "sent", "")
+			}
+			time.Sleep(100 * time.Millisecond)
+		}
+	}()
+
+	ui.SetFlash(w, fmt.Sprintf("Announcement queued for %d users.", len(recipients)))
+	http.Redirect(w, r, "/admin/email", http.StatusSeeOther)
 }
 
 // audit is a helper to log admin actions to the audit trail.

@@ -7,6 +7,7 @@ import (
 
 	"rstash/internal/auth"
 	"rstash/internal/db"
+	"rstash/internal/metrics"
 	"rstash/internal/settings"
 	"rstash/internal/ui"
 )
@@ -22,6 +23,7 @@ func RegisterHandler(deps *UIDeps) *registerHandler {
 
 type registerContent struct {
 	Username     string
+	Email        string
 	Closed       bool
 	ApprovalMode bool
 	Success      bool
@@ -56,6 +58,7 @@ func (h *registerHandler) DoRegister(w http.ResponseWriter, r *http.Request) {
 
 	password := r.FormValue("password")
 	confirm := r.FormValue("password_confirm")
+	emailRaw := r.FormValue("email")
 
 	username, valErr := db.ValidateUsername(r.FormValue("username"))
 
@@ -66,6 +69,7 @@ func (h *registerHandler) DoRegister(w http.ResponseWriter, r *http.Request) {
 			Title: "Register — rstash",
 			Content: &registerContent{
 				Username:   username,
+				Email:      emailRaw,
 				Error:      msg,
 				TOSUrl:     tosUrl,
 				PrivacyUrl: privacyUrl,
@@ -78,6 +82,25 @@ func (h *registerHandler) DoRegister(w http.ResponseWriter, r *http.Request) {
 		renderErr(valErr.Error())
 		return
 	}
+
+	email, emailErr := db.ValidateEmail(emailRaw)
+	if emailErr != nil {
+		renderErr(emailErr.Error())
+		return
+	}
+
+	// Check email uniqueness.
+	existing, err := h.deps.Auth.GetUserByEmail(r.Context(), email)
+	if err != nil {
+		slog.Error("failed to check email uniqueness", "error", err)
+		renderErr("An error occurred. Please try again.")
+		return
+	}
+	if existing != nil {
+		renderErr("An account with this email already exists.")
+		return
+	}
+
 	if msg := validatePassword(password); msg != "" {
 		renderErr(msg)
 		return
@@ -103,12 +126,14 @@ func (h *registerHandler) DoRegister(w http.ResponseWriter, r *http.Request) {
 
 	// Create user — in approval mode, the account is not yet approved.
 	approved := snap.RegistrationMode == "open"
-	user, err := h.deps.Auth.CreateUser(r.Context(), username, password, false, approved)
+	user, err := h.deps.Auth.CreateUser(r.Context(), username, password, email, false, approved)
 	if err != nil {
 		slog.Error("failed to create user", "error", err)
 		renderErr("Failed to create user. Username may already be taken.")
 		return
 	}
+
+	metrics.UserSignupsTotal.Inc()
 
 	// Record TOS and Privacy Policy acceptance.
 	if tosActive {
@@ -120,6 +145,12 @@ func (h *registerHandler) DoRegister(w http.ResponseWriter, r *http.Request) {
 		if err := h.deps.Repo.AcceptPrivacy(r.Context(), user.ID); err != nil {
 			slog.Error("failed to record Privacy acceptance", "error", err)
 		}
+	}
+
+	// Send verification email if mailer is configured.
+	if h.deps.Mailer != nil {
+		acctH := AccountHandler(h.deps)
+		acctH.sendVerificationEmail(r, user.ID, email)
 	}
 
 	if !approved {

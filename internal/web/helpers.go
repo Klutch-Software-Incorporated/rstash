@@ -39,6 +39,7 @@ func (d *UIDeps) pageData(w http.ResponseWriter, r *http.Request, title string, 
 		TOSUrl:           legalURL(snap.TOSMode, snap.TOSContent, "/legal/terms"),
 		PrivacyUrl:       legalURL(snap.PrivacyMode, snap.PrivacyContent, "/legal/privacy"),
 		Version:          config.Version,
+		HasMailer:        d.Mailer != nil,
 	}
 }
 

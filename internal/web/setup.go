@@ -9,6 +9,7 @@ import (
 	"rstash/internal/auth"
 	"rstash/internal/config"
 	"rstash/internal/db"
+	"rstash/internal/metrics"
 	"rstash/internal/ui"
 )
 
@@ -23,6 +24,7 @@ func SetupHandler(deps *UIDeps) *setupHandler {
 
 type setupContent struct {
 	Username string
+	Email    string
 	Error    string
 }
 
@@ -150,6 +152,7 @@ func (h *setupHandler) DoSetup(w http.ResponseWriter, r *http.Request) {
 
 	password := r.FormValue("password")
 	confirm := r.FormValue("password_confirm")
+	emailRaw := r.FormValue("email")
 
 	username, valErr := db.ValidateUsername(r.FormValue("username"))
 
@@ -157,7 +160,7 @@ func (h *setupHandler) DoSetup(w http.ResponseWriter, r *http.Request) {
 		h.deps.Renderer.Render(w, "setup", ui.PageData{
 			Title:     "Setup — rstash",
 			CSRFToken: CSRFToken(r),
-			Content:   &setupContent{Username: username, Error: msg},
+			Content:   &setupContent{Username: username, Email: emailRaw, Error: msg},
 		})
 	}
 
@@ -165,6 +168,13 @@ func (h *setupHandler) DoSetup(w http.ResponseWriter, r *http.Request) {
 		renderErr(valErr.Error())
 		return
 	}
+
+	email, valErr := db.ValidateEmail(emailRaw)
+	if valErr != nil {
+		renderErr(valErr.Error())
+		return
+	}
+
 	if msg := validatePassword(password); msg != "" {
 		renderErr(msg)
 		return
@@ -174,12 +184,14 @@ func (h *setupHandler) DoSetup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user, err := h.deps.Auth.CreateUser(r.Context(), username, password, true, true)
+	user, err := h.deps.Auth.CreateUser(r.Context(), username, password, email, true, true)
 	if err != nil {
 		slog.Error("failed to create admin user", "error", err)
 		renderErr("Failed to create user. Username may already be taken.")
 		return
 	}
+
+	metrics.UserSignupsTotal.Inc()
 
 	// Auto-accept TOS/Privacy for the initial admin (operator-created).
 	_ = h.deps.Repo.AcceptTOS(r.Context(), user.ID)

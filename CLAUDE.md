@@ -49,6 +49,7 @@ All configuration is via environment variables (see `rstash env` for a documente
 | RSTASH_TLS_KEY | | TLS private key file path |
 | RSTASH_TLS_MODE | *(empty)* | TLS mode: off, manual, auto (empty=auto-detect) |
 | RSTASH_TLS_CACHE | ./certs | Autocert certificate cache directory |
+| RSTASH_EMAIL | | Email provider DSN (e.g. resend:API_KEY?from=noreply@example.com) |
 
 Additional settings (registration mode, rate limits, quotas, OAuth token lifetime, etc.)
 are managed at runtime through the admin web UI and stored in the database.
@@ -65,7 +66,8 @@ are managed at runtime through the admin web UI and stored in the database.
 - `internal/blob/` — pluggable blob storage interface, backends (SQLite, filesystem, GORM, S3), and `OpenStore()` factory
 - `internal/storage/` — storage service (PutDocument, GetDocument, DeleteDocument, GetFolder), ETag generation, quota checking
 - `internal/api/` — remoteStorage protocol handlers (storage API, WebFinger, OAuth token), CORS, scope checking, request logging, rate limiting, security headers
-- `internal/web/` — web UI handlers (setup wizard, login, registration, admin panel, file browser, profile/settings, OAuth authorize, abuse reports), session middleware, CSRF, AdminGuard
+- `internal/email/` — pluggable email delivery interface, Resend backend, `Open()` factory, email body templates
+- `internal/web/` — web UI handlers (setup wizard, login, registration, admin panel, file browser, profile/settings, OAuth authorize, abuse reports, account/email management, password reset), session middleware, CSRF, AdminGuard, AccountGuard
 - `internal/ui/` — embedded templates and static assets (go:embed), template renderer, flash messages
 
 ## Key Conventions

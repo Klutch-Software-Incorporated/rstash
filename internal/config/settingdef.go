@@ -26,6 +26,7 @@ const (
 	EnvTLSKey   = "RSTASH_TLS_KEY"
 	EnvTLSMode  = "RSTASH_TLS_MODE"
 	EnvTLSCache = "RSTASH_TLS_CACHE"
+	EnvEmail    = "RSTASH_EMAIL"
 )
 
 // SettingDef describes one configurable setting — the single source of truth
@@ -138,6 +139,16 @@ func SettingDefs() []SettingDef {
 			Description:     "Directory for autocert certificate cache (used when TLS mode is auto).",
 			Help:            "The filesystem directory where Let's Encrypt certificates are cached when using TLS mode \"auto\". The directory is created if it does not exist. Must be writable by the server process. Changing this setting requires a server restart.",
 			Default:         "./certs",
+			InputType:       InputText,
+			RuntimeEditable: false,
+		},
+		{
+			Key:             "email_dsn",
+			EnvVar:          EnvEmail,
+			Group:           "Server",
+			Label:           "Email provider",
+			Description:     "Email delivery DSN (e.g. resend:API_KEY?from=noreply@example.com). Empty = email disabled.",
+			Help:            "The DSN for the email delivery provider, set via the " + EnvEmail + " environment variable. Currently supported: resend:API_KEY?from=sender@domain.com. When configured, enables email verification, password reset, and notification features. When empty, these features are disabled but email addresses are still collected. Changing this setting requires a server restart.",
 			InputType:       InputText,
 			RuntimeEditable: false,
 		},

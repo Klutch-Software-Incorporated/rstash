@@ -16,6 +16,10 @@
         <input type="text" id="new_username" name="username" required autocomplete="off">
     </div>
     <div>
+        <label for="new_email">Email</label>
+        <input type="email" id="new_email" name="email" required autocomplete="off" placeholder="user@example.com">
+    </div>
+    <div>
         <label for="new_password">Password</label>
         <input type="password" id="new_password" name="password" required minlength="8" autocomplete="new-password">
     </div>
@@ -31,6 +35,7 @@
     <thead>
         <tr>
             <th>Username</th>
+            <th>Email</th>
             <th>Role</th>
             <th>Status</th>
             <th>Storage</th>
@@ -44,6 +49,7 @@
         {{range .Users}}
         <tr>
             <td data-label="Username"><a href="/~{{.Username}}/">{{.Username}}</a></td>
+            <td data-label="Email">{{if .Email}}{{.Email}}{{else}}<span style="color:#888">—</span>{{end}}</td>
             <td data-label="Role">{{if .IsAdmin}}<span class="badge badge-admin">admin</span>{{else}}user{{end}}</td>
             <td data-label="Status">{{if .PendingApproval}}<span class="badge badge-warning">pending</span>{{else if .Disabled}}<span class="badge badge-disabled">disabled</span>{{else}}<span class="badge badge-active">active</span>{{end}}</td>
             <td data-label="Storage">

@@ -50,6 +50,24 @@ var (
 		Name: "rstash_users_total",
 		Help: "Total number of registered users.",
 	})
+
+	// EmailsSentTotal counts emails sent by type and status.
+	EmailsSentTotal = promauto.NewCounterVec(prometheus.CounterOpts{
+		Name: "rstash_emails_sent_total",
+		Help: "Total emails sent.",
+	}, []string{"type", "status"})
+
+	// LoginFailuresTotal counts failed login attempts.
+	LoginFailuresTotal = promauto.NewCounter(prometheus.CounterOpts{
+		Name: "rstash_login_failures_total",
+		Help: "Total failed login attempts.",
+	})
+
+	// UserSignupsTotal counts user registrations.
+	UserSignupsTotal = promauto.NewCounter(prometheus.CounterOpts{
+		Name: "rstash_user_signups_total",
+		Help: "Total user registrations.",
+	})
 )
 
 // RouteGroup maps a request path to a bounded set of route groups.

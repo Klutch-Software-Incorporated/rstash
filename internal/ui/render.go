@@ -29,6 +29,7 @@ type PageData struct {
 	PrivacyUrl       string
 	OpenAbuseReports int64
 	Version          string
+	HasMailer        bool
 }
 
 // Renderer parses and renders HTML templates from the embedded filesystem.
@@ -60,6 +61,8 @@ func NewRenderer() *Renderer {
 		"templates/admin_audit.html",
 		"templates/admin_logs.html",
 		"templates/admin_oauth_test.html",
+		"templates/admin_status.html",
+		"templates/admin_email.html",
 		"templates/oauth_authorize.html",
 		"templates/profile_dashboard.html",
 		"templates/profile_settings.html",
@@ -67,6 +70,10 @@ func NewRenderer() *Renderer {
 		"templates/profile_files_search.html",
 		"templates/legal.html",
 		"templates/licenses.html",
+		"templates/add_email.html",
+		"templates/verify_email.html",
+		"templates/forgot_password.html",
+		"templates/reset_password.html",
 		"templates/abuse_report.html",
 		"templates/admin_abuse.html",
 	)

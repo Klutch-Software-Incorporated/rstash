@@ -71,7 +71,7 @@ func TestMetricsAuth_AdminSession(t *testing.T) {
 	authSvc := auth.NewLocalService(repo)
 
 	// Create admin user and session.
-	user, err := repo.CreateUser(context.Background(), "admin", "password123", true, true)
+	user, err := repo.CreateUser(context.Background(), "admin", "password123", "", true, true)
 	if err != nil {
 		t.Fatalf("create user: %v", err)
 	}
@@ -110,7 +110,7 @@ func TestMetricsAuth_NonAdminSession(t *testing.T) {
 	authSvc := auth.NewLocalService(repo)
 
 	// Create non-admin user and session.
-	user, err := repo.CreateUser(context.Background(), "regular", "password123", false, true)
+	user, err := repo.CreateUser(context.Background(), "regular", "password123", "", false, true)
 	if err != nil {
 		t.Fatalf("create user: %v", err)
 	}
