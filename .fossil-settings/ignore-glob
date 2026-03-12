@@ -51,5 +51,6 @@ site/.astro/
 
 # Infrastructure
 infra/pulumi/node_modules/
+infra/pulumi/.env
 infra/.caddy-image.tar
 infra/.fossil-image.tar

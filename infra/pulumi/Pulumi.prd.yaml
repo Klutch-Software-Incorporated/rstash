@@ -1,5 +1,1 @@
-config:
-  rstash-cloud:sshKeyName: curti@DESKTOP-TBGVTPO
-  rstash-cloud:privateKeyPath: C:\Users\curti\.ssh\id_rsa
-  digitalocean:token:
-    secure: AAABAFLTstzaT/DTOXZzlx8Wpttigx/a2Y5aaPtC+QPCbRkkXf5JM3+qwJhhmL1r9s4cXnxnS+tkkj/l/lWQCGt5Il3Fioltw+Up1zXIRhTEtADFA8I7U3Z5W2aI1JwTxG4x2/i4AA==
+config: {}

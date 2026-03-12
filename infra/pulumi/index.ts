@@ -1,3 +1,4 @@
+import "dotenv/config";
 import * as pulumi from "@pulumi/pulumi";
 import * as digitalocean from "@pulumi/digitalocean";
 import * as command from "@pulumi/command";
@@ -5,8 +6,10 @@ import * as fs from "fs";
 import * as os from "os";
 import * as path from "path";
 
-const config = new pulumi.Config();
-const sshKeyName = config.require("sshKeyName");
+const sshKeyName = process.env.SSH_KEY_NAME;
+if (!sshKeyName) {
+    throw new Error("SSH_KEY_NAME environment variable is required");
+}
 const sshKey = digitalocean.getSshKey({ name: sshKeyName });
 
 const project = new digitalocean.Project("rstash-cloud", {
@@ -58,7 +61,7 @@ new digitalocean.ProjectResources("rstash-cloud-resources", {
 
 // --- Server provisioning via SSH ---
 
-const privateKeyPath = config.get("privateKeyPath")
+const privateKeyPath = process.env.SSH_PRIVATE_KEY_PATH
     ?? path.join(os.homedir(), ".ssh", "id_ed25519");
 const privateKey = fs.readFileSync(privateKeyPath, "utf8");
 
