@@ -34,9 +34,12 @@ Files are organized just like the remoteStorage API exposes them, so what you se
 Your settings page at `/~yourname/settings` lets you:
 
 - **Change your password**
+- **Manage email** — add or change your email address, verify it via a confirmation link
 - **Manage sessions** — see all active sessions with creation and expiry dates, terminate individual sessions or all at once
 - **Manage OAuth tokens** — see which apps have access, revoke tokens you no longer need
 - **View storage usage** — see quota breakdown if quotas are enabled
+
+If email is configured on the server and you haven't added an email address yet, you'll be prompted to do so after logging in.
 
 ## OAuth Authorization
 
@@ -77,11 +80,26 @@ Environment-only settings (database DSN, listen address, TLS) are shown as read-
 
 A searchable log of all state-changing actions: user creation, login attempts, file uploads/deletions, setting changes, admin actions, and OAuth grants. Useful for troubleshooting and security review.
 
+### Abuse Reports
+
+A public abuse reporting form at `/abuse/report` lets anyone flag content. Reports include the file path, a reason category, and a description. Admins can review, dismiss, or action reports from `/admin/abuse`, with filters for open/reviewed/dismissed/actioned status.
+
 ### Other Admin Tools
 
-- **Abuse Reports** — review and resolve content reports submitted via the public abuse form
+- **Email Admin** — test email delivery, send announcements to users (when email is configured)
 - **OAuth Test Tool** — test the OAuth authorization flow interactively
 - **Server Logs** — view recent log output (when file logging is enabled)
+- **System Status** — server health and configuration overview
+
+## Next Steps
+
+## Password Reset
+
+When email is configured, users can reset their password via `/forgot-password`. They enter their email address, receive a reset link, and set a new password. The reset token expires after a short period.
+
+## Legal Pages
+
+If terms of service or a privacy policy are configured (via admin settings), they're served at `/legal/terms` and `/legal/privacy`. Registration requires users to accept the terms when active. An open-source licenses page is also available at `/legal/licenses`.
 
 ## Next Steps
 

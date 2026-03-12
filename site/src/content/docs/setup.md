@@ -4,17 +4,36 @@ description: Configure registration, users, quotas, and common options.
 order: 2
 ---
 
+## Environment Variables
+
+Some configuration **must be set via environment variables before starting** the server — these cannot be changed at runtime through the admin panel:
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `RSTASH_ADDR` | `:8080` | Listen address (`host:port`) |
+| `RSTASH_BASE_URL` | `http://localhost:8080` | Public URL (used in WebFinger, OAuth redirects) |
+| `RSTASH_DB` | `sqlite:rstash.db` | Metadata database — `sqlite:`, `postgres:`, `mysql:`, or `mssql:` |
+| `RSTASH_BLOB` | `sqlite:rstash-blobs.db` | Blob storage — same DB prefixes, plus `fs:/path` or `s3:bucket` |
+| `RSTASH_TLS_MODE` | *(auto-detect)* | `off`, `manual`, or `auto` (Let's Encrypt) |
+| `RSTASH_TLS_CERT` | | TLS certificate file (for `manual` mode) |
+| `RSTASH_TLS_KEY` | | TLS private key file (for `manual` mode) |
+| `RSTASH_TLS_CACHE` | `./certs` | Autocert certificate cache directory |
+| `RSTASH_EMAIL` | *(none)* | Email provider DSN (e.g. `resend:KEY?from=noreply@example.com`) |
+| `RSTASH_LOG_FILE` | *(none)* | Path to log file (empty = stderr only) |
+
+If you're fine with the defaults (SQLite, port 8080, no TLS, no email), you don't need to set any of these — just run `rstash`. Otherwise, set them before first run. Run `rstash env` to generate a documented `.env` template, or `rstash check` to validate your configuration.
+
+See the [configuration reference](/docs/configuration/) for full details on all DSN formats and options.
+
 ## Initial Setup
 
 When you first run `rstash`, it starts the server and redirects you to the setup wizard at `/setup`. The wizard has two steps:
 
 1. **Review settings** — shows your current server configuration: base URL, database type (e.g., "SQLite (default)" or "PostgreSQL"), file storage type, and TLS status. If the database or file storage is using SQLite defaults, a warning explains what that means and how to change it before continuing.
 
-2. **Create admin account** — pick a username and password. This account has full admin privileges.
+2. **Create admin account** — pick a username, password, and email address. This account has full admin privileges.
 
-After setup, you're logged in and taken to the admin panel.
-
-> **Tip:** If you want to use PostgreSQL, MySQL, or a different storage backend, set the `RSTASH_DB` and `RSTASH_BLOB` environment variables *before* running rstash for the first time. Run `rstash env` to see all available options, or `rstash check` to verify your configuration.
+After setup, you're logged in and taken to the admin panel. Everything below can be configured at runtime from the admin Settings page.
 
 ## Creating Users
 
@@ -54,9 +73,9 @@ OAuth tokens issued to remoteStorage apps expire after 30 days by default. Users
 
 ## Changing Settings at Runtime
 
-Most settings can be changed without restarting the server. Use the admin panel Settings page — changes take effect immediately. Each setting shows whether it's using the default value or a database override, and you can reset any override with one click.
+Everything in this section (registration, quotas, rate limiting, upload size, OAuth lifetimes) can be changed without restarting the server. Use the admin panel Settings page — changes take effect immediately. Each setting shows whether it's using the default value or a database override, and you can reset any override with one click.
 
-Settings that require a restart (database DSN, blob store DSN, listen address, TLS) are configured via environment variables and shown in the admin panel as read-only.
+The environment variables listed at the top of this page (database, listen address, TLS, email) require a restart and are shown in the admin panel as read-only.
 
 ## Next Steps
 

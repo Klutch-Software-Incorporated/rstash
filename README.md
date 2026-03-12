@@ -7,12 +7,13 @@ A self-hosted [remoteStorage](https://remotestorage.io/) server written in Go, i
 - **Full remoteStorage protocol** — GET/PUT/DELETE/HEAD for documents and folders, ETags, conditional requests, folder listings with JSON-LD
 - **WebFinger discovery** — `/.well-known/webfinger` endpoint for client bootstrapping
 - **OAuth 2.0** — Built-in authorization flow (implicit + PKCE) with consent screen and scope management
-- **Web-based admin** — Setup wizard, user management, settings, audit log, file browser — all through the browser
+- **Web-based admin** — Setup wizard, user management, settings, audit log, file browser, abuse reports — all through the browser
 - **Multi-database support** — SQLite (default), PostgreSQL, MySQL, SQL Server via GORM
 - **Pluggable blob storage** — SQLite (default), filesystem, S3-compatible, or any supported database
 - **TLS support** — Manual certificate, automatic via Let's Encrypt (autocert), or off
 - **Per-IP rate limiting** — Token bucket with configurable rate and burst
 - **Storage quotas** — Global or per-user quota enforcement
+- **Email integration** — Email verification, password reset, admin announcements (via Resend)
 - **Single binary** — All templates and static assets embedded via `go:embed`
 
 ## Quick Start
@@ -26,7 +27,7 @@ chmod +x rstash-linux-amd64
 ./rstash-linux-amd64
 ```
 
-Pre-built binaries are available for Linux (amd64, arm64), macOS (amd64, arm64), and Windows (amd64) at `https://fossil.klutch.software/rstash/uv/`.
+[Pre-built binaries](https://fossil.klutch.software/rstash/uvlist) are available for Linux (amd64, arm64), macOS (amd64, arm64), and Windows (amd64).
 
 On first run, rstash redirects to a setup wizard where you review settings and create the admin account. All further management happens through the web UI.
 
@@ -56,8 +57,9 @@ All configuration is via environment variables. Run `rstash env` for a documente
 | `RSTASH_TLS_CERT` | | TLS certificate file (for `manual` mode) |
 | `RSTASH_TLS_KEY` | | TLS private key file (for `manual` mode) |
 | `RSTASH_TLS_CACHE` | `./certs` | Autocert certificate cache directory |
+| `RSTASH_EMAIL` | | Email provider DSN (e.g. `resend:KEY?from=noreply@example.com`) |
 
-Additional settings (registration mode, rate limits, quotas, OAuth token lifetime, max upload size, etc.) are managed at runtime through the admin web UI and stored in the database.
+Additional settings (registration mode, rate limits, quotas, OAuth token lifetime, max upload size, legal pages, etc.) are managed at runtime through the admin web UI and stored in the database.
 
 ### Database DSN Formats
 
@@ -103,12 +105,13 @@ internal/
   config/               Environment variable loading and validation
   settings/             Runtime settings (DB overrides + env defaults)
   db/                   GORM database layer, Repository pattern, migrations
-  model/                Domain types (User, OAuthClient, OAuthToken, Node, Session)
+  model/                Domain types (User, OAuthClient, OAuthToken, Node, Session, AuditEntry)
   blob/                 Pluggable blob storage (SQLite, filesystem, S3, GORM)
   storage/              Storage service (document/folder CRUD, ETags, quotas)
   auth/                 Authentication (sessions, passwords)
+  email/                Email delivery (Resend backend)
   api/                  Protocol handlers (storage API, WebFinger, OAuth, CORS, rate limiting)
-  web/                  Web UI (setup, login, admin, OAuth, file browser, registration)
+  web/                  Web UI (setup, login, admin, OAuth, file browser, registration, account)
   ui/                   Embedded templates and static assets
 ```
 

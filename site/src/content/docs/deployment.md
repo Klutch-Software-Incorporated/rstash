@@ -28,6 +28,8 @@ Certificates are automatically obtained and renewed.
 If you have your own certificates:
 
 ```bash
+export RSTASH_ADDR=":443"
+export RSTASH_BASE_URL="https://storage.example.com"
 export RSTASH_TLS_MODE="manual"
 export RSTASH_TLS_CERT="/etc/ssl/certs/storage.example.com.pem"
 export RSTASH_TLS_KEY="/etc/ssl/private/storage.example.com.key"
@@ -119,15 +121,24 @@ sudo systemctl enable --now rstash
 
 ## Docker
 
+The repository includes a multi-stage Dockerfile that builds from source:
+
 ```dockerfile
-FROM alpine:latest
-COPY rstash-linux-amd64 /usr/local/bin/rstash
-RUN chmod +x /usr/local/bin/rstash
+FROM golang:1.22-alpine AS build
+WORKDIR /src
+COPY go.mod go.sum ./
+RUN go mod download
+COPY . .
+ARG VERSION=dev
+RUN CGO_ENABLED=0 go build -ldflags "-s -w -X rstash/internal/config.Version=${VERSION}" -o /rstash .
+
+FROM gcr.io/distroless/static-debian12
+COPY --from=build /rstash /rstash
 EXPOSE 8080
-VOLUME ["/data"]
-WORKDIR /data
-CMD ["rstash"]
+ENTRYPOINT ["/rstash"]
 ```
+
+Build and run:
 
 ```bash
 docker build -t rstash .
@@ -135,18 +146,31 @@ docker run -d \
   -p 8080:8080 \
   -v rstash-data:/data \
   -e RSTASH_BASE_URL="https://storage.example.com" \
+  -e RSTASH_DB="sqlite:/data/rstash.db" \
+  -e RSTASH_BLOB="sqlite:/data/rstash-blobs.db" \
   rstash
 ```
 
+Or if you already have a pre-built binary and just want a minimal image:
+
+```dockerfile
+FROM gcr.io/distroless/static-debian12
+COPY rstash-linux-amd64 /rstash
+EXPOSE 8080
+ENTRYPOINT ["/rstash"]
+```
+
+> **Tip:** Set `RSTASH_DB` and `RSTASH_BLOB` paths to point inside your mounted volume so data persists across container restarts.
+
 ## Verify Your Setup
 
-Before going to production, run `rstash check` to verify your configuration:
+Before going to production, run [`rstash check`](/docs/cli/) to verify your configuration:
 
 ```bash
 rstash check
 ```
 
-This validates all settings and tests connectivity to the database and blob store.
+This validates all settings and tests connectivity to the database, blob store, and email provider (if configured).
 
 ## Database in Production
 
@@ -163,7 +187,7 @@ export RSTASH_DB="postgres:host=db.example.com dbname=rstash user=rstash passwor
 export RSTASH_BLOB="fs:/var/lib/rstash/blobs"
 ```
 
-Using `fs:` for blob storage alongside PostgreSQL keeps large files on disk instead of in the database.
+Using `fs:` for blob storage alongside PostgreSQL keeps large files on disk instead of in the database. See the [configuration reference](/docs/configuration/) for all supported DSN formats.
 
 ## Backups
 
@@ -179,3 +203,7 @@ cp /opt/rstash/rstash-blobs.db /backups/rstash-blobs-$(date +%F).db
 ### Filesystem Blob Storage
 
 If you use `fs:` for blobs, include that directory in your regular backup schedule alongside the metadata database.
+
+### S3 Blob Storage
+
+If you use `s3:` for blobs, rely on your S3 provider's built-in durability and versioning. You still need to back up the metadata database.

@@ -14,7 +14,7 @@ Start the remoteStorage server. This is the default command — just run `rstash
 rstash
 ```
 
-On first run, visit the server in your browser to complete setup (create admin account). All configuration is via environment variables.
+This is equivalent to `rstash serve`. On first run, visit the server in your browser to complete setup (create admin account). All configuration is via [environment variables](/docs/configuration/).
 
 ## `rstash env`
 
@@ -25,11 +25,11 @@ rstash env          # print to stdout
 rstash env > .env   # save to file
 ```
 
-Useful for seeing every available setting with its default value and description.
+Each variable is printed with a description, valid values (if restricted), and its default — all commented out so defaults take effect. Edit the file and uncomment what you need.
 
 ## `rstash check`
 
-Validate your configuration and test connectivity to the database and blob store.
+Validate your configuration and test connectivity to all configured backends.
 
 ```bash
 rstash check
@@ -47,4 +47,12 @@ Checking configuration...
 3 passed, 0 failed
 ```
 
-If TLS is configured with manual certificates, it also checks that the cert and key files exist. Useful for verifying your setup before going to production.
+Checks performed:
+
+- **Config validation** — verifies all environment variables are well-formed (valid URLs, DSN formats, listen address, TLS settings)
+- **Database connection** — opens the metadata database and runs a test query
+- **Blob store connection** — opens the blob store backend
+- **Email provider** — if `RSTASH_EMAIL` is set, verifies the provider is reachable
+- **TLS certificates** — if `RSTASH_TLS_MODE=manual`, checks that the cert and key files exist
+
+Run this before going to production to catch configuration issues early.

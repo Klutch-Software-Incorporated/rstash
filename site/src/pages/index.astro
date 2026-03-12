@@ -29,7 +29,7 @@ const features = [
   },
   {
     title: "Web UI Included",
-    desc: "Admin dashboard, file browser, user management, and OAuth flows — all built in.",
+    desc: "Admin dashboard, file browser, user management, OAuth flows, and email — all built in.",
     icon: `<svg viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="6" y="8" width="28" height="20" rx="3" stroke="currentColor" stroke-width="2"/><path d="M6 14h28" stroke="currentColor" stroke-width="2"/><circle cx="10" cy="11" r="1" fill="currentColor"/><circle cx="14" cy="11" r="1" fill="currentColor"/><path d="M16 32h8M20 28v4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>`,
   },
 ];
@@ -41,6 +41,7 @@ const configVars = [
   { name: "RSTASH_BLOB", default: "sqlite:rstash-blobs.db", desc: "Blob store DSN" },
   { name: "RSTASH_LOG_LEVEL", default: "info", desc: "Log level" },
   { name: "RSTASH_TLS_MODE", default: "auto-detect", desc: "TLS mode" },
+  { name: "RSTASH_EMAIL", default: "(none)", desc: "Email provider DSN" },
 ];
 ---
 
@@ -59,7 +60,7 @@ const configVars = [
         </p>
         <div class="flex flex-wrap gap-3 justify-center md:justify-start">
           <a
-            href="#quickstart"
+            href="/#quickstart"
             class="inline-flex items-center px-5 py-2.5 rounded-md font-semibold text-sm transition-colors"
             style="background: var(--color-accent); color: #fff;"
           >
@@ -196,7 +197,7 @@ const configVars = [
   </section>
 
   <!-- Quick Start -->
-  <section id="quickstart" class="py-20">
+  <section id="quickstart" class="pt-8 pb-20">
     <div class="max-w-4xl mx-auto px-6">
       <h2 class="text-2xl font-bold text-center mb-3">Up and running in seconds.</h2>
       <p class="text-center mb-10" style="color: var(--color-text-muted);">
@@ -228,6 +229,9 @@ const configVars = [
             </div>
           </div>
         </div>
+        <p class="text-center mt-4 text-sm" style="color: var(--color-text-muted);">
+          <a href="https://fossil.klutch.software/rstash/uvlist" class="underline" style="color: var(--color-accent);">View all available platforms →</a>
+        </p>
       </div>
     </div>
   </section>
@@ -321,7 +325,7 @@ const configVars = [
       </p>
       <div class="flex flex-wrap gap-3 justify-center">
         <a
-          href="#quickstart"
+          href="/#quickstart"
           class="inline-flex items-center px-6 py-3 rounded-md font-semibold text-sm transition-colors"
           style="background: var(--color-accent); color: #fff;"
         >

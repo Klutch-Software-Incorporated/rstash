@@ -13,6 +13,15 @@ tasks:
 
   build:
     desc: Build static site
+    sources:
+      - "src/**/*"
+      - "public/**/*"
+      - astro.config.mjs
+      - package.json
+      - tsconfig.json
+    generates:
+      - dist/**/*
+    method: checksum
     cmds:
       - npm run build
 
