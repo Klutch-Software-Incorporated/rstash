@@ -76,11 +76,11 @@ RSTASH_BLOB="fs:/var/lib/rstash/blobs"
 RSTASH_BLOB="s3:my-bucket?region=us-east-1"
 ```
 
-A common production pattern is PostgreSQL for metadata with filesystem or S3 for blobs — this keeps large files out of the database:
+A common production pattern is PostgreSQL for metadata with S3 for blobs — this keeps large files out of the database:
 
 ```bash
 RSTASH_DB="postgres:host=localhost dbname=rstash user=rstash password=secret sslmode=disable"
-RSTASH_BLOB="fs:/var/lib/rstash/blobs"
+RSTASH_BLOB="s3:my-bucket?region=us-east-1"
 ```
 
 ## TLS
