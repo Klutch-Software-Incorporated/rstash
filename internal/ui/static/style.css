@@ -65,7 +65,7 @@ body{
   min-height:100vh;display:flex;flex-direction:column;
 }
 
-main{flex:1}
+main{flex:1;position:relative;z-index:1}
 
 h1{font-size:1.4rem;font-weight:700;margin-bottom:.75rem}
 h2{font-size:1.15rem;font-weight:600;margin:1.5rem 0 .5rem;border-bottom:1px solid var(--border);padding-bottom:.25rem}
@@ -75,7 +75,7 @@ a{color:var(--accent);text-decoration:none}
 a:hover{text-decoration:underline}
 
 /* Header */
-header{margin-bottom:1.5rem;padding-bottom:.75rem;border-bottom:1px solid var(--border)}
+header{margin-bottom:1.5rem;padding-bottom:.75rem;border-bottom:1px solid var(--border);position:relative;z-index:1}
 header h1{margin-bottom:.25rem}
 header h1 a{color:inherit;text-decoration:none}
 header p{font-size:.875rem;color:var(--fg-muted);margin-bottom:.5rem}
@@ -91,7 +91,7 @@ header nav ul button:hover{text-decoration:underline}
 .nav-active{font-weight:700;text-decoration:underline;text-underline-offset:.25rem}
 
 /* Footer */
-footer{margin-top:2rem;padding-top:.75rem;border-top:1px solid var(--border);font-size:.75rem;color:var(--fg-faint);text-align:center}
+footer{margin-top:2rem;padding-top:.75rem;border-top:1px solid var(--border);font-size:.75rem;color:var(--fg-faint);text-align:center;position:relative;z-index:1}
 
 /* Theme toggle */
 .theme-toggle{background:none;border:1px solid var(--border);border-radius:3px;padding:.15rem .4rem;cursor:pointer;font-size:.875rem;color:var(--fg);line-height:1}
@@ -109,9 +109,9 @@ meter::-webkit-meter-optimum-value{background:var(--meter-fill)}
 meter::-moz-meter-bar{background:var(--meter-fill)}
 
 /* Tables */
-table{width:100%;border-collapse:collapse;font-size:.875rem;margin:.5rem 0 1rem}
-th{text-align:left;font-size:.7rem;text-transform:uppercase;letter-spacing:.04em;color:var(--fg-faint);padding:.4rem .5rem;border-bottom:1px solid var(--border)}
-td{padding:.4rem .5rem;border-bottom:1px solid var(--border-light)}
+table{width:100%;border-collapse:collapse;font-size:.875rem;margin:.5rem 0 1rem;background:var(--bg)}
+th{text-align:left;font-size:.7rem;text-transform:uppercase;letter-spacing:.04em;color:var(--fg-faint);padding:.4rem .5rem;border-bottom:1px solid var(--border);background:var(--surface-alt)}
+td{padding:.4rem .5rem;border-bottom:1px solid var(--border-light);background:var(--bg)}
 th:last-child,td:last-child{text-align:right}
 .setup-glance{border:1px solid var(--border);border-radius:6px;padding:1rem;margin:1.25rem 0;background:var(--surface)}
 .setup-glance h2{font-size:.9rem;font-weight:600;margin:0 0 .75rem;border-bottom:none;padding-bottom:0}
