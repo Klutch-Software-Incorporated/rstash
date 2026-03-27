@@ -118,8 +118,16 @@ func (s *Service) PutDocument(ctx context.Context, userID int64, path string, co
 			return err
 		}
 
-		// Document/folder conflict: existing node at this path is a folder.
+		// Document/folder conflict: existing node at this path is a folder,
+		// or a folder with the same name already exists (path + "/").
 		if existing != nil && existing.IsFolder {
+			return ErrConflict
+		}
+		folderPeer, err := txRepo.GetNode(ctx, userID, path+"/")
+		if err != nil {
+			return err
+		}
+		if folderPeer != nil {
 			return ErrConflict
 		}
 
@@ -421,6 +429,15 @@ func (s *Service) CreateFolder(ctx context.Context, userID int64, folderPath str
 			return err
 		}
 		if existing != nil {
+			return ErrConflict
+		}
+
+		// Document/folder conflict: a document with the same name exists.
+		docPeer, err := txRepo.GetNode(ctx, userID, strings.TrimSuffix(folderPath, "/"))
+		if err != nil {
+			return err
+		}
+		if docPeer != nil {
 			return ErrConflict
 		}
 
