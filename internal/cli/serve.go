@@ -220,6 +220,16 @@ func runServe(cmd *cobra.Command, args []string) error {
 	}
 	mux.Handle("GET /static/", http.StripPrefix("/static/", http.FileServer(http.FS(staticFS))))
 
+	// Serve embedded site (Astro build output) for public pages.
+	siteFS, _ := fs.Sub(ui.Site, "site")
+	if _, err := fs.Stat(siteFS, "index.html"); err == nil {
+		siteServer := http.FileServer(http.FS(siteFS))
+		mux.Handle("GET /docs/", siteWithCache(siteServer))
+		mux.Handle("GET /_astro/", siteWithCache(siteServer))
+		mux.Handle("GET /screenshots/", siteServer)
+		mux.Handle("GET /favicon.svg", siteServer)
+	}
+
 	// OAuth authorize routes (need auth loader + setup guard for session cookie support).
 	oauthH := web.OAuthHandler(uiDeps)
 	oauthWrap := func(h http.HandlerFunc) http.Handler {
@@ -410,6 +420,16 @@ func isLocalhost(addr string) bool {
 		host = addr
 	}
 	return host == "" || host == "127.0.0.1" || host == "::1" || host == "localhost"
+}
+
+// siteWithCache wraps a handler to add immutable cache headers for content-hashed paths.
+func siteWithCache(h http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.HasPrefix(r.URL.Path, "/_astro/") {
+			w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
+		}
+		h.ServeHTTP(w, r)
+	})
 }
 
 // extractHostname parses a URL and returns just the hostname (no port).

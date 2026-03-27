@@ -153,6 +153,18 @@ func SettingDefs() []SettingDef {
 			RuntimeEditable: false,
 		},
 
+		// ── Branding (runtime-editable, no env var) ──
+		{
+			Key:             "home_subtitle",
+			Group:           "Branding",
+			Label:           "Home page subtitle",
+			Description:     "Tagline shown to logged-out visitors on the home page.",
+			Help:            "The subtitle displayed below the server name on the public home page. Shown to unauthenticated visitors alongside the login form. Keep it short — one sentence is ideal. Changes take effect immediately.",
+			Default:         "A personal remoteStorage server.",
+			InputType:       InputText,
+			RuntimeEditable: true,
+		},
+
 		// ── Access (runtime-editable, no env var) ──
 		{
 			Key:             "registration_mode",

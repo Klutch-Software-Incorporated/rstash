@@ -28,6 +28,7 @@ type Snapshot struct {
 	RefreshTokens        string // "enabled" or "disabled"
 	RefreshTokenLifetime string // duration string: "90d", "0" (no expiry)
 	PublicWrites         string
+	HomeSubtitle         string
 	BlockedMIMETypes     string
 	TOSMode              string // "off", "text", "url"
 	TOSContent           string
@@ -153,6 +154,7 @@ func (snap *Snapshot) ValueMap() map[string]string {
 		"refresh_tokens":         snap.RefreshTokens,
 		"refresh_token_lifetime": snap.RefreshTokenLifetime,
 		"public_writes":          snap.PublicWrites,
+		"home_subtitle":          snap.HomeSubtitle,
 		"blocked_mime_types":     snap.BlockedMIMETypes,
 		"tos_mode":               snap.TOSMode,
 		"tos_content":            snap.TOSContent,
@@ -174,6 +176,7 @@ func (s *Settings) buildSnapshot(overrides map[string]string) *Snapshot {
 		QuotaUser:            s.defaults.QuotaUser,
 		MaxUploadSize:        s.defaults.MaxUploadSize,
 		PublicWrites:         s.defaults.PublicWrites,
+		HomeSubtitle:         s.defaults.HomeSubtitle,
 		TokenLifetime:        s.defaults.TokenLifetime,
 		RefreshTokens:        s.defaults.RefreshTokens,
 		RefreshTokenLifetime: s.defaults.RefreshTokenLifetime,
@@ -235,6 +238,9 @@ func (s *Settings) buildSnapshot(overrides map[string]string) *Snapshot {
 	}
 	if v, ok := overrides["refresh_token_lifetime"]; ok {
 		snap.RefreshTokenLifetime = v
+	}
+	if v, ok := overrides["home_subtitle"]; ok {
+		snap.HomeSubtitle = v
 	}
 	if v, ok := overrides["blocked_mime_types"]; ok {
 		snap.BlockedMIMETypes = v

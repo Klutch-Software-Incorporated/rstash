@@ -18,41 +18,25 @@ const { title, description = "A remoteStorage server written in Go" } = Astro.pr
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <title>{title}</title>
   </head>
-  <body class="min-h-screen flex flex-col">
-    <nav
-      class="sticky top-0 z-50 backdrop-blur-sm"
-      style={`background: color-mix(in srgb, var(--color-bg) 90%, transparent); border-bottom: 1px solid var(--color-border);`}
-    >
-      <div class="max-w-4xl mx-auto px-6 h-14 flex items-center justify-between">
-        <a href="/" class="flex items-center gap-2 font-semibold text-lg" style="color: var(--color-text);">
-          <img src="/favicon.svg" alt="" class="w-6 h-6" />
-          rstash
-        </a>
-        <div class="flex items-center gap-6 text-sm font-medium">
-          <a href="/#quickstart" style="color: var(--color-text-muted);">Quick Start</a>
-          <a href="/docs/getting-started/" style="color: var(--color-text-muted);">Docs</a>
-          <a
-            href="https://fossil.klutch.software/rstash"
-            style="color: var(--color-text-muted);"
-            target="_blank"
-            rel="noopener"
-          >Source</a>
-        </div>
+  <body>
+    <header>
+      <div class="header-top">
+        <a href="/" class="site-title">rstash</a>
+        <nav>
+          <a href="/#quickstart">Quick Start</a>
+          <a href="/docs/getting-started/">Docs</a>
+          <a href="https://fossil.klutch.software/rstash" target="_blank" rel="noopener">Source</a>
+        </nav>
       </div>
-    </nav>
+    </header>
 
-    <main class="flex-1">
+    <main>
       <slot />
     </main>
 
-    <footer
-      class="py-8 text-center text-sm"
-      style={`border-top: 1px solid var(--color-border); color: var(--color-text-muted);`}
-    >
-      <div class="max-w-4xl mx-auto px-6">
-        &copy; {new Date().getFullYear()} Klutch Software Inc. &middot;
-        <a href="https://fossil.klutch.software/rstash" class="underline" style="color: var(--color-text-muted);">Source Code</a>
-      </div>
+    <footer>
+      &copy; {new Date().getFullYear()} Klutch Software Inc. &middot;
+      <a href="https://fossil.klutch.software/rstash">Source Code</a>
     </footer>
   </body>
 </html>

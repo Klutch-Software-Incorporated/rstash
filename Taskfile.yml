@@ -30,6 +30,7 @@ tasks:
 
   run:
     desc: Run the server
+    deps: [site:embed]
     cmds:
       - go run .
 
@@ -56,13 +57,14 @@ tasks:
 
   build:
     desc: Cross-compile release binaries for all platforms
-    deps: [collect-licenses]
+    deps: [collect-licenses, site:embed]
     sources:
       - "**/*.go"
       - go.mod
       - go.sum
       - "internal/ui/templates/**/*"
       - "internal/ui/static/**/*"
+      - "internal/ui/site/**/*"
       - "internal/licenses/licenses.json"
     generates:
       - dist/rstash-linux-amd64

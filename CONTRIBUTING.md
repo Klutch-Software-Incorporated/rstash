@@ -84,6 +84,22 @@ You can browse objects in the MinIO console at `http://localhost:9001` (login: m
 
 See the Architecture section in [README.md](README.md) and the conventions in [CLAUDE.md](CLAUDE.md).
 
+## Dev Mode (Hot Reload)
+
+Build with the `dev` tag to serve templates, static assets, and the Astro site from disk instead of the embedded binary. This gives you hot reload on browser refresh — no Go recompile needed.
+
+```sh
+go run -tags dev .
+```
+
+What this changes:
+
+- **Go templates** (`internal/ui/templates/`) — re-parsed on every request, so edits show up on refresh
+- **Static assets** (`internal/ui/static/`) — served from disk via `os.DirFS`, changes are immediate
+- **Astro site** (`internal/ui/site/`) — served from disk, so `astro build --watch` output is picked up on refresh
+
+Without the `dev` tag (default), everything is embedded via `go:embed` as usual for single-binary deployment.
+
 ## Key Conventions
 
 - Standard library `net/http` for routing (Go 1.22+ enhanced patterns)

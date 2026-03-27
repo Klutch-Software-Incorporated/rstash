@@ -54,7 +54,15 @@ func (h *homeHandler) Show(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	h.deps.Renderer.Render(w, "home", h.deps.pageData(w, r, "rstash", nil))
+	snap := h.deps.Settings.Load()
+	content := struct {
+		Subtitle string
+	}{
+		Subtitle: snap.HomeSubtitle,
+	}
+	pd := h.deps.pageData(w, r, "rstash", content)
+	pd.HideHeader = true
+	h.deps.Renderer.Render(w, "home", pd)
 }
 
 func buildActivityFeed(ctx context.Context, repo *db.Repository, userID int64) []*activityEvent {

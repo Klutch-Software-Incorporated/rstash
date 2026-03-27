@@ -1,22 +1,31 @@
 {{define "home"}}
-{{/* ===== Logged-out: Server Info ===== */}}
-<div class="hero">
-    <h1>Welcome to rstash</h1>
-    <p>A <a href="https://remotestorage.io">remoteStorage</a> server.</p>
-
-    <p style="margin-top:.75rem">
-        Registration:
-        {{if eq .RegistrationMode "open"}}
-            <span class="badge badge-available">Open</span>
-        {{else}}
-            <span class="badge badge-used">Closed</span>
+<div class="home-hero">
+    <div class="home-branding">
+        <h1 class="home-title">rstash</h1>
+        <p class="home-subtitle">{{with .Content}}{{.Subtitle}}{{end}}</p>
+        <p class="home-tagline">One account for all your <a href="https://remotestorage.io">remoteStorage</a> apps. Your data, always under your control.</p>
+    </div>
+    <div class="home-login-card">
+        <h2 class="home-login-heading">Log in</h2>
+        <form method="POST" action="/login">
+            <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
+            <div>
+                <label for="username" class="sr-only">Username</label>
+                <input type="text" id="username" name="username" required autocomplete="username" placeholder="Username">
+            </div>
+            <div>
+                <label for="password" class="sr-only">Password</label>
+                <input type="password" id="password" name="password" required autocomplete="current-password" placeholder="Password">
+            </div>
+            <button type="submit">Log In</button>
+        </form>
+        {{if $.HasMailer}}
+        <p class="home-login-link"><a href="/forgot-password">Forgot password?</a></p>
         {{end}}
-    </p>
-
-    <div class="home-cta">
-        <a href="/login">Log In</a>
-        {{if eq .RegistrationMode "open"}}
-            <p class="home-register-link">or <a href="/register">create an account</a></p>
+        {{if and .RegistrationMode (not (eq .RegistrationMode "closed"))}}
+        <div class="home-register">
+            <a href="/register" class="home-register-btn">Create an account</a>
+        </div>
         {{end}}
     </div>
 </div>

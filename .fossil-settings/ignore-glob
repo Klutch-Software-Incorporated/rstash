@@ -48,6 +48,7 @@ astro/dist/
 astro/.astro/
 site/dist/
 site/.astro/
+internal/ui/site/*
 
 # Infrastructure
 infra/pulumi/node_modules/

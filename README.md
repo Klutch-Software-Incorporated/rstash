@@ -94,6 +94,14 @@ task vet      # Run go vet
 task clean    # Remove build artifacts
 ```
 
+Build with `-tags dev` to serve templates and assets from disk for hot reload during development:
+
+```sh
+go run -tags dev .
+```
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for details.
+
 Source control is managed via [Fossil](https://fossil-scm.org/), not git. Repository: [fossil.klutch.software/rstash](https://fossil.klutch.software/rstash)
 
 ## Architecture

@@ -30,6 +30,7 @@ type Config struct {
 	RefreshTokenLifetime string  // refresh token lifetime: "90d", "0" (no expiry)
 	MetricsMode          string  // "public", "admin", or "off"
 	PublicWrites         string  // "on" or "off"
+	HomeSubtitle         string  // tagline on logged-out home page
 	TOSMode              string  // "off", "text", "url"
 	TOSContent           string
 	PrivacyMode          string  // "off", "text", "url"
@@ -75,6 +76,7 @@ func Load() *Config {
 		EmailDSN:    os.Getenv(EnvEmail),
 
 		// Runtime-editable: sane defaults, changed via CLI/admin UI.
+		HomeSubtitle:     "A personal remoteStorage server.",
 		MetricsMode:      "public",
 		PublicWrites:     "on",
 		TOSMode:          "text",

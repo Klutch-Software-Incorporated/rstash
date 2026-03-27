@@ -30,6 +30,7 @@ type PageData struct {
 	OpenAbuseReports int64
 	Version          string
 	HasMailer        bool
+	HideHeader       bool
 }
 
 // Renderer parses and renders HTML templates from the embedded filesystem.
@@ -37,58 +38,66 @@ type Renderer struct {
 	templates *template.Template
 }
 
-// NewRenderer parses all templates from the embedded FS and returns a Renderer.
-func NewRenderer() *Renderer {
+var templateFiles = []string{
+	"templates/partials/header.html",
+	"templates/partials/footer.html",
+	"templates/partials/admin_nav.html",
+	"templates/layout.html",
+	"templates/home.html",
+	"templates/setup.html",
+	"templates/setup_review.html",
+	"templates/login.html",
+	"templates/register.html",
+	"templates/admin_dashboard.html",
+	"templates/admin_users.html",
+	"templates/admin_settings.html",
+	"templates/admin_setting_detail.html",
+	"templates/admin_audit.html",
+	"templates/admin_logs.html",
+	"templates/admin_oauth_test.html",
+	"templates/admin_status.html",
+	"templates/admin_email.html",
+	"templates/oauth_authorize.html",
+	"templates/profile_dashboard.html",
+	"templates/profile_settings.html",
+	"templates/profile_files.html",
+	"templates/profile_files_search.html",
+	"templates/legal.html",
+	"templates/licenses.html",
+	"templates/add_email.html",
+	"templates/verify_email.html",
+	"templates/forgot_password.html",
+	"templates/reset_password.html",
+	"templates/abuse_report.html",
+	"templates/admin_abuse.html",
+}
+
+func parseTemplates() *template.Template {
 	funcMap := template.FuncMap{
 		"eq":    func(a, b string) bool { return a == b },
 		"split": strings.Split,
 	}
-
-	tmpl, err := template.New("").Funcs(funcMap).ParseFS(Templates,
-		"templates/partials/header.html",
-		"templates/partials/footer.html",
-		"templates/partials/admin_nav.html",
-		"templates/layout.html",
-		"templates/home.html",
-		"templates/setup.html",
-		"templates/setup_review.html",
-		"templates/login.html",
-		"templates/register.html",
-		"templates/admin_dashboard.html",
-		"templates/admin_users.html",
-		"templates/admin_settings.html",
-		"templates/admin_setting_detail.html",
-		"templates/admin_audit.html",
-		"templates/admin_logs.html",
-		"templates/admin_oauth_test.html",
-		"templates/admin_status.html",
-		"templates/admin_email.html",
-		"templates/oauth_authorize.html",
-		"templates/profile_dashboard.html",
-		"templates/profile_settings.html",
-		"templates/profile_files.html",
-		"templates/profile_files_search.html",
-		"templates/legal.html",
-		"templates/licenses.html",
-		"templates/add_email.html",
-		"templates/verify_email.html",
-		"templates/forgot_password.html",
-		"templates/reset_password.html",
-		"templates/abuse_report.html",
-		"templates/admin_abuse.html",
-	)
+	tmpl, err := template.New("").Funcs(funcMap).ParseFS(Templates, templateFiles...)
 	if err != nil {
 		slog.Error("failed to parse templates", "error", err)
 		panic("failed to parse templates: " + err.Error())
 	}
+	return tmpl
+}
 
-	return &Renderer{templates: tmpl}
+// NewRenderer parses all templates from the embedded FS and returns a Renderer.
+func NewRenderer() *Renderer {
+	return &Renderer{templates: parseTemplates()}
 }
 
 // Render executes the layout template with the given page data, where
 // contentTemplate specifies which {{define "content"}} block to use.
 func (r *Renderer) Render(w http.ResponseWriter, contentTemplate string, data PageData) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+
+	if DevMode {
+		r.templates = parseTemplates()
+	}
 
 	// Clone and add a "content" template that delegates to the named content block.
 	tmpl, err := r.templates.Clone()
@@ -113,6 +122,9 @@ func (r *Renderer) Render(w http.ResponseWriter, contentTemplate string, data Pa
 
 // RenderTo renders to an arbitrary writer (useful for testing).
 func (r *Renderer) RenderTo(w io.Writer, contentTemplate string, data PageData) error {
+	if DevMode {
+		r.templates = parseTemplates()
+	}
 	tmpl, err := r.templates.Clone()
 	if err != nil {
 		return err

@@ -25,6 +25,21 @@ tasks:
     cmds:
       - npm run build
 
+  embed:
+    desc: Build site and stage for Go embedding
+    sources:
+      - "src/**/*"
+      - "public/**/*"
+      - astro.config.mjs
+      - package.json
+      - tsconfig.json
+    generates:
+      - ../internal/ui/site/**/*
+    method: checksum
+    cmds:
+      - npx astro build --outDir ../internal/ui/site
+      - touch ../internal/ui/site/.keep
+
   deploy:
     desc: Build and deploy site to server
     interactive: true
