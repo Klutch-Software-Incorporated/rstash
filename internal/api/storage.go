@@ -133,15 +133,15 @@ func Storage(repo *db.Repository, svc *storage.Service, maxUploadSize func() int
 		switch r.Method {
 		case http.MethodGet:
 			if isFolder {
-				handleGetFolder(w, r, svc, user.ID, storagePath, cond)
+				handleGetFolder(w, r, svc, user.ID, storagePath, isPublic, cond)
 			} else {
-				handleGetDocument(w, r, svc, user.ID, storagePath, cond)
+				handleGetDocument(w, r, svc, user.ID, storagePath, isPublic, cond)
 			}
 		case http.MethodHead:
 			if isFolder {
-				handleGetFolder(w, r, svc, user.ID, storagePath, cond)
+				handleGetFolder(w, r, svc, user.ID, storagePath, isPublic, cond)
 			} else {
-				handleHeadDocument(w, r, svc, user.ID, storagePath, cond)
+				handleHeadDocument(w, r, svc, user.ID, storagePath, isPublic, cond)
 			}
 		case http.MethodPut:
 			if isFolder {
@@ -179,7 +179,7 @@ func parseConditions(r *http.Request) storage.Conditions {
 	return cond
 }
 
-func handleGetDocument(w http.ResponseWriter, r *http.Request, svc *storage.Service, userID int64, path string, cond storage.Conditions) {
+func handleGetDocument(w http.ResponseWriter, r *http.Request, svc *storage.Service, userID int64, path string, isPublic bool, cond storage.Conditions) {
 	result, err := svc.GetDocument(r.Context(), userID, path, cond)
 	if err != nil {
 		writeServiceError(w, err)
@@ -190,12 +190,12 @@ func handleGetDocument(w http.ResponseWriter, r *http.Request, svc *storage.Serv
 	w.Header().Set("ETag", storage.QuoteETag(result.ETag))
 	w.Header().Set("Content-Type", result.ContentType)
 	w.Header().Set("Content-Length", fmt.Sprintf("%d", result.ContentLength))
-	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("Cache-Control", cacheControl(isPublic))
 	w.WriteHeader(http.StatusOK)
 	io.Copy(w, result.Content)
 }
 
-func handleHeadDocument(w http.ResponseWriter, r *http.Request, svc *storage.Service, userID int64, path string, cond storage.Conditions) {
+func handleHeadDocument(w http.ResponseWriter, r *http.Request, svc *storage.Service, userID int64, path string, isPublic bool, cond storage.Conditions) {
 	result, err := svc.HeadDocument(r.Context(), userID, path, cond)
 	if err != nil {
 		writeServiceError(w, err)
@@ -205,11 +205,11 @@ func handleHeadDocument(w http.ResponseWriter, r *http.Request, svc *storage.Ser
 	w.Header().Set("ETag", storage.QuoteETag(result.ETag))
 	w.Header().Set("Content-Type", result.ContentType)
 	w.Header().Set("Content-Length", fmt.Sprintf("%d", result.ContentLength))
-	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("Cache-Control", cacheControl(isPublic))
 	w.WriteHeader(http.StatusOK)
 }
 
-func handleGetFolder(w http.ResponseWriter, r *http.Request, svc *storage.Service, userID int64, path string, cond storage.Conditions) {
+func handleGetFolder(w http.ResponseWriter, r *http.Request, svc *storage.Service, userID int64, path string, isPublic bool, cond storage.Conditions) {
 	desc, etag, err := svc.GetFolder(r.Context(), userID, path, cond)
 	if err != nil {
 		writeServiceError(w, err)
@@ -225,7 +225,7 @@ func handleGetFolder(w http.ResponseWriter, r *http.Request, svc *storage.Servic
 	w.Header().Set("ETag", storage.QuoteETag(etag))
 	w.Header().Set("Content-Type", "application/ld+json")
 	w.Header().Set("Content-Length", fmt.Sprintf("%d", len(body)))
-	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("Cache-Control", cacheControl(isPublic))
 	w.WriteHeader(http.StatusOK)
 	w.Write(body)
 }
@@ -272,6 +272,13 @@ func extractBearer(r *http.Request) string {
 		return auth[7:]
 	}
 	return ""
+}
+
+func cacheControl(isPublic bool) string {
+	if isPublic {
+		return "no-cache, public"
+	}
+	return "no-cache"
 }
 
 func isPublicPath(path string) bool {
