@@ -233,6 +233,7 @@ button.btn-secondary:hover{background:var(--surface-alt)}
 .home-login-card form>div{margin-bottom:.6rem}
 .home-login-card label{margin-bottom:.15rem}
 .home-login-card input[type="text"],.home-login-card input[type="password"]{margin-bottom:0}
+.home-login-card button[type="submit"]{margin-top:.75rem}
 .home-login-link{text-align:center;font-size:.8rem;color:var(--fg-faint);margin-top:.5rem;margin-bottom:0}
 .home-register{margin-top:.75rem;padding-top:.75rem;border-top:1px solid var(--border);text-align:center}
 .home-register-btn{display:block;padding:.5rem 1rem;border:1px solid var(--border);border-radius:3px;font-weight:600;font-size:.875rem;color:var(--fg);text-decoration:none;text-align:center}
@@ -404,7 +405,7 @@ tr:target{background:var(--warning-bg);animation:target-fade 2s ease-out}
   .search-form{flex-direction:row}
   .search-form input[type="text"]{flex:1;width:auto}
   .shaper{display:none}
-  .home-hero{flex-direction:column;text-align:center;gap:2rem;padding:2rem 0;min-height:auto}
+  .home-hero{flex-direction:column;text-align:center;gap:1.5rem;padding:1rem 0;min-height:auto;align-items:stretch}
   .home-branding{text-align:center}
   .home-tagline{margin:0 auto}
   .home-login-card{width:100%}
