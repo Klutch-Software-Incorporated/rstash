@@ -37,6 +37,7 @@ func WebFinger(cfg *config.Config) http.Handler {
 
 		storageHref := cfg.BaseURL + "/storage/" + username
 		authURL := cfg.BaseURL + "/oauth/authorize"
+		tokenURL := cfg.BaseURL + "/oauth/token"
 
 		// Use canonical lowercase username in subject.
 		canonicalResource := "acct:" + username + "@" + parts[1]
@@ -49,8 +50,11 @@ func WebFinger(cfg *config.Config) http.Handler {
 					"rel":  "http://tools.ietf.org/id/draft-dejong-remotestorage",
 					"type": "draft-dejong-remotestorage-26",
 					"properties": map[string]string{
-						"http://remotestorage.io/spec/version": "draft-dejong-remotestorage-26",
-						"http://tools.ietf.org/html/rfc6749#section-4.2": authURL,
+						"http://remotestorage.io/spec/version":                          "draft-dejong-remotestorage-26",
+						"http://tools.ietf.org/html/rfc6749#section-4.2":                authURL,
+						"http://tools.ietf.org/html/rfc6749#section-3.1":                authURL,
+						"http://tools.ietf.org/html/rfc6749#section-3.2":                tokenURL,
+						"http://tools.ietf.org/html/rfc7636":                            "S256",
 					},
 				},
 			},
