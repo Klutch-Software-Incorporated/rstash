@@ -46,7 +46,7 @@
 {{if .Def.Help}}
 <h3>Documentation</h3>
 {{range split .Def.Help "\n\n"}}
-<p>{{.}}</p>
+<p>{{. | safeHTML}}</p>
 {{end}}
 {{end}}
 

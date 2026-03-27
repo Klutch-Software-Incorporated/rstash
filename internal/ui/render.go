@@ -76,8 +76,9 @@ var templateFiles = []string{
 
 func parseTemplates() *template.Template {
 	funcMap := template.FuncMap{
-		"eq":    func(a, b string) bool { return a == b },
-		"split": strings.Split,
+		"eq":       func(a, b string) bool { return a == b },
+		"split":    strings.Split,
+		"safeHTML": func(s string) template.HTML { return template.HTML(s) },
 	}
 	tmpl, err := template.New("").Funcs(funcMap).ParseFS(Templates, templateFiles...)
 	if err != nil {

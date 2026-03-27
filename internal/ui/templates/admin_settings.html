@@ -22,7 +22,7 @@
                     <button type="submit" formaction="/admin/settings/{{.Key}}/reset" style="background:none;border:none;color:var(--accent);font-size:.7rem;cursor:pointer;padding:0;text-decoration:underline">reset</button>
                     {{end}}
                 </div>
-                <p class="setting-desc">{{.Description}}</p>
+                <p class="setting-desc">{{.Description | safeHTML}}</p>
                 {{if eq .InputType "select"}}
                 <select name="{{.Key}}">
                     {{$val := .Value}}
