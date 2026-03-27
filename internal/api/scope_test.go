@@ -59,6 +59,8 @@ func TestParseScopes(t *testing.T) {
 		{"invalid", false, 0},
 		{"contacts:x", false, 0},
 		{"contacts:", false, 0},
+		{"public:r", false, 0},  // "public" is a reserved word per spec
+		{"public:rw", false, 0}, // "public" is a reserved word per spec
 	}
 
 	for _, tt := range tests {

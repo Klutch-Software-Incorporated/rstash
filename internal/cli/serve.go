@@ -209,8 +209,6 @@ func runServe(cmd *cobra.Command, args []string) error {
 	mux.Handle("POST /oauth/revoke", api.CORS(api.OAuthRevoke(repo)))
 	mux.Handle("/storage/{user}/{path...}", api.CORS(api.Storage(repo, storageSvc, func() int64 {
 		return runtimeSettings.Load().MaxUploadSize
-	}, func() string {
-		return runtimeSettings.Load().PublicWrites
 	})))
 
 	// Static file server from embedded assets.

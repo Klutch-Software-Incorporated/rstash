@@ -239,6 +239,15 @@ button.btn-secondary:hover{background:var(--surface-alt)}
 .home-register-btn{display:block;padding:.5rem 1rem;border:1px solid var(--border);border-radius:3px;font-weight:600;font-size:.875rem;color:var(--fg);text-decoration:none;text-align:center}
 .home-register-btn:hover{background:var(--surface-alt);text-decoration:none}
 
+/* Error page */
+.error-page{max-width:28rem;margin:3rem auto;text-align:center}
+.error-card{border:1px solid var(--border);border-radius:6px;padding:2rem;background:var(--surface)}
+.error-code{font-size:2.5rem;font-weight:700;color:var(--fg-faint);margin:0 0 .25rem}
+.error-title{font-size:1.1rem;font-weight:600;margin:0 0 .75rem;border-bottom:none;padding-bottom:0}
+.error-message{font-size:.9rem;color:var(--fg-muted);margin:0}
+.error-detail{font-size:.8rem;color:var(--fg-faint);margin:.75rem 0 0;font-family:ui-monospace,"Cascadia Code",Menlo,monospace;background:var(--surface-code);padding:.4rem .6rem;border-radius:3px}
+.error-back{font-size:.85rem;margin-top:1rem}
+
 /* OAuth consent */
 .oauth-consent{max-width:28rem;margin:0 auto}
 .oauth-consent-card{border:1px solid var(--border);border-radius:6px;overflow:hidden;margin-bottom:1rem}

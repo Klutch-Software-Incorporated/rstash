@@ -29,7 +29,6 @@ type Config struct {
 	RefreshTokens        string  // "enabled" or "disabled"
 	RefreshTokenLifetime string  // refresh token lifetime: "90d", "0" (no expiry)
 	MetricsMode          string  // "public", "admin", or "off"
-	PublicWrites         string  // "on" or "off"
 	SiteName             string  // display name in header/footer (default "rstash")
 	HomeSubtitle         string  // tagline on logged-out home page
 	TOSMode              string  // "off", "text", "url"
@@ -80,7 +79,6 @@ func Load() *Config {
 		SiteName:         "rstash",
 		HomeSubtitle:     "A personal remoteStorage server.",
 		MetricsMode:      "public",
-		PublicWrites:     "on",
 		TOSMode:          "text",
 		TOSContent:       defaultTOSContent,
 		PrivacyMode:      "text",

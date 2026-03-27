@@ -461,8 +461,7 @@ type profileFilesContent struct {
 	ParentBrowseURL string
 	Breadcrumbs     []breadcrumb
 	Items           []*fileItem
-	URLPrefix       string
-	PublicWritesOff bool
+	URLPrefix string
 }
 
 type profileSearchContent struct {
@@ -534,8 +533,6 @@ func (h *profileHandler) browseFolder(w http.ResponseWriter, r *http.Request, us
 		parentURL = breadcrumbs[len(breadcrumbs)-2].Path
 	}
 
-	publicWritesOff := strings.HasPrefix(storagePath, "/public/") && h.deps.Settings.Load().PublicWrites == "off"
-
 	h.deps.Renderer.Render(w, "profile_files", h.deps.pageData(w, r, "Files — "+storagePath, profileFilesContent{
 		Username:        username,
 		CurrentPath:     storagePath,
@@ -545,7 +542,6 @@ func (h *profileHandler) browseFolder(w http.ResponseWriter, r *http.Request, us
 		Breadcrumbs:     breadcrumbs,
 		Items:           items,
 		URLPrefix:       prefix,
-		PublicWritesOff: publicWritesOff,
 	}))
 }
 
@@ -668,12 +664,6 @@ func (h *profileHandler) UploadFile(w http.ResponseWriter, r *http.Request) {
 	if folder == "/" {
 		ui.SetFlashError(w, "Cannot upload to root. Please create or select a module first.")
 		http.Redirect(w, r, prefix+"/files/", http.StatusSeeOther)
-		return
-	}
-
-	if strings.HasPrefix(folder, "/public/") && h.deps.Settings.Load().PublicWrites == "off" {
-		ui.SetFlashError(w, "Uploads to public paths are disabled by the server operator.")
-		http.Redirect(w, r, prefix+"/files"+folder, http.StatusSeeOther)
 		return
 	}
 

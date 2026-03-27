@@ -266,18 +266,6 @@ func SettingDefs() []SettingDef {
 			InputType:       InputByteSize,
 			RuntimeEditable: true,
 		},
-		{
-			Key:             "public_writes",
-			Group:           "Storage",
-			Label:           "Public writes",
-			Description:     "Allow writes to /public/ paths (publicly readable storage).",
-			Help:            "Controls whether users can write to /public/ paths. Public paths are readable by anyone without authentication per the remoteStorage spec. When \"off\", PUT and DELETE requests to /public/ paths are rejected with 403 Forbidden. Users can still read existing public documents. When \"on\", writes are allowed normally. Operators concerned about users hosting publicly accessible content (piracy, illegal material) should set this to \"off\". Changes take effect immediately.",
-			Default:         "on",
-			ValidValues:     []string{"on", "off"},
-			InputType:       InputSelect,
-			RuntimeEditable: true,
-		},
-
 		// ── Monitoring (runtime-editable / env-only) ──
 		{
 			Key:             "metrics_mode",

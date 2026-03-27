@@ -95,6 +95,35 @@ func (d *UIDeps) adminPageData(w http.ResponseWriter, r *http.Request, title str
 	return pd
 }
 
+// errorContent holds the data for the styled error page template.
+type errorContent struct {
+	Code    int
+	Title   string
+	Message string
+	Detail  string
+}
+
+// renderError renders a styled error page with the given status code and message.
+func (d *UIDeps) renderError(w http.ResponseWriter, r *http.Request, code int, title, message string) {
+	w.WriteHeader(code)
+	d.Renderer.Render(w, "error_page", d.pageData(w, r, title, &errorContent{
+		Code:    code,
+		Title:   title,
+		Message: message,
+	}))
+}
+
+// renderErrorDetail renders a styled error page with additional detail text.
+func (d *UIDeps) renderErrorDetail(w http.ResponseWriter, r *http.Request, code int, title, message, detail string) {
+	w.WriteHeader(code)
+	d.Renderer.Render(w, "error_page", d.pageData(w, r, title, &errorContent{
+		Code:    code,
+		Title:   title,
+		Message: message,
+		Detail:  detail,
+	}))
+}
+
 // ClientIP extracts the client IP address from the request.
 // It checks X-Forwarded-For (first entry), X-Real-IP, then RemoteAddr.
 func ClientIP(r *http.Request) string {

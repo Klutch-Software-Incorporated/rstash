@@ -59,6 +59,7 @@ var templateFiles = []string{
 	"templates/admin_status.html",
 	"templates/admin_email.html",
 	"templates/oauth_authorize.html",
+	"templates/error.html",
 	"templates/profile_dashboard.html",
 	"templates/profile_settings.html",
 	"templates/profile_files.html",

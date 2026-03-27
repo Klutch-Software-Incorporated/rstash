@@ -117,26 +117,33 @@ func (h *oauthHandler) ShowAuthorize(w http.ResponseWriter, r *http.Request) {
 
 	responseType := q.Get("response_type")
 	if responseType != "token" && responseType != "code" {
-		http.Error(w, "unsupported response_type: must be 'token' or 'code'", http.StatusBadRequest)
+		h.deps.renderErrorDetail(w, r, http.StatusBadRequest, "Invalid Request",
+			"The response_type parameter must be \"token\" or \"code\".",
+			"response_type="+responseType)
 		return
 	}
 
 	redirectURI := q.Get("redirect_uri")
 	if redirectURI == "" {
-		http.Error(w, "missing redirect_uri", http.StatusBadRequest)
+		h.deps.renderError(w, r, http.StatusBadRequest, "Invalid Request",
+			"The application did not provide a redirect URI. This is required for the OAuth flow.")
 		return
 	}
 
 	origin, err := extractOrigin(redirectURI)
 	if err != nil {
-		http.Error(w, "invalid redirect_uri", http.StatusBadRequest)
+		h.deps.renderErrorDetail(w, r, http.StatusBadRequest, "Invalid Request",
+			"The redirect URI provided by the application is not valid.",
+			redirectURI)
 		return
 	}
 
 	scopeStr := q.Get("scope")
 	scopes, ok := api.ParseScopes(scopeStr)
 	if !ok {
-		http.Error(w, "invalid scope", http.StatusBadRequest)
+		h.deps.renderErrorDetail(w, r, http.StatusBadRequest, "Invalid Scope",
+			"The application requested an invalid scope. Scopes must be in the format \"module:r\" or \"module:rw\".",
+			"scope="+scopeStr)
 		return
 	}
 
@@ -146,7 +153,8 @@ func (h *oauthHandler) ShowAuthorize(w http.ResponseWriter, r *http.Request) {
 		codeChallenge = q.Get("code_challenge")
 		codeChallengeMethod = q.Get("code_challenge_method")
 		if codeChallenge == "" || codeChallengeMethod != "S256" {
-			http.Error(w, "code flow requires code_challenge and code_challenge_method=S256", http.StatusBadRequest)
+			h.deps.renderError(w, r, http.StatusBadRequest, "Invalid Request",
+				"The code flow requires a code_challenge with method S256.")
 			return
 		}
 	}

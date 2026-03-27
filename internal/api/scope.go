@@ -9,6 +9,7 @@ var scopePattern = regexp.MustCompile(`^([a-zA-Z0-9_-]+|\*):r(w)?$`)
 
 // ParseScopes validates a space-separated scope string.
 // Valid format: "module:r" or "module:rw" where module is [a-zA-Z0-9_-]+ or "*".
+// The word "public" is reserved per spec and rejected as a module name.
 // Returns the individual scope strings and whether they are all valid.
 func ParseScopes(scopeStr string) ([]string, bool) {
 	scopes := strings.Fields(scopeStr)
@@ -17,6 +18,11 @@ func ParseScopes(scopeStr string) ([]string, bool) {
 	}
 	for _, s := range scopes {
 		if !scopePattern.MatchString(s) {
+			return nil, false
+		}
+		// "public" is a reserved word per draft-dejong-remotestorage-26.
+		module := s[:strings.Index(s, ":")]
+		if module == "public" {
 			return nil, false
 		}
 	}
