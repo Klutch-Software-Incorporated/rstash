@@ -382,6 +382,8 @@ func (s *Service) GetFolder(ctx context.Context, userID int64, path string, cond
 			item.ContentType = child.ContentType
 			cl := child.ContentLength
 			item.ContentLength = &cl
+			lastMod := child.UpdatedAt.Unix()
+			item.LastModified = &lastMod
 		}
 		items[name] = item
 	}
