@@ -385,15 +385,25 @@ func (s *Service) GetFolder(ctx context.Context, userID int64, path string, cond
 	items := make(map[string]api.FolderItem)
 	for _, child := range children {
 		name := strings.TrimPrefix(child.Path, path)
-		item := api.FolderItem{ETag: child.ETag}
-		if !child.IsFolder {
-			item.ContentType = child.ContentType
+		if child.IsFolder {
+			// Per spec, empty folders MUST NOT appear in the parent listing.
+			grandchildren, err := s.repo.ListChildren(ctx, userID, child.Path)
+			if err != nil {
+				return nil, "", err
+			}
+			if len(grandchildren) == 0 {
+				continue
+			}
+			items[name] = api.FolderItem{ETag: child.ETag}
+		} else {
 			cl := child.ContentLength
-			item.ContentLength = &cl
-			lastMod := child.UpdatedAt.Unix()
-			item.LastModified = &lastMod
+			items[name] = api.FolderItem{
+				ETag:          child.ETag,
+				ContentType:   child.ContentType,
+				ContentLength: &cl,
+				LastModified:  child.UpdatedAt.UTC().Format(http.TimeFormat),
+			}
 		}
-		items[name] = item
 	}
 
 	// Compute ETag from children if no folder node exists (e.g., empty root).

@@ -291,7 +291,7 @@ func writeServiceError(w http.ResponseWriter, err error) {
 	case errors.Is(err, storage.ErrPayloadTooLarge):
 		http.Error(w, "payload too large", http.StatusRequestEntityTooLarge)
 	case errors.Is(err, storage.ErrQuotaExceeded):
-		http.Error(w, "quota exceeded", http.StatusRequestEntityTooLarge)
+		http.Error(w, "quota exceeded", http.StatusInsufficientStorage)
 	case errors.Is(err, storage.ErrContentRejected):
 		http.Error(w, err.Error(), http.StatusUnsupportedMediaType)
 	default:
