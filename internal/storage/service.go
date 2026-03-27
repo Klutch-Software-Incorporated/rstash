@@ -26,8 +26,23 @@ var (
 
 // Conditions holds parsed If-Match / If-None-Match header values (unquoted).
 type Conditions struct {
-	IfMatch     string // unquoted ETag value
-	IfNoneMatch string // unquoted ETag value, or "*"
+	IfMatch     string   // unquoted ETag value
+	IfNoneMatch []string // unquoted ETag values, or ["*"]
+}
+
+// IfNoneMatchStar returns true if If-None-Match is "*".
+func (c Conditions) IfNoneMatchStar() bool {
+	return len(c.IfNoneMatch) == 1 && c.IfNoneMatch[0] == "*"
+}
+
+// IfNoneMatchContains returns true if etag appears in the If-None-Match list.
+func (c Conditions) IfNoneMatchContains(etag string) bool {
+	for _, v := range c.IfNoneMatch {
+		if v == etag {
+			return true
+		}
+	}
+	return false
 }
 
 // PutResult is returned by PutDocument.
@@ -139,7 +154,7 @@ func (s *Service) PutDocument(ctx context.Context, userID int64, path string, co
 		}
 
 		// If-None-Match: "*" means "only if the document doesn't exist yet".
-		if cond.IfNoneMatch == "*" && existing != nil {
+		if cond.IfNoneMatchStar() && existing != nil {
 			return ErrPreconditionFailed
 		}
 
@@ -191,7 +206,7 @@ func (s *Service) GetDocument(ctx context.Context, userID int64, path string, co
 		return nil, ErrNotFound
 	}
 
-	if cond.IfNoneMatch != "" && node.ETag == cond.IfNoneMatch {
+	if cond.IfNoneMatchContains(node.ETag) {
 		return nil, ErrNotModified
 	}
 
@@ -218,7 +233,7 @@ func (s *Service) HeadDocument(ctx context.Context, userID int64, path string, c
 		return nil, ErrNotFound
 	}
 
-	if cond.IfNoneMatch != "" && node.ETag == cond.IfNoneMatch {
+	if cond.IfNoneMatchContains(node.ETag) {
 		return nil, ErrNotModified
 	}
 
@@ -373,7 +388,7 @@ func (s *Service) GetFolder(ctx context.Context, userID int64, path string, cond
 		etag = node.ETag
 	}
 
-	if cond.IfNoneMatch != "" && etag != "" && etag == cond.IfNoneMatch {
+	if etag != "" && cond.IfNoneMatchContains(etag) {
 		return nil, etag, ErrNotModified
 	}
 

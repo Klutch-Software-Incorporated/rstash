@@ -171,9 +171,14 @@ func parseConditions(r *http.Request) storage.Conditions {
 	}
 	if inm := r.Header.Get("If-None-Match"); inm != "" {
 		if inm == "*" {
-			cond.IfNoneMatch = "*"
+			cond.IfNoneMatch = []string{"*"}
 		} else {
-			cond.IfNoneMatch = storage.UnquoteETag(inm)
+			for _, part := range strings.Split(inm, ",") {
+				part = strings.TrimSpace(part)
+				if part != "" {
+					cond.IfNoneMatch = append(cond.IfNoneMatch, storage.UnquoteETag(part))
+				}
+			}
 		}
 	}
 	return cond

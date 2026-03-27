@@ -174,13 +174,13 @@ func TestConditionalIfNoneMatch(t *testing.T) {
 	}
 
 	// GET with matching If-None-Match → 304.
-	_, err = svc.GetDocument(ctx, userID, "/test.txt", storage.Conditions{IfNoneMatch: putResult.ETag})
+	_, err = svc.GetDocument(ctx, userID, "/test.txt", storage.Conditions{IfNoneMatch: []string{putResult.ETag}})
 	if err != storage.ErrNotModified {
 		t.Fatalf("expected ErrNotModified, got %v", err)
 	}
 
 	// GET with non-matching If-None-Match → 200.
-	result, err := svc.GetDocument(ctx, userID, "/test.txt", storage.Conditions{IfNoneMatch: "bogus"})
+	result, err := svc.GetDocument(ctx, userID, "/test.txt", storage.Conditions{IfNoneMatch: []string{"bogus"}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -214,13 +214,13 @@ func TestConditionalIfNoneMatchStar(t *testing.T) {
 	ctx := context.Background()
 
 	// PUT with If-None-Match: * on non-existing → OK.
-	_, err := svc.PutDocument(ctx, userID, "/new.txt", strings.NewReader("data"), "text/plain", storage.Conditions{IfNoneMatch: "*"})
+	_, err := svc.PutDocument(ctx, userID, "/new.txt", strings.NewReader("data"), "text/plain", storage.Conditions{IfNoneMatch: []string{"*"}})
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// PUT with If-None-Match: * on existing → 412.
-	_, err = svc.PutDocument(ctx, userID, "/new.txt", strings.NewReader("other"), "text/plain", storage.Conditions{IfNoneMatch: "*"})
+	_, err = svc.PutDocument(ctx, userID, "/new.txt", strings.NewReader("other"), "text/plain", storage.Conditions{IfNoneMatch: []string{"*"}})
 	if err != storage.ErrPreconditionFailed {
 		t.Fatalf("expected ErrPreconditionFailed, got %v", err)
 	}
