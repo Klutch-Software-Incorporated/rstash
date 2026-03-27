@@ -10,8 +10,8 @@ func validConfig() *Config {
 	return &Config{
 		Addr:             ":8080",
 		BaseURL:          "http://localhost:8080",
-		DatabaseDSN:      "sqlite:rstash.db",
-		BlobDSN:          "sqlite:rstash-blobs.db",
+		DatabaseDSN:      "sqlite:rstash.sqlite",
+		BlobDSN:          "sqlite:rstash-blobs.sqlite",
 		RegistrationMode: "closed",
 		LogLevel:         "info",
 		RateLimitRate:    10,
@@ -97,7 +97,7 @@ func TestValidate_BaseURL_TrailingSlash(t *testing.T) {
 func TestValidate_DatabaseDSN(t *testing.T) {
 	// Valid DSNs for all supported databases.
 	for _, dsn := range []string{
-		"sqlite:rstash.db",
+		"sqlite:rstash.sqlite",
 		"sqlite::memory:",
 		"postgres:host=localhost dbname=rstash",
 		"mysql:user:pass@tcp(localhost:3306)/rstash",

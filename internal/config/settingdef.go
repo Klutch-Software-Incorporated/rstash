@@ -84,8 +84,8 @@ func SettingDefs() []SettingDef {
 			Group:           "Server",
 			Label:           "Database DSN",
 			Description:     "Metadata database DSN. Supported: sqlite:, postgres:, mysql:, mssql:.",
-			Help:            "The Data Source Name for the metadata database, set via the " + EnvDB + " environment variable. Stores users, sessions, OAuth tokens, audit entries, and file metadata (nodes). Supported formats: sqlite:path (e.g. sqlite:rstash.db), sqlite::memory:, postgres:host=localhost dbname=rstash user=rstash password=secret sslmode=disable, mysql:user:pass@tcp(host:3306)/dbname?parseTime=true, mssql:sqlserver://user:pass@host:1433?database=dbname. Changing this setting requires a server restart.",
-			Default:         "sqlite:rstash.db",
+			Help:            "The Data Source Name for the metadata database, set via the " + EnvDB + " environment variable. Stores users, sessions, OAuth tokens, audit entries, and file metadata (nodes). Supported formats: sqlite:path (e.g. sqlite:rstash.sqlite), sqlite::memory:, postgres:host=localhost dbname=rstash user=rstash password=secret sslmode=disable, mysql:user:pass@tcp(host:3306)/dbname?parseTime=true, mssql:sqlserver://user:pass@host:1433?database=dbname. Changing this setting requires a server restart.",
+			Default:         "sqlite:rstash.sqlite",
 			InputType:       InputText,
 			RuntimeEditable: false,
 		},
@@ -96,7 +96,7 @@ func SettingDefs() []SettingDef {
 			Label:           "Blob store DSN",
 			Description:     "Blob store DSN. Supported: sqlite:, fs:, postgres:, mysql:, mssql:, s3:.",
 			Help:            "The Data Source Name for the blob (file content) store, set via the " + EnvBlob + " environment variable. Supported backends: sqlite:path stores blobs in a SQLite database (simple, single-file), fs:/path/to/dir stores blobs as individual files on the filesystem (better for large deployments), postgres:/mysql:/mssql: store blobs in the corresponding database (useful when running on a non-SQLite metadata database), and s3:bucket?region=us-east-1&endpoint=s3.amazonaws.com&prefix=optional/prefix stores blobs in an S3-compatible object store. S3 credentials can be set via access_key/secret_key query parameters or AWS_ACCESS_KEY_ID/AWS_SECRET_ACCESS_KEY environment variables. S3 examples: s3:my-bucket?region=us-west-2 (AWS), s3:my-space?region=nyc3&endpoint=nyc3.digitaloceanspaces.com (DigitalOcean Spaces), s3:data?endpoint=minio.local:9000&tls=false&access_key=minioadmin&secret_key=minioadmin (MinIO). Changing this setting requires a server restart.",
-			Default:         "sqlite:rstash-blobs.db",
+			Default:         "sqlite:rstash-blobs.sqlite",
 			InputType:       InputText,
 			RuntimeEditable: false,
 		},
@@ -154,6 +154,16 @@ func SettingDefs() []SettingDef {
 		},
 
 		// ── Branding (runtime-editable, no env var) ──
+		{
+			Key:             "site_name",
+			Group:           "Branding",
+			Label:           "Site name",
+			Description:     "Display name shown in the header, footer, and page titles.",
+			Help:            "Replaces the default \"rstash\" branding throughout the web UI. Useful for giving your instance a custom identity (e.g. \"My Cloud Storage\"). Changes take effect immediately.",
+			Default:         "rstash",
+			InputType:       InputText,
+			RuntimeEditable: true,
+		},
 		{
 			Key:             "home_subtitle",
 			Group:           "Branding",

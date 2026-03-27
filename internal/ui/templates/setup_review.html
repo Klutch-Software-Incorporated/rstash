@@ -1,32 +1,42 @@
 {{define "setup_review"}}
-<div class="form-page" style="max-width:36rem">
+<div class="form-page" style="max-width:40rem">
     <h1>Welcome to rstash</h1>
-    <p>Before creating your admin account, please review your server settings.</p>
+    <p>Before creating your admin account, review your server settings.</p>
 
     {{with .Content}}
-        <table class="setup-review">
+        <div class="setup-glance">
+            <h2>Status at a glance</h2>
             {{range .Settings}}
-            <tr>
-                <th>{{.Label}}</th>
-                <td>{{.Value}}</td>
-            </tr>
-            {{end}}
-        </table>
-
-        {{if .Warnings}}
-            {{range .Warnings}}
-            <div role="alert" class="alert-warning" style="margin-top:1rem">
-                {{.}}
+            {{if .Detail}}
+            <details class="setup-row">
+                <summary>
+                    <span class="setup-label">{{.Label}}</span>
+                    <span class="setup-status"{{if .Tooltip}} title="{{.Tooltip}}"{{end}}>
+                        <span class="setup-dot setup-dot-{{.Level}}"></span>
+                        {{.Status}}
+                    </span>
+                </summary>
+                <p class="setup-detail">{{.Detail}}</p>
+            </details>
+            {{else}}
+            <div class="setup-row">
+                <div class="setup-row-inner">
+                    <span class="setup-label">{{.Label}}</span>
+                    <span class="setup-status"{{if .Tooltip}} title="{{.Tooltip}}"{{end}}>
+                        <span class="setup-dot setup-dot-{{.Level}}"></span>
+                        {{.Status}}
+                    </span>
+                </div>
             </div>
             {{end}}
-        {{end}}
+            {{end}}
+        </div>
     {{end}}
 
     <p style="margin-top:1.5rem">
         These settings are configured via environment variables. If anything
         looks wrong, stop the server and update your configuration before
-        continuing. You can run <code>rstash env</code> to see all available
-        options.
+        continuing. Run <code>rstash env</code> to see all available options.
     </p>
 
     <a href="/setup?step=account" style="display:inline-block;margin-top:1rem;padding:.5rem 1.25rem;background:var(--accent);color:#fff;border-radius:3px;text-decoration:none">

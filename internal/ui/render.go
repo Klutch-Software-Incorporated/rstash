@@ -31,6 +31,7 @@ type PageData struct {
 	Version          string
 	HasMailer        bool
 	HideHeader       bool
+	SiteName         string
 }
 
 // Renderer parses and renders HTML templates from the embedded filesystem.

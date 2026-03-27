@@ -12,8 +12,8 @@ Some configuration **must be set via environment variables before starting** the
 |----------|---------|-------------|
 | `RSTASH_ADDR` | `:8080` | Listen address (`host:port`) |
 | `RSTASH_BASE_URL` | `http://localhost:8080` | Public URL (used in WebFinger, OAuth redirects) |
-| `RSTASH_DB` | `sqlite:rstash.db` | Metadata database — `sqlite:`, `postgres:`, `mysql:`, or `mssql:` |
-| `RSTASH_BLOB` | `sqlite:rstash-blobs.db` | Blob storage — same DB prefixes, plus `fs:/path` or `s3:bucket` |
+| `RSTASH_DB` | `sqlite:rstash.sqlite` | Metadata database — `sqlite:`, `postgres:`, `mysql:`, or `mssql:` |
+| `RSTASH_BLOB` | `sqlite:rstash-blobs.sqlite` | Blob storage — same DB prefixes, plus `fs:/path` or `s3:bucket` |
 | `RSTASH_TLS_MODE` | *(auto-detect)* | `off`, `manual`, or `auto` (Let's Encrypt) |
 | `RSTASH_TLS_CERT` | | TLS certificate file (for `manual` mode) |
 | `RSTASH_TLS_KEY` | | TLS private key file (for `manual` mode) |

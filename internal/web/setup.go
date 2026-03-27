@@ -30,12 +30,14 @@ type setupContent struct {
 
 type setupReviewContent struct {
 	Settings []setupSetting
-	Warnings []string
 }
 
 type setupSetting struct {
-	Label string
-	Value string
+	Label   string
+	Status  string // short status text
+	Level   string // "ok", "info", "warn", "muted"
+	Detail  string // expandable help text, empty if none
+	Tooltip string // hover tooltip, empty if none
 }
 
 func (h *setupHandler) ShowSetup(w http.ResponseWriter, r *http.Request) {
@@ -69,27 +71,69 @@ func (h *setupHandler) ShowSetup(w http.ResponseWriter, r *http.Request) {
 func (h *setupHandler) buildReview() *setupReviewContent {
 	cfg := h.deps.Config
 
-	dbType := friendlyDSNType(cfg.DatabaseDSN)
-	blobType := friendlyDSNType(cfg.BlobDSN)
-
-	settings := []setupSetting{
-		{Label: "Server address", Value: cfg.BaseURL},
-		{Label: "Database", Value: dbType},
-		{Label: "File storage", Value: blobType},
-		{Label: "TLS", Value: friendlyTLS(cfg)},
+	// Server URL
+	urlLevel := "ok"
+	urlStatus := cfg.BaseURL
+	if strings.Contains(cfg.BaseURL, "localhost") || strings.Contains(cfg.BaseURL, "127.0.0.1") {
+		urlLevel = "muted"
+		urlStatus = "Localhost"
 	}
 
-	var warnings []string
+	// Database
+	dbLevel := "ok"
+	dbStatus := friendlyDSNType(cfg.DatabaseDSN)
 	if strings.HasPrefix(cfg.DatabaseDSN, "sqlite:") {
-		warnings = append(warnings, "The database is set to SQLite (the default). This works well for personal and small-group use. If you plan to use PostgreSQL, MySQL, or SQL Server instead, stop the server now and set the RSTASH_DB environment variable before continuing.")
+		dbLevel = "info"
+		dbStatus = "Default (SQLite)"
 	}
+
+	// Blob storage
+	blobLevel := "ok"
+	blobStatus := friendlyDSNType(cfg.BlobDSN)
 	if strings.HasPrefix(cfg.BlobDSN, "sqlite:") {
-		warnings = append(warnings, "File storage is set to SQLite (the default). For larger deployments, consider using filesystem storage (fs:) or S3 by setting the RSTASH_BLOB environment variable.")
+		blobLevel = "info"
+		blobStatus = "Default (SQLite)"
+	}
+
+	// TLS
+	tlsLevel := "ok"
+	tlsStatus := friendlyTLS(cfg)
+	if tlsStatus == "Off" {
+		tlsLevel = "warn"
+	}
+
+	// Email
+	emailLevel := "ok"
+	emailStatus := "Configured"
+	if cfg.EmailDSN == "" {
+		emailLevel = "muted"
+		emailStatus = "Not set"
+	}
+
+	// Listen address
+	addrStatus := cfg.Addr
+	if addrStatus == "" {
+		addrStatus = ":8080"
 	}
 
 	return &setupReviewContent{
-		Settings: settings,
-		Warnings: warnings,
+		Settings: []setupSetting{
+			{Label: "Server URL", Status: urlStatus, Level: urlLevel,
+				Detail: "The public URL used for WebFinger discovery and OAuth redirects. Set RSTASH_BASE_URL to your production domain."},
+			{Label: "Listen address", Status: addrStatus, Level: "ok"},
+			{Label: "Database", Status: dbStatus, Level: dbLevel,
+				Detail:  "Stores users, sessions, and file metadata. SQLite works well for personal use. For larger deployments, set RSTASH_DB to a PostgreSQL, MySQL, or SQL Server DSN.",
+				Tooltip: "RSTASH_DB"},
+			{Label: "File storage", Status: blobStatus, Level: blobLevel,
+				Detail:  "Stores uploaded file contents. SQLite is simple but can grow large. Set RSTASH_BLOB to use filesystem (fs:) or S3-compatible (s3:) storage instead.",
+				Tooltip: "RSTASH_BLOB"},
+			{Label: "TLS", Status: tlsStatus, Level: tlsLevel,
+				Detail:  "Encrypts traffic between clients and the server. Set RSTASH_TLS_MODE to auto for Let\u2019s Encrypt, manual for your own certificate, or use a reverse proxy like Caddy or nginx.",
+				Tooltip: "RSTASH_TLS_MODE"},
+			{Label: "Email", Status: emailStatus, Level: emailLevel,
+				Detail:  "Required for password reset and email verification. Set RSTASH_EMAIL to an email provider DSN (e.g. resend:API_KEY?from=noreply@example.com).",
+				Tooltip: "RSTASH_EMAIL"},
+		},
 	}
 }
 

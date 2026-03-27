@@ -53,7 +53,7 @@ tasks:
     desc: Remove build artifacts and local database
     cmds:
       - rm -rf ./dist
-      - rm -f rstash.db rstash.db-wal rstash.db-shm
+      - rm -f rstash.sqlite rstash.sqlite-wal rstash.sqlite-shm
 
   build:
     desc: Cross-compile release binaries for all platforms

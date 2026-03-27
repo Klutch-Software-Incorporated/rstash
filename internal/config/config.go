@@ -15,7 +15,7 @@ const defaultPrivacyContent = "Privacy Policy\n\n1. Data Collected. This service
 type Config struct {
 	Addr             string  // RSTASH_ADDR — listen address
 	BaseURL          string  // RSTASH_BASE_URL — public URL of the server
-	DatabaseDSN      string  // RSTASH_DB — metadata database DSN (e.g. sqlite:rstash.db)
+	DatabaseDSN      string  // RSTASH_DB — metadata database DSN (e.g. sqlite:rstash.sqlite)
 	BlobDSN          string  // RSTASH_BLOB — blob store DSN (e.g. sqlite:blobs.db, fs:/path)
 	RegistrationMode string  // RSTASH_REGISTRATION — "open" or "closed"
 	LogLevel         string  // RSTASH_LOG_LEVEL — "debug", "info", "warn", "error"
@@ -30,6 +30,7 @@ type Config struct {
 	RefreshTokenLifetime string  // refresh token lifetime: "90d", "0" (no expiry)
 	MetricsMode          string  // "public", "admin", or "off"
 	PublicWrites         string  // "on" or "off"
+	SiteName             string  // display name in header/footer (default "rstash")
 	HomeSubtitle         string  // tagline on logged-out home page
 	TOSMode              string  // "off", "text", "url"
 	TOSContent           string
@@ -44,7 +45,7 @@ type Config struct {
 }
 
 // ParseDSN splits a DSN string into its scheme and path components.
-// For example, "sqlite:rstash.db" returns ("sqlite", "rstash.db", nil).
+// For example, "sqlite:rstash.sqlite" returns ("sqlite", "rstash.sqlite", nil).
 func ParseDSN(dsn string) (scheme, path string, err error) {
 	i := strings.Index(dsn, ":")
 	if i < 1 {
@@ -65,8 +66,8 @@ func Load() *Config {
 		// Boot-critical: read from env vars.
 		Addr:        envOrDefault(EnvAddr, ":8080"),
 		BaseURL:     envOrDefault(EnvBaseURL, "http://localhost:8080"),
-		DatabaseDSN: envOrDefault(EnvDB, "sqlite:rstash.db"),
-		BlobDSN:     envOrDefault(EnvBlob, "sqlite:rstash-blobs.db"),
+		DatabaseDSN: envOrDefault(EnvDB, "sqlite:rstash.sqlite"),
+		BlobDSN:     envOrDefault(EnvBlob, "sqlite:rstash-blobs.sqlite"),
 		LogLevel:    envOrDefault(EnvLogLevel, "info"),
 		LogFile:     os.Getenv(EnvLogFile),
 		TLSCert:     os.Getenv(EnvTLSCert),
@@ -76,6 +77,7 @@ func Load() *Config {
 		EmailDSN:    os.Getenv(EnvEmail),
 
 		// Runtime-editable: sane defaults, changed via CLI/admin UI.
+		SiteName:         "rstash",
 		HomeSubtitle:     "A personal remoteStorage server.",
 		MetricsMode:      "public",
 		PublicWrites:     "on",

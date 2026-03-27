@@ -35,8 +35,8 @@ RSTASH_BASE_URL="https://storage.example.com"
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `RSTASH_DB` | `sqlite:rstash.db` | Metadata database DSN |
-| `RSTASH_BLOB` | `sqlite:rstash-blobs.db` | Blob store DSN |
+| `RSTASH_DB` | `sqlite:rstash.sqlite` | Metadata database DSN |
+| `RSTASH_BLOB` | `sqlite:rstash-blobs.sqlite` | Blob store DSN |
 
 Both `RSTASH_DB` and `RSTASH_BLOB` accept a DSN (Data Source Name) with a scheme prefix indicating the database type:
 
@@ -54,8 +54,8 @@ The blob store (`RSTASH_BLOB`) also supports:
 
 ```bash
 # SQLite (default) — file in the current directory
-RSTASH_DB="sqlite:rstash.db"
-RSTASH_BLOB="sqlite:rstash-blobs.db"
+RSTASH_DB="sqlite:rstash.sqlite"
+RSTASH_BLOB="sqlite:rstash-blobs.sqlite"
 
 # PostgreSQL
 RSTASH_DB="postgres:host=localhost dbname=rstash user=rstash password=secret sslmode=disable"

@@ -40,6 +40,7 @@ func (d *UIDeps) pageData(w http.ResponseWriter, r *http.Request, title string, 
 		PrivacyUrl:       legalURL(snap.PrivacyMode, snap.PrivacyContent, "/legal/privacy"),
 		Version:          config.Version,
 		HasMailer:        d.Mailer != nil,
+		SiteName:         snap.SiteName,
 	}
 }
 

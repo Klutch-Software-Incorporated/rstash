@@ -49,8 +49,8 @@ All configuration is via environment variables. Run `rstash env` for a documente
 |----------|---------|-------------|
 | `RSTASH_ADDR` | `:8080` | Listen address (host:port) |
 | `RSTASH_BASE_URL` | `http://localhost:8080` | Public URL for WebFinger and OAuth |
-| `RSTASH_DB` | `sqlite:rstash.db` | Metadata database DSN |
-| `RSTASH_BLOB` | `sqlite:rstash-blobs.db` | Blob store DSN |
+| `RSTASH_DB` | `sqlite:rstash.sqlite` | Metadata database DSN |
+| `RSTASH_BLOB` | `sqlite:rstash-blobs.sqlite` | Blob store DSN |
 | `RSTASH_LOG_LEVEL` | `info` | Log level: debug, info, warn, error |
 | `RSTASH_LOG_FILE` | | Log file path (empty = stderr only) |
 | `RSTASH_TLS_MODE` | *(auto-detect)* | TLS mode: `off`, `manual`, `auto` |
@@ -65,7 +65,7 @@ Additional settings (registration mode, rate limits, quotas, OAuth token lifetim
 
 | Database | DSN Format | Example |
 |----------|-----------|---------|
-| SQLite | `sqlite:path` | `sqlite:rstash.db` |
+| SQLite | `sqlite:path` | `sqlite:rstash.sqlite` |
 | PostgreSQL | `postgres:connstring` | `postgres:host=localhost dbname=rstash` |
 | MySQL | `mysql:dsn` | `mysql:user:pass@tcp(localhost:3306)/rstash?parseTime=true` |
 | SQL Server | `mssql:dsn` | `mssql:sqlserver://sa:Pass@localhost:1433?database=rstash` |
@@ -74,7 +74,7 @@ Additional settings (registration mode, rate limits, quotas, OAuth token lifetim
 
 | Backend | DSN Format | Example |
 |---------|-----------|---------|
-| SQLite | `sqlite:path` | `sqlite:rstash-blobs.db` |
+| SQLite | `sqlite:path` | `sqlite:rstash-blobs.sqlite` |
 | Filesystem | `fs:/path` | `fs:/var/lib/rstash/blobs` |
 | S3-compatible | `s3:bucket?params` | `s3:my-bucket?region=us-west-2` |
 | Database | Any database DSN | `postgres:host=localhost dbname=blobs` |

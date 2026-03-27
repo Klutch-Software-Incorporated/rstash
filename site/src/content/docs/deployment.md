@@ -146,8 +146,8 @@ docker run -d \
   -p 8080:8080 \
   -v rstash-data:/data \
   -e RSTASH_BASE_URL="https://storage.example.com" \
-  -e RSTASH_DB="sqlite:/data/rstash.db" \
-  -e RSTASH_BLOB="sqlite:/data/rstash-blobs.db" \
+  -e RSTASH_DB="sqlite:/data/rstash.sqlite" \
+  -e RSTASH_BLOB="sqlite:/data/rstash-blobs.sqlite" \
   rstash
 ```
 
@@ -196,8 +196,8 @@ Using `fs:` for blob storage alongside PostgreSQL keeps large files on disk inst
 Back up the database files (stop the server first for a consistent snapshot, or use SQLite's backup API):
 
 ```bash
-cp /opt/rstash/rstash.db /backups/rstash-$(date +%F).db
-cp /opt/rstash/rstash-blobs.db /backups/rstash-blobs-$(date +%F).db
+cp /opt/rstash/rstash.sqlite /backups/rstash-$(date +%F).db
+cp /opt/rstash/rstash-blobs.sqlite /backups/rstash-blobs-$(date +%F).db
 ```
 
 ### Filesystem Blob Storage

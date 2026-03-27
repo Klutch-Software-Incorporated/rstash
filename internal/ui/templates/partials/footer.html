@@ -1,7 +1,7 @@
 {{define "footer"}}
 <footer>
   <p>
-    rstash{{if $.Version}} <small>{{$.Version}}</small>{{end}} &mdash; self-hosted <a href="https://remotestorage.io">remoteStorage</a> server
+    {{if $.SiteName}}{{$.SiteName}}{{else}}rstash{{end}}{{if $.Version}} <small>{{$.Version}}</small>{{end}} &mdash; self-hosted <a href="https://remotestorage.io">remoteStorage</a> server
     {{if or $.TOSUrl $.PrivacyUrl}} &middot; {{end}}
     {{if $.TOSUrl}}<a href="{{$.TOSUrl}}">Terms</a>{{end}}
     {{if and $.TOSUrl $.PrivacyUrl}} &middot; {{end}}

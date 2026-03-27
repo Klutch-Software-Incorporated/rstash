@@ -1,7 +1,7 @@
 {{define "header"}}
 <header>
   <div class="header-top">
-    <h1><a href="/">rstash</a></h1>
+    <h1><a href="/">{{if .SiteName}}{{.SiteName}}{{else}}rstash{{end}}</a></h1>
     {{if .CurrentUser}}
       <button class="nav-toggle" aria-label="Toggle navigation" onclick="document.querySelector('header nav ul').classList.toggle('open')">&#9776;</button>
     {{end}}

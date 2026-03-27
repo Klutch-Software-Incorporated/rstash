@@ -60,7 +60,7 @@ func (h *homeHandler) Show(w http.ResponseWriter, r *http.Request) {
 	}{
 		Subtitle: snap.HomeSubtitle,
 	}
-	pd := h.deps.pageData(w, r, "rstash", content)
+	pd := h.deps.pageData(w, r, snap.SiteName, content)
 	pd.HideHeader = true
 	h.deps.Renderer.Render(w, "home", pd)
 }

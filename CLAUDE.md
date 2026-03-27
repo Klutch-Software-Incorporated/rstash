@@ -41,8 +41,8 @@ All configuration is via environment variables (see `rstash env` for a documente
 |----------|---------|-------------|
 | RSTASH_ADDR | :8080 | Listen address (host:port) |
 | RSTASH_BASE_URL | http://localhost:8080 | Public URL of the server |
-| RSTASH_DB | sqlite:rstash.db | Metadata database DSN (sqlite:, postgres:, mysql:, mssql:) |
-| RSTASH_BLOB | sqlite:rstash-blobs.db | Blob store DSN (sqlite:path, fs:/path, s3:bucket, or database DSN) |
+| RSTASH_DB | sqlite:rstash.sqlite | Metadata database DSN (sqlite:, postgres:, mysql:, mssql:) |
+| RSTASH_BLOB | sqlite:rstash-blobs.sqlite | Blob store DSN (sqlite:path, fs:/path, s3:bucket, or database DSN) |
 | RSTASH_LOG_LEVEL | info | Log level: debug, info, warn, error |
 | RSTASH_LOG_FILE | | Path to log file (empty = stderr only) |
 | RSTASH_TLS_CERT | | TLS certificate file path |

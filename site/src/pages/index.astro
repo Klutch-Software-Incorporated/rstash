@@ -37,8 +37,8 @@ const features = [
 const configVars = [
   { name: "RSTASH_ADDR", default: ":8080", desc: "Listen address" },
   { name: "RSTASH_BASE_URL", default: "http://localhost:8080", desc: "Public URL" },
-  { name: "RSTASH_DB", default: "sqlite:rstash.db", desc: "Database DSN" },
-  { name: "RSTASH_BLOB", default: "sqlite:rstash-blobs.db", desc: "Blob store DSN" },
+  { name: "RSTASH_DB", default: "sqlite:rstash.sqlite", desc: "Database DSN" },
+  { name: "RSTASH_BLOB", default: "sqlite:rstash-blobs.sqlite", desc: "Blob store DSN" },
   { name: "RSTASH_LOG_LEVEL", default: "info", desc: "Log level" },
   { name: "RSTASH_TLS_MODE", default: "auto-detect", desc: "TLS mode" },
   { name: "RSTASH_EMAIL", default: "(none)", desc: "Email provider DSN" },

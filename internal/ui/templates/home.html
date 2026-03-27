@@ -1,7 +1,7 @@
 {{define "home"}}
 <div class="home-hero">
     <div class="home-branding">
-        <h1 class="home-title">rstash</h1>
+        <h1 class="home-title">{{if .SiteName}}{{.SiteName}}{{else}}rstash{{end}}</h1>
         <p class="home-subtitle">{{with .Content}}{{.Subtitle}}{{end}}</p>
         <p class="home-tagline">One account for all your <a href="https://remotestorage.io">remoteStorage</a> apps. Your data, always under your control.</p>
     </div>

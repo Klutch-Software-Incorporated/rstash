@@ -71,7 +71,7 @@ To test the full server with S3-backed blob storage:
 podman exec minio mc mb local/rstash
 
 # Start rstash with S3 blob storage
-export RSTASH_DB="sqlite:rstash.db"
+export RSTASH_DB="sqlite:rstash.sqlite"
 export RSTASH_BLOB="s3:rstash?endpoint=localhost:9000&tls=false&access_key=minioadmin&secret_key=minioadmin"
 go run . serve
 ```
