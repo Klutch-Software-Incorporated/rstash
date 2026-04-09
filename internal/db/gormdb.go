@@ -85,7 +85,16 @@ func parseDSN(dsn string) (scheme, connStr string) {
 	// Handle known multi-char schemes first.
 	for _, prefix := range []string{"sqlite:", "postgres:", "mysql:", "mssql:"} {
 		if strings.HasPrefix(dsn, prefix) {
-			return strings.TrimSuffix(prefix, ":"), dsn[len(prefix):]
+			s := strings.TrimSuffix(prefix, ":")
+			cs := dsn[len(prefix):]
+			// Postgres and MySQL drivers accept full URL format (e.g.
+			// postgres://user:pass@host/db). If the remainder looks like a
+			// URL (starts with //), pass the original DSN so the driver
+			// receives a complete URL with the scheme intact.
+			if (s == "postgres" || s == "mysql") && strings.HasPrefix(cs, "//") {
+				return s, dsn
+			}
+			return s, cs
 		}
 	}
 	// No recognized scheme — treat as a bare SQLite path.
