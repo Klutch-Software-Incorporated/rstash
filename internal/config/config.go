@@ -41,6 +41,7 @@ type Config struct {
 	TLSMode              string  // RSTASH_TLS_MODE — "off", "manual", "auto", or "" (auto-detect)
 	TLSCacheDir          string  // RSTASH_TLS_CACHE — autocert cache directory
 	EmailDSN             string  // RSTASH_EMAIL — email provider DSN
+	APIKey               string  // RSTASH_API_KEY — admin API key
 }
 
 // ParseDSN splits a DSN string into its scheme and path components.
@@ -74,6 +75,7 @@ func Load() *Config {
 		TLSMode:     os.Getenv(EnvTLSMode),
 		TLSCacheDir: envOrDefault(EnvTLSCache, "./certs"),
 		EmailDSN:    os.Getenv(EnvEmail),
+		APIKey:      os.Getenv(EnvAPIKey),
 
 		// Runtime-editable: sane defaults, changed via CLI/admin UI.
 		SiteName:         "rstash",
@@ -94,6 +96,16 @@ func Load() *Config {
 		RefreshTokens:        "enabled",
 		RefreshTokenLifetime: "90d",
 	}
+}
+
+func maskSecret(s string) string {
+	if s == "" {
+		return ""
+	}
+	if len(s) <= 8 {
+		return "***"
+	}
+	return s[:4] + "***" + s[len(s)-4:]
 }
 
 func envOrDefault(key, defaultVal string) string {
@@ -148,5 +160,6 @@ func (c *Config) ValueMap() map[string]string {
 		"tls_mode":               c.TLSMode,
 		"tls_cache":              c.TLSCacheDir,
 		"email_dsn":              c.EmailDSN,
+		"api_key":                maskSecret(c.APIKey),
 	}
 }
