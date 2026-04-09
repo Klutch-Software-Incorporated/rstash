@@ -8,7 +8,7 @@ import (
 	"gorm.io/gorm"
 )
 
-// Migrate runs GORM AutoMigrate for all model types.
+// Migrate runs GORM AutoMigrate for all model types and applies data migrations.
 func Migrate(gormDB *gorm.DB) error {
 	if err := gormDB.AutoMigrate(
 		&model.User{},
@@ -25,6 +25,13 @@ func Migrate(gormDB *gorm.DB) error {
 	); err != nil {
 		return fmt.Errorf("auto migrate: %w", err)
 	}
+
+	// Data migration: delete legacy folder nodes. Folders are now implicit
+	// (derived from document paths), so explicit folder rows are no longer needed.
+	if gormDB.Migrator().HasColumn(&model.Node{}, "is_folder") {
+		gormDB.Exec("DELETE FROM nodes WHERE is_folder = ?", true)
+	}
+
 	return nil
 }
 

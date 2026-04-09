@@ -44,7 +44,6 @@ type Node struct {
 	ID            int64     `gorm:"primaryKey;autoIncrement"`
 	UserID        int64     `gorm:"not null;uniqueIndex:idx_nodes_user_path"`
 	Path          string    `gorm:"size:512;not null;uniqueIndex:idx_nodes_user_path"`
-	IsFolder      bool      `gorm:"not null;default:false"`
 	ContentType   string    `gorm:"size:255;default:''"`
 	ContentLength int64     `gorm:"default:0"`
 	ETag          string    `gorm:"size:255;not null"`

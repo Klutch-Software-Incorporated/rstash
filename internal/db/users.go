@@ -338,7 +338,7 @@ func (r *Repository) TopUsersByStorage(ctx context.Context, limit int) ([]*TopUs
 	err := r.db.WithContext(ctx).
 		Table("users u").
 		Select("u.username, COALESCE(SUM(n.content_length), 0) AS storage_used").
-		Joins("LEFT JOIN nodes n ON n.user_id = u.id AND n.is_folder = ?", false).
+		Joins("LEFT JOIN nodes n ON n.user_id = u.id").
 		Where("u.id >= 1").
 		Group("u.id").
 		Order("storage_used DESC").
@@ -350,10 +350,10 @@ func (r *Repository) TopUsersByStorage(ctx context.Context, limit int) ([]*TopUs
 	return results, nil
 }
 
-// GetTotalStorageUsed returns the total content_length across all users' non-folder nodes.
+// GetTotalStorageUsed returns the total content_length across all users' document nodes.
 func (r *Repository) GetTotalStorageUsed(ctx context.Context) (int64, error) {
 	var total *int64
-	err := r.db.WithContext(ctx).Model(&model.Node{}).Where("is_folder = ?", false).Select("COALESCE(SUM(content_length), 0)").Scan(&total).Error
+	err := r.db.WithContext(ctx).Model(&model.Node{}).Select("COALESCE(SUM(content_length), 0)").Scan(&total).Error
 	if err != nil {
 		return 0, fmt.Errorf("get total storage used: %w", err)
 	}

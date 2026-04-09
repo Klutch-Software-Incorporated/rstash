@@ -35,7 +35,7 @@ func createTestUser(t *testing.T, repo *db.Repository, username string, quota in
 
 func addTestNode(t *testing.T, repo *db.Repository, userID int64, path string, size int64) {
 	t.Helper()
-	_, err := repo.UpsertNode(context.Background(), userID, path, false, "", size, "etag")
+	_, err := repo.UpsertNode(context.Background(), userID, path, "", size, "etag")
 	if err != nil {
 		t.Fatal(err)
 	}

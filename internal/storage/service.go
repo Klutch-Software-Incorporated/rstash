@@ -89,7 +89,7 @@ func NewService(repo *db.Repository, blobs blob.Store, quota *QuotaChecker) *Ser
 	return &Service{repo: repo, blobs: blobs, quota: quota}
 }
 
-// PutDocument stores a document and propagates folder ETags up to root.
+// PutDocument stores a document.
 // Blob is written first (non-transactional), then metadata is updated in a TX.
 func (s *Service) PutDocument(ctx context.Context, userID int64, path string, content io.Reader, contentType string, cond Conditions) (*PutResult, error) {
 	if strings.HasSuffix(path, "/") {
@@ -133,17 +133,14 @@ func (s *Service) PutDocument(ctx context.Context, userID int64, path string, co
 			return err
 		}
 
-		// Document/folder conflict: existing node at this path is a folder,
-		// or a folder with the same name already exists (path + "/").
-		if existing != nil && existing.IsFolder {
-			return ErrConflict
-		}
-		folderPeer, err := txRepo.GetNode(ctx, userID, path+"/")
-		if err != nil {
+		// Document/folder conflict: a document cannot be created at a path
+		// that is already used as a folder prefix by other documents, or
+		// where an ancestor segment matches an existing document.
+		if err := txRepo.CheckPathConflict(ctx, userID, path); err != nil {
+			if errors.Is(err, db.ErrPathConflict) {
+				return ErrConflict
+			}
 			return err
-		}
-		if folderPeer != nil {
-			return ErrConflict
 		}
 
 		// If-Match: require existing ETag to match.
@@ -171,11 +168,7 @@ func (s *Service) PutDocument(ctx context.Context, userID int64, path string, co
 
 		isNew := existing == nil
 
-		if _, err := txRepo.UpsertNode(ctx, userID, path, false, contentType, int64(len(data)), etag); err != nil {
-			return err
-		}
-
-		if err := propagateETags(ctx, txRepo, userID, path); err != nil {
+		if _, err := txRepo.UpsertNode(ctx, userID, path, contentType, int64(len(data)), etag); err != nil {
 			return err
 		}
 
@@ -202,7 +195,7 @@ func (s *Service) GetDocument(ctx context.Context, userID int64, path string, co
 	if err != nil {
 		return nil, err
 	}
-	if node == nil || node.IsFolder {
+	if node == nil {
 		return nil, ErrNotFound
 	}
 
@@ -229,7 +222,7 @@ func (s *Service) HeadDocument(ctx context.Context, userID int64, path string, c
 	if err != nil {
 		return nil, err
 	}
-	if node == nil || node.IsFolder {
+	if node == nil {
 		return nil, ErrNotFound
 	}
 
@@ -244,8 +237,7 @@ func (s *Service) HeadDocument(ctx context.Context, userID int64, path string, c
 	}, nil
 }
 
-// DeleteDocument removes a document and propagates folder ETags, cleaning up
-// empty ancestor folders (except root "/").
+// DeleteDocument removes a document.
 // Metadata is deleted in a TX first, then the blob is removed after commit.
 func (s *Service) DeleteDocument(ctx context.Context, userID int64, path string, cond Conditions) (*DeleteResult, error) {
 	var deleteResult *DeleteResult
@@ -269,31 +261,6 @@ func (s *Service) DeleteDocument(ctx context.Context, userID int64, path string,
 			return err
 		}
 
-		// Propagate folder ETags and clean up empty ancestor folders.
-		ancestors := db.AncestorPaths(path)
-		for _, folderPath := range ancestors {
-			children, err := txRepo.ListChildren(ctx, userID, folderPath)
-			if err != nil {
-				return err
-			}
-
-			if len(children) == 0 && folderPath != "/" {
-				if err := txRepo.DeleteNode(ctx, userID, folderPath); err != nil {
-					return err
-				}
-			} else {
-				childETags := make(map[string]string)
-				for _, child := range children {
-					name := strings.TrimPrefix(child.Path, folderPath)
-					childETags[name] = child.ETag
-				}
-				etag := FolderETag(childETags)
-				if _, err := txRepo.UpsertNode(ctx, userID, folderPath, true, "", 0, etag); err != nil {
-					return err
-				}
-			}
-		}
-
 		deleteResult = &DeleteResult{ETag: deletedETag}
 		return nil
 	})
@@ -310,8 +277,7 @@ func (s *Service) DeleteDocument(ctx context.Context, userID int64, path string,
 	return deleteResult, nil
 }
 
-// DeleteFolder recursively removes a folder and all its contents (files and
-// subfolders), then propagates ETags up to ancestor folders.
+// DeleteFolder recursively removes all documents under a folder path.
 // Metadata is deleted in a TX first, then blobs are removed after commit.
 func (s *Service) DeleteFolder(ctx context.Context, userID int64, folderPath string) (int, error) {
 	if !strings.HasSuffix(folderPath, "/") {
@@ -331,34 +297,9 @@ func (s *Service) DeleteFolder(ctx context.Context, userID int64, folderPath str
 		}
 		fileCount = len(files)
 
-		// Delete all nodes (files + folders) under this path, including the folder itself.
+		// Delete all document nodes under this path.
 		if err := txRepo.DeleteSubtree(ctx, userID, folderPath); err != nil {
 			return err
-		}
-
-		// Propagate ETags and clean up empty ancestor folders.
-		ancestors := db.AncestorPaths(folderPath)
-		for _, ancestorPath := range ancestors {
-			children, err := txRepo.ListChildren(ctx, userID, ancestorPath)
-			if err != nil {
-				return err
-			}
-
-			if len(children) == 0 && ancestorPath != "/" {
-				if err := txRepo.DeleteNode(ctx, userID, ancestorPath); err != nil {
-					return err
-				}
-			} else {
-				childETags := make(map[string]string)
-				for _, child := range children {
-					name := strings.TrimPrefix(child.Path, ancestorPath)
-					childETags[name] = child.ETag
-				}
-				etag := FolderETag(childETags)
-				if _, err := txRepo.UpsertNode(ctx, userID, ancestorPath, true, "", 0, etag); err != nil {
-					return err
-				}
-			}
 		}
 
 		return nil
@@ -376,58 +317,38 @@ func (s *Service) DeleteFolder(ctx context.Context, userID int64, folderPath str
 	return fileCount, nil
 }
 
-// GetFolder returns a JSON-LD folder description listing direct children.
+// GetFolder returns a JSON-LD folder description with virtual children derived
+// from document paths. Folders are implicit — they exist because documents
+// exist beneath them. ETags are computed on-the-fly from children.
 func (s *Service) GetFolder(ctx context.Context, userID int64, path string, cond Conditions) (*api.FolderDescription, string, error) {
-	node, err := s.repo.GetNode(ctx, userID, path)
-	if err != nil {
-		return nil, "", err
-	}
-
-	var etag string
-	if node != nil {
-		etag = node.ETag
-	}
-
-	if etag != "" && cond.IfNoneMatchContains(etag) {
-		return nil, etag, ErrNotModified
-	}
-
-	children, err := s.repo.ListChildren(ctx, userID, path)
+	children, err := s.repo.ListVirtualChildren(ctx, userID, path)
 	if err != nil {
 		return nil, "", err
 	}
 
 	items := make(map[string]api.FolderItem)
+	childETags := make(map[string]string)
+
 	for _, child := range children {
-		name := strings.TrimPrefix(child.Path, path)
 		if child.IsFolder {
-			// Per spec, empty folders MUST NOT appear in the parent listing.
-			grandchildren, err := s.repo.ListChildren(ctx, userID, child.Path)
-			if err != nil {
-				return nil, "", err
-			}
-			if len(grandchildren) == 0 {
-				continue
-			}
-			items[name] = api.FolderItem{ETag: child.ETag}
+			// Virtual folder: ETag is computed from descendant documents.
+			items[child.Name] = api.FolderItem{ETag: child.ETag}
 		} else {
 			cl := child.ContentLength
-			items[name] = api.FolderItem{
+			items[child.Name] = api.FolderItem{
 				ETag:          child.ETag,
 				ContentType:   child.ContentType,
 				ContentLength: &cl,
 				LastModified:  child.UpdatedAt.UTC().Format(http.TimeFormat),
 			}
 		}
+		childETags[child.Name] = child.ETag
 	}
 
-	// Compute ETag from children if no folder node exists (e.g., empty root).
-	if etag == "" {
-		childETags := make(map[string]string)
-		for name, item := range items {
-			childETags[name] = item.ETag
-		}
-		etag = FolderETag(childETags)
+	etag := FolderETag(childETags)
+
+	if cond.IfNoneMatchContains(etag) {
+		return nil, etag, ErrNotModified
 	}
 
 	desc := &api.FolderDescription{
@@ -436,64 +357,4 @@ func (s *Service) GetFolder(ctx context.Context, userID int64, path string, cond
 	}
 
 	return desc, etag, nil
-}
-
-// CreateFolder creates an empty folder node and propagates ETags.
-// The path must end with "/" and must not be root "/".
-func (s *Service) CreateFolder(ctx context.Context, userID int64, folderPath string) error {
-	if !strings.HasSuffix(folderPath, "/") {
-		return ErrConflict
-	}
-	if folderPath == "/" {
-		return ErrConflict
-	}
-
-	return s.repo.Transaction(func(txRepo *db.Repository) error {
-		existing, err := txRepo.GetNode(ctx, userID, folderPath)
-		if err != nil {
-			return err
-		}
-		if existing != nil {
-			return ErrConflict
-		}
-
-		// Document/folder conflict: a document with the same name exists.
-		docPeer, err := txRepo.GetNode(ctx, userID, strings.TrimSuffix(folderPath, "/"))
-		if err != nil {
-			return err
-		}
-		if docPeer != nil {
-			return ErrConflict
-		}
-
-		etag := FolderETag(nil)
-		if _, err := txRepo.UpsertNode(ctx, userID, folderPath, true, "", 0, etag); err != nil {
-			return err
-		}
-
-		return propagateETags(ctx, txRepo, userID, folderPath)
-	})
-}
-
-// propagateETags recomputes folder ETags for all ancestors of path.
-func propagateETags(ctx context.Context, repo *db.Repository, userID int64, path string) error {
-	ancestors := db.AncestorPaths(path)
-	for _, folderPath := range ancestors {
-		children, err := repo.ListChildren(ctx, userID, folderPath)
-		if err != nil {
-			return err
-		}
-
-		childETags := make(map[string]string)
-		for _, child := range children {
-			name := strings.TrimPrefix(child.Path, folderPath)
-			childETags[name] = child.ETag
-		}
-
-		etag := FolderETag(childETags)
-		if _, err := repo.UpsertNode(ctx, userID, folderPath, true, "", 0, etag); err != nil {
-			return err
-		}
-	}
-	return nil
 }

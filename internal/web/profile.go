@@ -4,12 +4,9 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
-	"mime"
-	"mime/multipart"
 	"net/http"
 	"net/url"
 	"path"
-	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -21,37 +18,6 @@ import (
 	"rstash/internal/storage"
 	"rstash/internal/ui"
 )
-
-var moduleNameRe = regexp.MustCompile(`^[a-zA-Z0-9_-]+$`)
-var folderNameRe = regexp.MustCompile(`^[a-zA-Z0-9_.-]+$`)
-
-// fallbackMIME supplements Go's mime package for common extensions it doesn't know.
-var fallbackMIME = map[string]string{
-	".md":         "text/markdown",
-	".markdown":   "text/markdown",
-	".yaml":       "application/yaml",
-	".yml":        "application/yaml",
-	".toml":       "application/toml",
-	".go":         "text/x-go",
-	".rs":         "text/x-rust",
-	".sh":         "text/x-shellscript",
-	".bash":       "text/x-shellscript",
-	".zsh":        "text/x-shellscript",
-	".fish":       "text/x-shellscript",
-	".ps1":        "text/x-powershell",
-	".bat":        "text/x-bat",
-	".cmd":        "text/x-bat",
-	".dockerfile": "text/x-dockerfile",
-	".tf":         "text/x-terraform",
-	".tsx":        "text/tsx",
-	".jsx":        "text/jsx",
-}
-
-// knownFilenames maps extensionless filenames to MIME types.
-var knownFilenames = map[string]string{
-	"dockerfile": "text/x-dockerfile",
-	"makefile":   "text/x-makefile",
-}
 
 type tokenRow struct {
 	TokenPrefix string
@@ -637,70 +603,6 @@ func (h *profileHandler) DeleteFile(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, prefix+"/files"+parentFolder, http.StatusSeeOther)
 }
 
-func (h *profileHandler) UploadFile(w http.ResponseWriter, r *http.Request) {
-	target := TargetUser(r)
-	prefix := urlPrefix(r)
-
-	maxSize := h.deps.Settings.Load().MaxUploadSize
-	if maxSize <= 0 {
-		maxSize = 50 << 20
-	}
-	r.Body = http.MaxBytesReader(w, r.Body, maxSize)
-
-	if err := r.ParseMultipartForm(maxSize); err != nil {
-		ui.SetFlashError(w, "Upload failed: file too large or invalid form data.")
-		http.Redirect(w, r, prefix+"/files/", http.StatusSeeOther)
-		return
-	}
-
-	folder := r.FormValue("folder")
-	if folder == "" {
-		folder = "/"
-	}
-	if !strings.HasSuffix(folder, "/") {
-		folder += "/"
-	}
-
-	if folder == "/" {
-		ui.SetFlashError(w, "Cannot upload to root. Please create or select a module first.")
-		http.Redirect(w, r, prefix+"/files/", http.StatusSeeOther)
-		return
-	}
-
-	files := r.MultipartForm.File["files"]
-	if len(files) == 0 {
-		ui.SetFlashError(w, "No files selected.")
-		http.Redirect(w, r, prefix+"/files"+folder, http.StatusSeeOther)
-		return
-	}
-
-	uploaded := 0
-	for _, fh := range files {
-		f, err := fh.Open()
-		if err != nil {
-			slog.Error("failed to open uploaded file", "error", err, "filename", fh.Filename)
-			continue
-		}
-
-		contentType := detectContentType(fh)
-		docPath := folder + fh.Filename
-		_, err = h.deps.Storage.PutDocument(r.Context(), target.ID, docPath, f, contentType, storage.Conditions{})
-		f.Close()
-		if err != nil {
-			slog.Error("failed to store uploaded file", "error", err, "path", docPath)
-			continue
-		}
-		uploaded++
-	}
-
-	if uploaded == len(files) {
-		ui.SetFlash(w, fmt.Sprintf("Uploaded %d file(s).", uploaded))
-	} else {
-		ui.SetFlash(w, fmt.Sprintf("Uploaded %d of %d file(s). Some failed.", uploaded, len(files)))
-	}
-	http.Redirect(w, r, prefix+"/files"+folder, http.StatusSeeOther)
-}
-
 func (h *profileHandler) BulkDeleteFiles(w http.ResponseWriter, r *http.Request) {
 	target := TargetUser(r)
 	prefix := urlPrefix(r)
@@ -745,68 +647,6 @@ func (h *profileHandler) BulkDeleteFiles(w http.ResponseWriter, r *http.Request)
 	}
 }
 
-func (h *profileHandler) CreateModule(w http.ResponseWriter, r *http.Request) {
-	target := TargetUser(r)
-	prefix := urlPrefix(r)
-
-	name := strings.TrimSpace(r.FormValue("name"))
-	if !moduleNameRe.MatchString(name) {
-		ui.SetFlashError(w, "Invalid module name. Use only letters, numbers, hyphens, and underscores.")
-		http.Redirect(w, r, prefix+"/files/", http.StatusSeeOther)
-		return
-	}
-
-	folderPath := "/" + name + "/"
-	err := h.deps.Storage.CreateFolder(r.Context(), target.ID, folderPath)
-	if err != nil {
-		if err == storage.ErrConflict {
-			ui.SetFlashError(w, fmt.Sprintf("Module %q already exists.", name))
-		} else {
-			slog.Error("failed to create module", "error", err, "name", name)
-			ui.SetFlashError(w, "Failed to create module.")
-		}
-		http.Redirect(w, r, prefix+"/files/", http.StatusSeeOther)
-		return
-	}
-
-	ui.SetFlash(w, fmt.Sprintf("Created module %s/", name))
-	http.Redirect(w, r, prefix+"/files/", http.StatusSeeOther)
-}
-
-func (h *profileHandler) CreateFolder(w http.ResponseWriter, r *http.Request) {
-	target := TargetUser(r)
-	prefix := urlPrefix(r)
-
-	parent := r.FormValue("parent")
-	if parent == "" || !strings.HasSuffix(parent, "/") {
-		ui.SetFlashError(w, "Invalid parent folder.")
-		http.Redirect(w, r, prefix+"/files/", http.StatusSeeOther)
-		return
-	}
-
-	name := strings.TrimSpace(r.FormValue("name"))
-	if !folderNameRe.MatchString(name) {
-		ui.SetFlashError(w, "Invalid folder name. Use only letters, numbers, hyphens, underscores, and dots.")
-		http.Redirect(w, r, prefix+"/files"+parent, http.StatusSeeOther)
-		return
-	}
-
-	folderPath := parent + name + "/"
-	err := h.deps.Storage.CreateFolder(r.Context(), target.ID, folderPath)
-	if err != nil {
-		if err == storage.ErrConflict {
-			ui.SetFlashError(w, fmt.Sprintf("Folder %q already exists.", name))
-		} else {
-			slog.Error("failed to create folder", "error", err, "path", folderPath)
-			ui.SetFlashError(w, "Failed to create folder.")
-		}
-		http.Redirect(w, r, prefix+"/files"+parent, http.StatusSeeOther)
-		return
-	}
-
-	ui.SetFlash(w, fmt.Sprintf("Created folder %s/", name))
-	http.Redirect(w, r, prefix+"/files"+parent, http.StatusSeeOther)
-}
 
 // --- Settings POST handlers ---
 
@@ -1179,20 +1019,3 @@ func profileBreadcrumbs(storagePath, prefix string) []breadcrumb {
 	return crumbs
 }
 
-// detectContentType determines a MIME type from a multipart file header.
-func detectContentType(fh *multipart.FileHeader) string {
-	contentType := fh.Header.Get("Content-Type")
-	if contentType == "" || contentType == "application/octet-stream" {
-		ext := strings.ToLower(path.Ext(fh.Filename))
-		if detected := mime.TypeByExtension(ext); detected != "" {
-			contentType = detected
-		} else if detected, ok := fallbackMIME[ext]; ok {
-			contentType = detected
-		} else if ext == "" {
-			if detected, ok := knownFilenames[strings.ToLower(fh.Filename)]; ok {
-				contentType = detected
-			}
-		}
-	}
-	return contentType
-}

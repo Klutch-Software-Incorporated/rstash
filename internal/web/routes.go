@@ -139,14 +139,8 @@ func profileRouter(deps *UIDeps) http.Handler {
 		// --- POST routes: file operations ---
 		case method == "POST" && sub == "/files/delete":
 			scope(RequireCSRF(ph.DeleteFile))(w, r)
-		case method == "POST" && sub == "/files/upload":
-			scope(RequireCSRF(ph.UploadFile))(w, r)
 		case method == "POST" && sub == "/files/bulk-delete":
 			scope(RequireCSRF(ph.BulkDeleteFiles))(w, r)
-		case method == "POST" && sub == "/files/create-module":
-			scope(RequireCSRF(ph.CreateModule))(w, r)
-		case method == "POST" && sub == "/files/create-folder":
-			scope(RequireCSRF(ph.CreateFolder))(w, r)
 
 		// --- POST routes: settings operations ---
 		case method == "POST" && sub == "/settings/email":
