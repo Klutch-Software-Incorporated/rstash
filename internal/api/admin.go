@@ -191,6 +191,14 @@ func (d *AdminDeps) createUser(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "password is required (or set provision=true to issue a claim token)")
 		return
 	}
+	if req.QuotaBytes < 0 {
+		writeError(w, http.StatusBadRequest, "quota_bytes must be >= 0 (0 means use the server default)")
+		return
+	}
+	if req.BandwidthQuotaBytes < 0 {
+		writeError(w, http.StatusBadRequest, "bandwidth_quota_bytes must be >= 0 (0 means use the server default)")
+		return
+	}
 
 	password := req.Password
 	if req.Provision {
@@ -290,6 +298,10 @@ func (d *AdminDeps) setUserQuota(w http.ResponseWriter, r *http.Request) {
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid JSON body")
+		return
+	}
+	if req.QuotaBytes < 0 {
+		writeError(w, http.StatusBadRequest, "quota_bytes must be >= 0 (0 means use the server default)")
 		return
 	}
 
@@ -475,6 +487,10 @@ func (d *AdminDeps) setUserBandwidthQuota(w http.ResponseWriter, r *http.Request
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid JSON body")
+		return
+	}
+	if req.QuotaBytes < 0 {
+		writeError(w, http.StatusBadRequest, "quota_bytes must be >= 0 (0 means use the server default)")
 		return
 	}
 	user, err := d.Repo.GetUserByUsername(r.Context(), username)

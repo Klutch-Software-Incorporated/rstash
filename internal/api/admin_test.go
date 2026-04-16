@@ -209,6 +209,58 @@ func TestAdminAPI_CreateUser_Provision(t *testing.T) {
 	}
 }
 
+func TestAdminAPI_SetUserQuota_RejectsNegative(t *testing.T) {
+	deps, repo := setupAdminTest(t)
+	handler := AdminRoutes(deps)
+
+	_, _ = repo.CreateUser(t.Context(), "neg", "password123", "", false, true)
+
+	body := `{"quota_bytes":-1}`
+	req := httptest.NewRequest("PUT", "/api/admin/users/neg/quota", bytes.NewReader([]byte(body)))
+	req.Header.Set("X-API-Key", testAPIKey)
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+func TestAdminAPI_SetUserBandwidthQuota_RejectsNegative(t *testing.T) {
+	deps, repo := setupAdminTest(t)
+	handler := AdminRoutes(deps)
+
+	_, _ = repo.CreateUser(t.Context(), "neg2", "password123", "", false, true)
+
+	body := `{"quota_bytes":-500}`
+	req := httptest.NewRequest("PUT", "/api/admin/users/neg2/bandwidth_quota", bytes.NewReader([]byte(body)))
+	req.Header.Set("X-API-Key", testAPIKey)
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+func TestAdminAPI_CreateUser_RejectsNegativeQuota(t *testing.T) {
+	deps, _ := setupAdminTest(t)
+	handler := AdminRoutes(deps)
+
+	body := `{"username":"zz","password":"password123","quota_bytes":-1}`
+	req := httptest.NewRequest("POST", "/api/admin/users", bytes.NewReader([]byte(body)))
+	req.Header.Set("X-API-Key", testAPIKey)
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
 func TestAdminAPI_CreateUser_ProvisionRequiresNoPassword(t *testing.T) {
 	deps, _ := setupAdminTest(t)
 	handler := AdminRoutes(deps)
