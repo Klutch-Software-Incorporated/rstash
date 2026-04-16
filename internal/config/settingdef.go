@@ -27,7 +27,6 @@ const (
 	EnvTLSMode  = "RSTASH_TLS_MODE"
 	EnvTLSCache = "RSTASH_TLS_CACHE"
 	EnvEmail    = "RSTASH_EMAIL"
-	EnvAPIKey   = "RSTASH_API_KEY"
 )
 
 // SettingDef describes one configurable setting — the single source of truth
@@ -150,17 +149,6 @@ func SettingDefs() []SettingDef {
 			Label:           "Email provider",
 			Description:     "Email delivery DSN (e.g. resend:API_KEY?from=noreply@example.com). Empty = email disabled.",
 			Help:            "The DSN for the email delivery provider, set via the " + EnvEmail + " environment variable. Currently supported: resend:API_KEY?from=sender@domain.com. When configured, enables email verification, password reset, and notification features. When empty, these features are disabled but email addresses are still collected. Changing this setting requires a server restart.",
-			InputType:       InputText,
-			RuntimeEditable: false,
-		},
-
-		{
-			Key:             "api_key",
-			EnvVar:          EnvAPIKey,
-			Group:           "Server",
-			Label:           "Admin API key",
-			Description:     "Shared secret for the admin API. Empty = admin API disabled.",
-			Help:            "A static API key for authenticating admin API requests, set via the " + EnvAPIKey + " environment variable. Clients pass it in the X-API-Key header. When empty, the admin API endpoints return 503. Changing this setting requires a server restart.",
 			InputType:       InputText,
 			RuntimeEditable: false,
 		},

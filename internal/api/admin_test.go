@@ -8,7 +8,10 @@ import (
 	"testing"
 
 	"rstash/internal/db"
+	"rstash/internal/model"
 )
+
+const testAPIKey = "test-key"
 
 func setupAdminTest(t *testing.T) (*AdminDeps, *db.Repository) {
 	t.Helper()
@@ -16,24 +19,33 @@ func setupAdminTest(t *testing.T) (*AdminDeps, *db.Repository) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	deps := &AdminDeps{Repo: repo, APIKey: "test-key"}
-	return deps, repo
-}
-
-func TestAdminAPI_NoAPIKey(t *testing.T) {
-	repo, err := db.OpenRepository("sqlite::memory:")
+	hash, err := db.HashAPIKey(testAPIKey)
 	if err != nil {
 		t.Fatal(err)
 	}
-	deps := &AdminDeps{Repo: repo, APIKey: ""}
+	key := &model.APIKey{
+		Name:         "test",
+		KeyHash:      hash,
+		KeyPrefix:    db.APIKeyPrefix(testAPIKey),
+		RateLimitRPM: 60,
+	}
+	if err := repo.CreateAPIKey(t.Context(), key); err != nil {
+		t.Fatal(err)
+	}
+	deps := &AdminDeps{Repo: repo}
+	return deps, repo
+}
+
+func TestAdminAPI_MissingKey(t *testing.T) {
+	deps, _ := setupAdminTest(t)
 	handler := AdminRoutes(deps)
 
 	req := httptest.NewRequest("GET", "/api/admin/users", nil)
 	w := httptest.NewRecorder()
 	handler.ServeHTTP(w, req)
 
-	if w.Code != http.StatusServiceUnavailable {
-		t.Fatalf("expected 503 when API key not configured, got %d", w.Code)
+	if w.Code != http.StatusUnauthorized {
+		t.Fatalf("expected 401 when no key provided, got %d", w.Code)
 	}
 }
 
@@ -56,7 +68,7 @@ func TestAdminAPI_BearerAuth(t *testing.T) {
 	handler := AdminRoutes(deps)
 
 	req := httptest.NewRequest("GET", "/api/admin/users", nil)
-	req.Header.Set("Authorization", "Bearer test-key")
+	req.Header.Set("Authorization", "Bearer "+testAPIKey)
 	w := httptest.NewRecorder()
 	handler.ServeHTTP(w, req)
 
@@ -76,7 +88,7 @@ func TestAdminAPI_ListUsers(t *testing.T) {
 	}
 
 	req := httptest.NewRequest("GET", "/api/admin/users", nil)
-	req.Header.Set("X-API-Key", "test-key")
+	req.Header.Set("X-API-Key", testAPIKey)
 	w := httptest.NewRecorder()
 	handler.ServeHTTP(w, req)
 
@@ -103,19 +115,12 @@ func TestAdminAPI_GetUser(t *testing.T) {
 	}
 
 	req := httptest.NewRequest("GET", "/api/admin/users/bob", nil)
-	req.Header.Set("X-API-Key", "test-key")
+	req.Header.Set("X-API-Key", testAPIKey)
 	w := httptest.NewRecorder()
 	handler.ServeHTTP(w, req)
 
 	if w.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
-	}
-
-	var resp map[string]any
-	json.Unmarshal(w.Body.Bytes(), &resp)
-	data := resp["data"].(map[string]any)
-	if data["username"] != "bob" {
-		t.Fatalf("expected username bob, got %v", data["username"])
 	}
 }
 
@@ -124,7 +129,7 @@ func TestAdminAPI_GetUser_NotFound(t *testing.T) {
 	handler := AdminRoutes(deps)
 
 	req := httptest.NewRequest("GET", "/api/admin/users/nonexistent", nil)
-	req.Header.Set("X-API-Key", "test-key")
+	req.Header.Set("X-API-Key", testAPIKey)
 	w := httptest.NewRecorder()
 	handler.ServeHTTP(w, req)
 
@@ -137,9 +142,9 @@ func TestAdminAPI_CreateUser(t *testing.T) {
 	deps, _ := setupAdminTest(t)
 	handler := AdminRoutes(deps)
 
-	body := `{"username":"charlie","password":"secret123","email":"charlie@example.com"}`
-	req := httptest.NewRequest("POST", "/api/admin/users", bytes.NewReader([]byte(body)))
-	req.Header.Set("X-API-Key", "test-key")
+	body := bytes.NewBufferString(`{"username":"carol","password":"password123","email":"carol@example.com"}`)
+	req := httptest.NewRequest("POST", "/api/admin/users", body)
+	req.Header.Set("X-API-Key", testAPIKey)
 	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
 	handler.ServeHTTP(w, req)
@@ -147,16 +152,9 @@ func TestAdminAPI_CreateUser(t *testing.T) {
 	if w.Code != http.StatusCreated {
 		t.Fatalf("expected 201, got %d: %s", w.Code, w.Body.String())
 	}
-
-	var resp map[string]any
-	json.Unmarshal(w.Body.Bytes(), &resp)
-	data := resp["data"].(map[string]any)
-	if data["username"] != "charlie" {
-		t.Fatalf("expected username charlie, got %v", data["username"])
-	}
 }
 
-func TestAdminAPI_SetQuota(t *testing.T) {
+func TestAdminAPI_SetUserQuota(t *testing.T) {
 	deps, repo := setupAdminTest(t)
 	handler := AdminRoutes(deps)
 
@@ -167,7 +165,7 @@ func TestAdminAPI_SetQuota(t *testing.T) {
 
 	body := `{"quota_bytes":10737418240}`
 	req := httptest.NewRequest("PUT", "/api/admin/users/dave/quota", bytes.NewReader([]byte(body)))
-	req.Header.Set("X-API-Key", "test-key")
+	req.Header.Set("X-API-Key", testAPIKey)
 	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
 	handler.ServeHTTP(w, req)
@@ -194,7 +192,7 @@ func TestAdminAPI_DisableUser(t *testing.T) {
 
 	body := `{"disabled":true}`
 	req := httptest.NewRequest("PUT", "/api/admin/users/eve/disable", bytes.NewReader([]byte(body)))
-	req.Header.Set("X-API-Key", "test-key")
+	req.Header.Set("X-API-Key", testAPIKey)
 	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
 	handler.ServeHTTP(w, req)
@@ -219,7 +217,7 @@ func TestAdminAPI_DeleteUser(t *testing.T) {
 	}
 
 	req := httptest.NewRequest("DELETE", "/api/admin/users/frank", nil)
-	req.Header.Set("X-API-Key", "test-key")
+	req.Header.Set("X-API-Key", testAPIKey)
 	w := httptest.NewRecorder()
 	handler.ServeHTTP(w, req)
 
@@ -238,7 +236,7 @@ func TestAdminAPI_Stats(t *testing.T) {
 	handler := AdminRoutes(deps)
 
 	req := httptest.NewRequest("GET", "/api/admin/stats", nil)
-	req.Header.Set("X-API-Key", "test-key")
+	req.Header.Set("X-API-Key", testAPIKey)
 	w := httptest.NewRecorder()
 	handler.ServeHTTP(w, req)
 

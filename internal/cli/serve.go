@@ -211,13 +211,10 @@ func runServe(cmd *cobra.Command, args []string) error {
 		return runtimeSettings.Load().MaxUploadSize
 	})))
 
-	// Admin JSON API (optional, gated on RSTASH_API_KEY).
-	adminDeps := &api.AdminDeps{Repo: repo, Storage: storageSvc, APIKey: cfg.APIKey}
+	// Admin JSON API (keys managed via admin UI).
+	adminDeps := &api.AdminDeps{Repo: repo, Storage: storageSvc}
 	mux.Handle("/api/admin/", api.AdminRoutes(adminDeps))
 	mux.HandleFunc("GET /api/admin/openapi.json", api.ServeOpenAPISpec(api.AdminOpenAPISpec()))
-	if cfg.APIKey != "" {
-		slog.Info("admin API enabled")
-	}
 
 	// Static file server from embedded assets.
 	staticFS, err := fs.Sub(ui.Static, "static")
