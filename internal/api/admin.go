@@ -14,6 +14,9 @@ import (
 type AdminDeps struct {
 	Repo    *db.Repository
 	Storage *storage.Service
+	// RateLimiter enforces per-APIKey RateLimitRPM. Nil disables rate limiting
+	// (e.g. in tests).
+	RateLimiter *APIKeyRateLimiter
 }
 
 // AdminRoutes returns an http.Handler that serves the admin JSON API.
@@ -30,7 +33,7 @@ func AdminRoutes(deps *AdminDeps) http.Handler {
 	mux.HandleFunc("DELETE /api/admin/users/{username}", deps.deleteUser)
 	mux.HandleFunc("GET /api/admin/stats", deps.getStats)
 
-	return RequireAPIKey(deps.Repo)(jsonContentType(mux))
+	return RequireAPIKey(deps.Repo, deps.RateLimiter)(jsonContentType(mux))
 }
 
 // jsonContentType sets Content-Type: application/json on all responses.

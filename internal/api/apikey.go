@@ -2,7 +2,9 @@ package api
 
 import (
 	"context"
+	"math"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"rstash/internal/db"
@@ -24,8 +26,10 @@ func CurrentAPIKey(r *http.Request) *model.APIKey {
 // Checks X-API-Key header first, then falls back to Authorization: Bearer.
 // Returns 401 if the key is missing, unknown, or doesn't match any stored hash.
 // On success, the matching *APIKey is placed in the request context and is
-// accessible via CurrentAPIKey(r).
-func RequireAPIKey(repo *db.Repository) func(http.Handler) http.Handler {
+// accessible via CurrentAPIKey(r). Enforces the key's per-key RateLimitRPM.
+//
+// If limiter is nil, rate limiting is skipped (useful in tests).
+func RequireAPIKey(repo *db.Repository, limiter *APIKeyRateLimiter) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			provided := r.Header.Get("X-API-Key")
@@ -51,6 +55,20 @@ func RequireAPIKey(repo *db.Repository) func(http.Handler) http.Handler {
 				w.Header().Set("Content-Type", "application/json")
 				http.Error(w, `{"error":"invalid API key"}`, http.StatusUnauthorized)
 				return
+			}
+
+			if limiter != nil {
+				allowed, retryAfter := limiter.Allow(key.ID, key.RateLimitRPM)
+				if !allowed {
+					secs := int(math.Ceil(retryAfter.Seconds()))
+					if secs < 1 {
+						secs = 1
+					}
+					w.Header().Set("Content-Type", "application/json")
+					w.Header().Set("Retry-After", strconv.Itoa(secs))
+					http.Error(w, `{"error":"rate limit exceeded"}`, http.StatusTooManyRequests)
+					return
+				}
 			}
 
 			ctx := context.WithValue(r.Context(), apiKeyContextKey{}, key)
