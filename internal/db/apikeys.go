@@ -1,5 +1,44 @@
 package db
 
+// API key storage and lookup — "prefix + bcrypt" pattern
+//
+// API keys are stored as an indexed plaintext prefix plus a bcrypt hash of
+// the full key. The prefix exists because bcrypt is non-deterministic:
+// bcrypt(key) produces a different hash on every call (fresh 16-byte salt),
+// so there is no way to query "find the row whose bcrypt hash matches this
+// incoming key" — you can only ask CompareHashAndPassword(storedHash, plain)
+// one row at a time.
+//
+// For password login that's fine: the user supplies a username, you look up
+// the ONE row for that username, and run ONE bcrypt compare. API keys have
+// no username equivalent — the incoming header is just an opaque string, so
+// without a searchable fingerprint the only option would be to bcrypt-compare
+// against every row (O(N) @ ~100ms each). Unusable for per-request auth.
+//
+// The prefix (first 8 hex chars of the raw key, stored plaintext in an
+// indexed column) plays the same role username plays in the password flow:
+// it lets us narrow to usually 0–1 candidate rows with a fast indexed query
+// before we do the one expensive bcrypt compare.
+//
+// Validation flow on an incoming key:
+//   1. prefix := incoming[:8]
+//   2. SELECT * FROM api_keys WHERE key_prefix = prefix   (indexed, fast)
+//   3. bcrypt.Compare(candidate.KeyHash, incoming)         (one compare)
+//   4. First match (if any) authenticates the request.
+//
+// Why this is still secure:
+//   - The prefix is 4 bytes out of a 32-byte key. An attacker who sees the
+//     prefix still needs to guess the remaining 28 bytes (2^224 keyspace).
+//   - bcrypt remains one-way, so a stolen DB can't be turned back into keys.
+//   - Timing doesn't leak match-vs-no-match: the prefix lookup always runs,
+//     bcrypt runs on collisions, and both the "no match" and "wrong key"
+//     branches return 401 with the same response shape.
+//
+// 8 hex chars is a deliberate compromise: enough entropy that collisions
+// in the prefix column are very rare (2^32 space), short enough to print in
+// the admin UI as a human-readable fingerprint ("key starting with a7b9c1d2…").
+// Same pattern used by GitHub (ghp_…), Stripe (sk_live_…), AWS (AKIA…).
+
 import (
 	"context"
 	"crypto/rand"
