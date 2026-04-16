@@ -152,3 +152,37 @@ type APIKey struct {
 	LastUsedAt   *time.Time
 	CreatedAt    time.Time `gorm:"not null;autoCreateTime"`
 }
+
+// WebhookSubscription is an admin-registered HTTP endpoint that receives
+// state-change events from rstash. Deliveries are HMAC-signed with Secret
+// (shown once at creation) and retried with exponential backoff via the
+// WebhookDelivery outbox.
+type WebhookSubscription struct {
+	ID            int64     `gorm:"primaryKey;autoIncrement"`
+	Name          string    `gorm:"size:255;not null"`
+	URL           string    `gorm:"size:2048;not null"`
+	Secret        string    `gorm:"size:255;not null"`
+	Events        string    `gorm:"size:1024;not null"` // space-separated, "*" = all
+	Active        bool      `gorm:"not null;default:true"`
+	LastSuccessAt *time.Time
+	LastErrorAt   *time.Time
+	LastError     string    `gorm:"size:1024;default:''"`
+	FailureCount  int       `gorm:"not null;default:0"`
+	CreatedAt     time.Time `gorm:"not null;autoCreateTime"`
+}
+
+// WebhookDelivery is a queued delivery attempt in the outbox. The worker
+// picks rows where DeliveredAt IS NULL and NextAttemptAt <= now, POSTs
+// the payload, and either marks DeliveredAt or schedules retry via
+// exponential backoff.
+type WebhookDelivery struct {
+	ID             int64     `gorm:"primaryKey;autoIncrement"`
+	SubscriptionID int64     `gorm:"not null;index"`
+	Event          string    `gorm:"size:64;not null"`
+	Payload        []byte    `gorm:"not null"`
+	Attempts       int       `gorm:"not null;default:0"`
+	LastError      string    `gorm:"size:1024;default:''"`
+	NextAttemptAt  time.Time `gorm:"not null;index"`
+	DeliveredAt    *time.Time
+	CreatedAt      time.Time `gorm:"not null;autoCreateTime"`
+}

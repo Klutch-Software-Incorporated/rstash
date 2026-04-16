@@ -27,6 +27,7 @@ import (
 	"rstash/internal/storage"
 	"rstash/internal/ui"
 	"rstash/internal/web"
+	"rstash/internal/webhooks"
 
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/spf13/cobra"
@@ -169,6 +170,10 @@ func runServe(cmd *cobra.Command, args []string) error {
 	secureCookies := strings.HasPrefix(cfg.BaseURL, "https://") ||
 		effectiveTLSMode == "manual" || effectiveTLSMode == "auto"
 
+	// Webhook outbox: emitter is shared across the admin API and UI handlers.
+	// The worker is started after the signal context is created below.
+	webhookEmitter := webhooks.NewEmitter(repo)
+
 	// UI dependencies (shared by UI handlers and OAuth).
 	uiDeps := &web.UIDeps{
 		Auth:          localAuth,
@@ -178,6 +183,7 @@ func runServe(cmd *cobra.Command, args []string) error {
 		Storage:       storageSvc,
 		Settings:      runtimeSettings,
 		Mailer:        mailer,
+		Webhooks:      webhookEmitter,
 		SecureCookies: secureCookies,
 		LogFile:       cfg.LogFile,
 	}
@@ -213,7 +219,7 @@ func runServe(cmd *cobra.Command, args []string) error {
 
 	// Admin JSON API (keys managed via admin UI).
 	apiKeyLimiter := api.NewAPIKeyRateLimiter()
-	adminDeps := &api.AdminDeps{Repo: repo, Storage: storageSvc, BaseURL: cfg.BaseURL, RateLimiter: apiKeyLimiter}
+	adminDeps := &api.AdminDeps{Repo: repo, Storage: storageSvc, BaseURL: cfg.BaseURL, RateLimiter: apiKeyLimiter, Webhooks: webhookEmitter}
 	mux.Handle("/api/admin/", api.AdminRoutes(adminDeps))
 	mux.HandleFunc("GET /api/admin/openapi.json", api.ServeOpenAPISpec(api.AdminOpenAPISpec()))
 
@@ -281,6 +287,11 @@ func runServe(cmd *cobra.Command, args []string) error {
 	// Graceful shutdown on SIGINT/SIGTERM.
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
+
+	// Webhook delivery worker (drains the outbox with exponential-backoff retries).
+	webhookWorker := webhooks.NewWorker(repo)
+	webhookWorker.Start(ctx)
+	defer webhookWorker.Stop()
 
 	// Session cleanup goroutine.
 	go func() {

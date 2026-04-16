@@ -91,6 +91,15 @@ func FullRoutes(deps *UIDeps) http.Handler {
 	mux.HandleFunc("POST /admin/api-keys/{id}", AdminGuard(RequireCSRF(apiKeysH.DoUpdate)))
 	mux.HandleFunc("POST /admin/api-keys/{id}/delete", AdminGuard(RequireCSRF(apiKeysH.DoDelete)))
 
+	// Webhook subscriptions admin UI.
+	webhooksH := WebhooksHandler(deps)
+	mux.HandleFunc("GET /admin/webhooks", AdminGuard(webhooksH.ShowList))
+	mux.HandleFunc("GET /admin/webhooks/new", AdminGuard(webhooksH.ShowNew))
+	mux.HandleFunc("POST /admin/webhooks", AdminGuard(RequireCSRF(webhooksH.DoCreate)))
+	mux.HandleFunc("GET /admin/webhooks/{id}", AdminGuard(webhooksH.ShowEdit))
+	mux.HandleFunc("POST /admin/webhooks/{id}", AdminGuard(RequireCSRF(webhooksH.DoUpdate)))
+	mux.HandleFunc("POST /admin/webhooks/{id}/delete", AdminGuard(RequireCSRF(webhooksH.DoDelete)))
+
 	// Profile routes are handled via a custom router since Go's ServeMux
 	// doesn't support partial-segment wildcards like /~{username}/.
 	tildeRouter := profileRouter(deps)

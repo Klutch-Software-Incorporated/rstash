@@ -1,0 +1,47 @@
+{{define "admin_webhook_edit"}}
+{{template "admin_nav" $}}
+{{with .Content}}
+
+<h2>Edit webhook subscription</h2>
+
+{{if .Error}}<div role="alert" class="alert-error">{{.Error}}</div>{{end}}
+
+<form method="post" action="/admin/webhooks/{{.Subscription.ID}}">
+    <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
+    <label>
+        Name
+        <input type="text" name="name" value="{{.Subscription.Name}}" required maxlength="255">
+    </label>
+    <label>
+        URL
+        <input type="url" name="url" value="{{.Subscription.URL}}" required>
+    </label>
+    <fieldset>
+        <legend>Events</legend>
+        {{$events := .Subscription.Events}}
+        <label><input type="checkbox" name="events" value="user.claimed" {{if or (eq $events "*") (containsEvent $events "user.claimed")}}checked{{end}}> user.claimed</label><br>
+        <label><input type="checkbox" name="events" value="user.email_changed" {{if or (eq $events "*") (containsEvent $events "user.email_changed")}}checked{{end}}> user.email_changed</label><br>
+        <label><input type="checkbox" name="events" value="user.disabled" {{if or (eq $events "*") (containsEvent $events "user.disabled")}}checked{{end}}> user.disabled</label><br>
+        <label><input type="checkbox" name="events" value="user.enabled" {{if or (eq $events "*") (containsEvent $events "user.enabled")}}checked{{end}}> user.enabled</label><br>
+        <label><input type="checkbox" name="events" value="user.deleted" {{if or (eq $events "*") (containsEvent $events "user.deleted")}}checked{{end}}> user.deleted</label><br>
+        <label><input type="checkbox" name="events" value="*" {{if eq $events "*"}}checked{{end}}> * (all events)</label>
+    </fieldset>
+    <label>
+        <input type="checkbox" name="active" value="on" {{if .Subscription.Active}}checked{{end}}> Active
+    </label>
+    <p>
+        <button type="submit" class="btn">Save</button>
+        <a href="/admin/webhooks">Cancel</a>
+    </p>
+</form>
+
+<hr>
+
+<h3>Delete subscription</h3>
+<form method="post" action="/admin/webhooks/{{.Subscription.ID}}/delete" onsubmit="return confirm('Delete this subscription? Pending deliveries will also be removed.');">
+    <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
+    <button type="submit" class="btn btn-danger">Delete subscription</button>
+</form>
+
+{{end}}
+{{end}}

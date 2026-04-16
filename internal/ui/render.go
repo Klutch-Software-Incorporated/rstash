@@ -86,6 +86,10 @@ var templateFiles = []string{
 	"templates/admin_apikey_form.html",
 	"templates/admin_apikey_edit.html",
 	"templates/admin_apikey_created.html",
+	"templates/admin_webhooks.html",
+	"templates/admin_webhook_form.html",
+	"templates/admin_webhook_edit.html",
+	"templates/admin_webhook_secret.html",
 	"templates/claim.html",
 }
 
@@ -94,6 +98,14 @@ func parseTemplates() *template.Template {
 		"eq":       func(a, b string) bool { return a == b },
 		"split":    strings.Split,
 		"safeHTML": func(s string) template.HTML { return template.HTML(s) },
+		"containsEvent": func(list, needle string) bool {
+			for _, e := range strings.Fields(list) {
+				if e == needle {
+					return true
+				}
+			}
+			return false
+		},
 	}
 	tmpl, err := template.New("").Funcs(funcMap).ParseFS(Templates, templateFiles...)
 	if err != nil {

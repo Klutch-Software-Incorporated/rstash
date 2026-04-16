@@ -10,6 +10,7 @@ import (
 
 	"rstash/internal/db"
 	"rstash/internal/storage"
+	"rstash/internal/webhooks"
 )
 
 // AdminDeps holds dependencies for the admin API handlers.
@@ -21,6 +22,8 @@ type AdminDeps struct {
 	// RateLimiter enforces per-APIKey RateLimitRPM. Nil disables rate limiting
 	// (e.g. in tests).
 	RateLimiter *APIKeyRateLimiter
+	// Webhooks emits state-change events to registered subscribers. Nil disables.
+	Webhooks *webhooks.Emitter
 }
 
 // AdminRoutes returns an http.Handler that serves the admin JSON API.
@@ -257,6 +260,7 @@ func (d *AdminDeps) createUser(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusCreated, resp)
 }
 
+
 // randomHex returns n random bytes encoded as 2n hex chars.
 func randomHex(n int) (string, error) {
 	b := make([]byte, n)
@@ -341,6 +345,13 @@ func (d *AdminDeps) setUserEmail(w http.ResponseWriter, r *http.Request) {
 	}
 
 	d.Repo.Audit(r.Context(), 0, "admin_api.user.email_updated", "user", username, email)
+	if d.Webhooks != nil {
+		d.Webhooks.Emit(r.Context(), "user.email_changed", map[string]any{
+			"username":   username,
+			"new_email":  email,
+			"changed_by": "admin_api",
+		})
+	}
 	writeJSON(w, http.StatusOK, map[string]string{"ok": "true"})
 }
 
@@ -368,6 +379,13 @@ func (d *AdminDeps) setUserDisabled(w http.ResponseWriter, r *http.Request) {
 	}
 
 	d.Repo.Audit(r.Context(), 0, "admin_api.user.disable", "user", username, "")
+	if d.Webhooks != nil {
+		event := "user.enabled"
+		if req.Disabled {
+			event = "user.disabled"
+		}
+		d.Webhooks.Emit(r.Context(), event, map[string]any{"username": username})
+	}
 
 	writeJSON(w, http.StatusOK, map[string]string{"ok": "true"})
 }
@@ -388,6 +406,9 @@ func (d *AdminDeps) deleteUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	d.Repo.Audit(r.Context(), 0, "admin_api.user.delete", "user", username, "")
+	if d.Webhooks != nil {
+		d.Webhooks.Emit(r.Context(), "user.deleted", map[string]any{"username": username})
+	}
 
 	writeJSON(w, http.StatusOK, map[string]string{"ok": "true"})
 }

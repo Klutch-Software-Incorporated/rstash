@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"time"
 
 	"rstash/internal/auth"
 	"rstash/internal/ui"
@@ -107,6 +108,14 @@ func (h *claimHandler) DoClaim(w http.ResponseWriter, r *http.Request) {
 	}
 	_ = h.deps.Repo.UpdateUserLastLogin(r.Context(), user.ID, ClientIP(r))
 	h.deps.Repo.Audit(r.Context(), user.ID, "user.claimed", "user", fmt.Sprintf("%d", user.ID), user.Username)
+	if h.deps.Webhooks != nil {
+		claimedAt := time.Now().UTC().Format(time.RFC3339)
+		data := map[string]any{"username": user.Username, "claimed_at": claimedAt}
+		if user.Email != nil {
+			data["email"] = *user.Email
+		}
+		h.deps.Webhooks.Emit(r.Context(), "user.claimed", data)
+	}
 	auth.SetSessionCookie(w, sess.Token, h.deps.Settings.Load().CookieDomain, h.deps.SecureCookies)
 	ui.SetFlash(w, "Welcome! Your account is activated.")
 	http.Redirect(w, r, "/", http.StatusSeeOther)
