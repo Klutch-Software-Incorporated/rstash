@@ -307,7 +307,11 @@ func writeServiceError(w http.ResponseWriter, err error) {
 	case errors.Is(err, storage.ErrQuotaExceeded):
 		http.Error(w, "quota exceeded", http.StatusInsufficientStorage)
 	case errors.Is(err, storage.ErrBandwidthExceeded):
-		// Retry-After points at the next-month boundary (UTC).
+		// 429 per draft-dejong-remotestorage-26 §5 ("rate limiting") and RFC 6585.
+		// We use 429 rather than 507 because 507 means "storage is full" which is
+		// about the blob store, not transfer, and implies a permanent condition.
+		// 429 + Retry-After matches the "retry after the window resets" semantic
+		// that clients and HTTP libraries already understand.
 		now := time.Now().UTC()
 		nextMonth := time.Date(now.Year(), now.Month()+1, 1, 0, 0, 0, 0, time.UTC)
 		secs := int(nextMonth.Sub(now).Seconds())
