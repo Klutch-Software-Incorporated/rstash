@@ -94,6 +94,7 @@ var templateFiles = []string{
 	"templates/account_delete.html",
 	"templates/account_activity.html",
 	"templates/account_apps.html",
+	"templates/admin_api_docs.html",
 }
 
 func parseTemplates() *template.Template {

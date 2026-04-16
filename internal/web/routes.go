@@ -100,6 +100,10 @@ func FullRoutes(deps *UIDeps) http.Handler {
 	mux.HandleFunc("POST /admin/api-keys/{id}", AdminGuard(RequireCSRF(apiKeysH.DoUpdate)))
 	mux.HandleFunc("POST /admin/api-keys/{id}/delete", AdminGuard(RequireCSRF(apiKeysH.DoDelete)))
 
+	// OpenAPI docs viewer (Redoc).
+	apiDocsH := APIDocsHandler(deps)
+	mux.HandleFunc("GET /admin/api-docs", AdminGuard(apiDocsH.ShowAPIDocs))
+
 	// Webhook subscriptions admin UI.
 	webhooksH := WebhooksHandler(deps)
 	mux.HandleFunc("GET /admin/webhooks", AdminGuard(webhooksH.ShowList))
