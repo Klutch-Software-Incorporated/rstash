@@ -77,6 +77,15 @@ func FullRoutes(deps *UIDeps) http.Handler {
 	mux.HandleFunc("GET /admin/abuse", AdminGuard(abuseH.ShowAbuseReports))
 	mux.HandleFunc("POST /admin/abuse/{id}/review", AdminGuard(RequireCSRF(abuseH.ReviewAbuseReport)))
 
+	// API Keys admin UI.
+	apiKeysH := APIKeysHandler(deps)
+	mux.HandleFunc("GET /admin/api-keys", AdminGuard(apiKeysH.ShowList))
+	mux.HandleFunc("GET /admin/api-keys/new", AdminGuard(apiKeysH.ShowNew))
+	mux.HandleFunc("POST /admin/api-keys", AdminGuard(RequireCSRF(apiKeysH.DoCreate)))
+	mux.HandleFunc("GET /admin/api-keys/{id}", AdminGuard(apiKeysH.ShowEdit))
+	mux.HandleFunc("POST /admin/api-keys/{id}", AdminGuard(RequireCSRF(apiKeysH.DoUpdate)))
+	mux.HandleFunc("POST /admin/api-keys/{id}/delete", AdminGuard(RequireCSRF(apiKeysH.DoDelete)))
+
 	// Profile routes are handled via a custom router since Go's ServeMux
 	// doesn't support partial-segment wildcards like /~{username}/.
 	tildeRouter := profileRouter(deps)

@@ -9,6 +9,7 @@
     <a href="/admin/status" {{if eq $.ActiveAdminNav "status"}}class="active"{{end}}>Status</a>
     <a href="/admin/email" {{if eq $.ActiveAdminNav "email"}}class="active"{{end}}>Email</a>
     <a href="/admin/oauth-test" {{if eq $.ActiveAdminNav "oauth-test"}}class="active"{{end}}>OAuth Test</a>
+    <a href="/admin/api-keys" {{if eq $.ActiveAdminNav "api-keys"}}class="active"{{end}}>API Keys</a>
 </nav>
 {{if and $.OpenAbuseReports (ne $.ActiveAdminNav "abuse")}}
 <div role="alert" class="alert-warning" style="margin-bottom:1rem">

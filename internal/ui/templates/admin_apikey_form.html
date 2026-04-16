@@ -1,0 +1,37 @@
+{{define "admin_apikey_form"}}
+{{template "admin_nav" $}}
+{{with .Content}}
+
+<h2>Create API key</h2>
+
+{{if .Error}}
+<div role="alert" class="alert-error">{{.Error}}</div>
+{{end}}
+
+<form method="post" action="/admin/api-keys">
+    <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
+    <label>
+        Name
+        <input type="text" name="name" value="{{.Key.Name}}" required autofocus maxlength="255">
+    </label>
+    <label>
+        Description
+        <textarea name="description" rows="2" maxlength="1024">{{.Key.Description}}</textarea>
+    </label>
+    <label>
+        Rate limit (requests per minute)
+        <input type="number" name="rate_limit_rpm" value="{{.Key.RateLimitRPM}}" min="0" step="1">
+    </label>
+    <p>
+        <button type="submit" class="btn">Create key</button>
+        <a href="/admin/api-keys">Cancel</a>
+    </p>
+</form>
+
+<p class="muted">
+    The generated key will be shown only once on the next page. Copy it immediately — it
+    cannot be retrieved afterward. If you lose the key, regenerate it from the key's edit page.
+</p>
+
+{{end}}
+{{end}}
