@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"rstash/internal/auth"
+	"rstash/internal/db"
 	"rstash/internal/model"
 )
 
@@ -18,6 +19,8 @@ type meResponse struct {
 	EmailVerified       bool    `json:"email_verified"`
 	StorageQuotaBytes   int64   `json:"storage_quota_bytes"`
 	StorageUsedBytes    int64   `json:"storage_used_bytes"`
+	BandwidthQuotaBytes int64   `json:"bandwidth_quota_bytes,omitempty"`
+	BandwidthUsedBytes  int64   `json:"bandwidth_used_bytes,omitempty"`
 	AccountState        string  `json:"account_state"`
 	ExternallyManaged   bool    `json:"externally_managed,omitempty"`
 	CreatedAt           string  `json:"created_at"`
@@ -70,11 +73,19 @@ func (d *AdminDeps) getMe(w http.ResponseWriter, r *http.Request) {
 		EmailVerified:     user.EmailVerified,
 		StorageQuotaBytes: user.StorageQuota,
 		AccountState:      accountState(user),
+		ExternallyManaged: user.ExternallyManaged,
 		CreatedAt:         user.CreatedAt.Format(time.RFC3339),
 	}
 	if stats != nil {
 		resp.StorageUsedBytes = stats.TotalBytes
 	}
+
+	// Bandwidth fields are omitted from the JSON when both are zero (see the
+	// omitempty tags above), which effectively hides them when bandwidth_mode=off.
+	if bw, _ := d.Repo.GetBandwidthUsage(ctx, user.ID, db.CurrentPeriod()); bw != nil {
+		resp.BandwidthUsedBytes = bw.BytesOut
+	}
+	resp.BandwidthQuotaBytes = user.BandwidthQuota
 
 	writeJSON(w, http.StatusOK, map[string]any{"data": resp})
 }

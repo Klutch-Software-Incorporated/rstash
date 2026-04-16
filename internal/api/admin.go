@@ -39,6 +39,9 @@ func AdminRoutes(deps *AdminDeps) http.Handler {
 	mux.HandleFunc("PUT /api/admin/users/{username}/email", deps.setUserEmail)
 	mux.HandleFunc("PUT /api/admin/users/{username}/disable", deps.setUserDisabled)
 	mux.HandleFunc("DELETE /api/admin/users/{username}", deps.deleteUser)
+	mux.HandleFunc("GET /api/admin/users/{username}/usage", deps.getUserUsage)
+	mux.HandleFunc("PUT /api/admin/users/{username}/bandwidth_quota", deps.setUserBandwidthQuota)
+	mux.HandleFunc("POST /api/admin/users/{username}/reset_bandwidth", deps.resetUserBandwidth)
 	mux.HandleFunc("GET /api/admin/stats", deps.getStats)
 
 	return RequireAPIKey(deps.Repo, deps.RateLimiter)(jsonContentType(mux))
@@ -410,6 +413,81 @@ func (d *AdminDeps) deleteUser(w http.ResponseWriter, r *http.Request) {
 		d.Webhooks.Emit(r.Context(), "user.deleted", map[string]any{"username": username})
 	}
 
+	writeJSON(w, http.StatusOK, map[string]string{"ok": "true"})
+}
+
+func (d *AdminDeps) getUserUsage(w http.ResponseWriter, r *http.Request) {
+	username := r.PathValue("username")
+	user, err := d.Repo.GetUserByUsername(r.Context(), username)
+	if err != nil || user == nil {
+		writeError(w, http.StatusNotFound, "user not found")
+		return
+	}
+
+	stats, _ := d.Repo.GetUserStorageStats(r.Context(), user.ID)
+	period := db.CurrentPeriod()
+	bw, _ := d.Repo.GetBandwidthUsage(r.Context(), user.ID, period)
+
+	storageUsed := int64(0)
+	if stats != nil {
+		storageUsed = stats.TotalBytes
+	}
+	bandwidthUsed := int64(0)
+	if bw != nil {
+		bandwidthUsed = bw.BytesOut
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{
+		"data": map[string]any{
+			"storage": map[string]any{
+				"quota_bytes": user.StorageQuota,
+				"used_bytes":  storageUsed,
+			},
+			"bandwidth": map[string]any{
+				"quota_bytes": user.BandwidthQuota,
+				"used_bytes":  bandwidthUsed,
+				"period":      period,
+			},
+		},
+	})
+}
+
+func (d *AdminDeps) setUserBandwidthQuota(w http.ResponseWriter, r *http.Request) {
+	username := r.PathValue("username")
+	var req struct {
+		QuotaBytes int64 `json:"quota_bytes"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid JSON body")
+		return
+	}
+	user, err := d.Repo.GetUserByUsername(r.Context(), username)
+	if err != nil || user == nil {
+		writeError(w, http.StatusNotFound, "user not found")
+		return
+	}
+	if err := d.Repo.UpdateUserBandwidthQuota(r.Context(), user.ID, req.QuotaBytes); err != nil {
+		slog.Error("admin API: set bandwidth quota", "error", err)
+		writeError(w, http.StatusInternalServerError, "failed to update bandwidth quota")
+		return
+	}
+	d.Repo.Audit(r.Context(), 0, "admin_api.user.bandwidth_quota", "user", username, "")
+	writeJSON(w, http.StatusOK, map[string]string{"ok": "true"})
+}
+
+func (d *AdminDeps) resetUserBandwidth(w http.ResponseWriter, r *http.Request) {
+	username := r.PathValue("username")
+	user, err := d.Repo.GetUserByUsername(r.Context(), username)
+	if err != nil || user == nil {
+		writeError(w, http.StatusNotFound, "user not found")
+		return
+	}
+	if err := d.Repo.ResetBandwidthUsage(r.Context(), user.ID, db.CurrentPeriod()); err != nil {
+		slog.Error("admin API: reset bandwidth", "error", err)
+		writeError(w, http.StatusInternalServerError, "failed to reset bandwidth")
+		return
+	}
+	d.Repo.Audit(r.Context(), 0, "admin_api.user.reset_bandwidth", "user", username, "")
 	writeJSON(w, http.StatusOK, map[string]string{"ok": "true"})
 }
 

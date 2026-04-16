@@ -133,8 +133,21 @@ func runServe(cmd *cobra.Command, args []string) error {
 		})
 	})
 
+	// Initialize bandwidth tracker (egress counting + enforcement).
+	bandwidthTracker := storage.NewBandwidthTracker(storage.BandwidthConfig{
+		Mode:      snap.BandwidthMode,
+		UserLimit: snap.BandwidthQuotaUser,
+	}, repo)
+	runtimeSettings.OnChange(func(s *settings.Snapshot) {
+		bandwidthTracker.UpdateConfig(storage.BandwidthConfig{
+			Mode:      s.BandwidthMode,
+			UserLimit: s.BandwidthQuotaUser,
+		})
+	})
+
 	// Initialize storage service.
 	storageSvc := storage.NewService(repo, blobs, quotaChecker)
+	storageSvc.SetBandwidthTracker(bandwidthTracker)
 
 	// Initialize content scanner.
 	mimeScanner := storage.NewMIMEScanner(func() string {
@@ -292,6 +305,10 @@ func runServe(cmd *cobra.Command, args []string) error {
 	webhookWorker := webhooks.NewWorker(repo)
 	webhookWorker.Start(ctx)
 	defer webhookWorker.Stop()
+
+	// Bandwidth tracker flush loop (batches per-user counters to disk).
+	bandwidthTracker.Start(ctx)
+	defer bandwidthTracker.Stop(context.Background())
 
 	// Session cleanup goroutine.
 	go func() {

@@ -311,6 +311,27 @@ func SettingDefs() []SettingDef {
 			InputType:       InputByteSize,
 			RuntimeEditable: true,
 		},
+		{
+			Key:             "bandwidth_mode",
+			Group:           "Storage",
+			Label:           "Bandwidth mode",
+			Description:     "How monthly egress (download) bandwidth is enforced.",
+			Help:            "Controls monthly egress limits per user. \"off\" disables both tracking and enforcement — no counter writes on the read path. \"user\" enforces per-user limits (configured via bandwidth_quota_user, with optional per-user overrides via the admin API). When a user's remaining quota for the current calendar month is zero, GetDocument returns 429 with a Retry-After header pointing to the next-month boundary. Uploads always succeed. Changes take effect immediately.",
+			Default:         "user",
+			ValidValues:     []string{"off", "user"},
+			InputType:       InputSelect,
+			RuntimeEditable: true,
+		},
+		{
+			Key:             "bandwidth_quota_user",
+			Group:           "Storage",
+			Label:           "Per-user bandwidth",
+			Description:     "Default monthly egress limit per user (e.g. 500GB).",
+			Help:            "The default monthly egress (download) limit per user when bandwidth_mode=user. Individual users can be given higher or lower limits via the admin API. Accepts human-readable sizes: B, KB, MB, GB, TB. Must be greater than 0. Resets at the calendar-month boundary (UTC). Changes take effect immediately.",
+			Default:         "500GB",
+			InputType:       InputByteSize,
+			RuntimeEditable: true,
+		},
 		// ── Monitoring (runtime-editable / env-only) ──
 		{
 			Key:             "metrics_mode",

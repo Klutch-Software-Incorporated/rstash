@@ -29,6 +29,11 @@ type User struct {
 	// When true, the rstash web UI redirects email/delete flows to an
 	// external management URL instead of handling them locally.
 	ExternallyManaged bool `gorm:"not null;default:false"`
+
+	// BandwidthQuota is the per-user egress limit in bytes per calendar
+	// month. 0 = use the server default (bandwidth_quota_user setting).
+	// Enforced only when bandwidth_mode=user.
+	BandwidthQuota int64 `gorm:"not null;default:0"`
 }
 
 // IsUnclaimed returns true when a user was provisioned via the admin API
@@ -169,6 +174,16 @@ type WebhookSubscription struct {
 	LastError     string    `gorm:"size:1024;default:''"`
 	FailureCount  int       `gorm:"not null;default:0"`
 	CreatedAt     time.Time `gorm:"not null;autoCreateTime"`
+}
+
+// BandwidthUsage tracks per-user egress bytes by calendar-month period
+// ("YYYY-MM"). Uploads are not counted. Enforcement happens in the storage
+// service via GetDocument before the response body is written.
+type BandwidthUsage struct {
+	UserID    int64     `gorm:"primaryKey;autoIncrement:false"`
+	Period    string    `gorm:"primaryKey;size:7"`
+	BytesOut  int64     `gorm:"not null;default:0"`
+	UpdatedAt time.Time `gorm:"not null;autoUpdateTime"`
 }
 
 // WebhookDelivery is a queued delivery attempt in the outbox. The worker

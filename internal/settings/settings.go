@@ -52,6 +52,8 @@ type Snapshot struct {
 	ExternalAccountURL      string // where externally-managed users manage email/delete
 	CustomLinks             []CustomLink // admin-configured links for user menu/profile
 	DisabledAccountMessage  string       // HTML shown on login-error for disabled users
+	BandwidthMode           string       // "off" or "user" — monthly egress enforcement
+	BandwidthQuotaUser      int64        // default per-user monthly egress in bytes
 }
 
 // Settings provides runtime-configurable settings backed by the database.
@@ -183,6 +185,8 @@ func (snap *Snapshot) ValueMap() map[string]string {
 		"external_account_url":        snap.ExternalAccountURL,
 		"custom_links":                snap.customLinksRaw(),
 		"disabled_account_message":    snap.DisabledAccountMessage,
+		"bandwidth_mode":              snap.BandwidthMode,
+		"bandwidth_quota_user":        config.FormatByteSize(snap.BandwidthQuotaUser),
 	}
 }
 
@@ -220,6 +224,8 @@ func (s *Settings) buildSnapshot(overrides map[string]string) *Snapshot {
 		PrivacyMode:          s.defaults.PrivacyMode,
 		PrivacyContent:       s.defaults.PrivacyContent,
 		CookieDomain:         s.defaults.CookieDomain,
+		BandwidthMode:        s.defaults.BandwidthMode,
+		BandwidthQuotaUser:   s.defaults.BandwidthQuotaUser,
 	}
 
 	if overrides == nil {
@@ -309,6 +315,14 @@ func (s *Settings) buildSnapshot(overrides map[string]string) *Snapshot {
 	}
 	if v, ok := overrides["disabled_account_message"]; ok {
 		snap.DisabledAccountMessage = v
+	}
+	if v, ok := overrides["bandwidth_mode"]; ok {
+		snap.BandwidthMode = v
+	}
+	if v, ok := overrides["bandwidth_quota_user"]; ok {
+		if n, err := config.ParseByteSize(v); err == nil {
+			snap.BandwidthQuotaUser = n
+		}
 	}
 
 	return snap
