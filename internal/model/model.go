@@ -124,3 +124,17 @@ type EmailSend struct {
 	Error     string    `gorm:"size:1024"`
 	CreatedAt time.Time `gorm:"not null;index"`
 }
+
+// APIKey is an admin API credential issued and managed via the admin UI.
+// The raw key is shown once at creation; only the bcrypt hash is stored.
+// KeyPrefix (first 8 hex chars) is indexed for fast lookup before bcrypt compare.
+type APIKey struct {
+	ID           int64     `gorm:"primaryKey;autoIncrement"`
+	Name         string    `gorm:"size:255;not null"`
+	Description  string    `gorm:"size:1024;default:''"`
+	KeyHash      string    `gorm:"size:255;not null"`
+	KeyPrefix    string    `gorm:"size:16;index;not null"`
+	RateLimitRPM int       `gorm:"not null;default:60"`
+	LastUsedAt   *time.Time
+	CreatedAt    time.Time `gorm:"not null;autoCreateTime"`
+}
