@@ -156,11 +156,15 @@ func errorSchema() *openapi3.Schema {
 func createUserSchema() *openapi3.Schema {
 	return &openapi3.Schema{
 		Type:     &openapi3.Types{"object"},
-		Required: []string{"username", "password"},
+		Required: []string{"username"},
 		Properties: openapi3.Schemas{
-			"username": schemaRef("string", ""),
-			"password": schemaRef("string", ""),
-			"email":    schemaRef("string", ""),
+			"username":              schemaRef("string", ""),
+			"password":              schemaRef("string", ""),
+			"email":                 schemaRef("string", ""),
+			"email_verified":        schemaRef("boolean", ""),
+			"provision":             schemaRef("boolean", ""),
+			"quota_bytes":           schemaRef("integer", "int64"),
+			"bandwidth_quota_bytes": schemaRef("integer", "int64"),
 		},
 	}
 }

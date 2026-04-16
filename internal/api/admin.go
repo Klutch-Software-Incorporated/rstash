@@ -170,12 +170,13 @@ const claimTokenLifetime = 24 * time.Hour
 
 func (d *AdminDeps) createUser(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		Username      string `json:"username"`
-		Password      string `json:"password"`
-		Email         string `json:"email"`
-		EmailVerified bool   `json:"email_verified"`
-		Provision     bool   `json:"provision"`
-		QuotaBytes    int64  `json:"quota_bytes"`
+		Username            string `json:"username"`
+		Password            string `json:"password"`
+		Email               string `json:"email"`
+		EmailVerified       bool   `json:"email_verified"`
+		Provision           bool   `json:"provision"`
+		QuotaBytes          int64  `json:"quota_bytes"`
+		BandwidthQuotaBytes int64  `json:"bandwidth_quota_bytes"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid JSON body")
@@ -214,6 +215,13 @@ func (d *AdminDeps) createUser(w http.ResponseWriter, r *http.Request) {
 			slog.Error("admin API: set quota on create", "error", err)
 		}
 		user.StorageQuota = req.QuotaBytes
+	}
+
+	if req.BandwidthQuotaBytes > 0 {
+		if err := d.Repo.UpdateUserBandwidthQuota(r.Context(), user.ID, req.BandwidthQuotaBytes); err != nil {
+			slog.Error("admin API: set bandwidth quota on create", "error", err)
+		}
+		user.BandwidthQuota = req.BandwidthQuotaBytes
 	}
 
 	if req.EmailVerified && user.Email != nil {
