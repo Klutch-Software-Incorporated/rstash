@@ -1,0 +1,33 @@
+{{define "claim"}}
+{{with .Content}}
+<main class="container narrow">
+    <h1>Activate your account</h1>
+
+    {{if .Success}}
+    <p>Your account is activated. <a href="/">Go home</a>.</p>
+    {{else if .Error}}
+    <div role="alert" class="alert-error">{{.Error}}</div>
+    <p><a href="/">Home</a></p>
+    {{else}}
+    <p>
+        Welcome{{if .Username}}, <strong>{{.Username}}</strong>{{end}}. Set a password to finish activating your account.
+        {{if .Email}}Verification emails and account notices will go to <strong>{{.Email}}</strong>.{{end}}
+    </p>
+
+    <form method="POST" action="/claim">
+        <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
+        <input type="hidden" name="token" value="{{.Token}}">
+        <label>
+            New password
+            <input type="password" name="password" required minlength="8" autocomplete="new-password" autofocus>
+        </label>
+        <label>
+            Confirm password
+            <input type="password" name="password_confirm" required minlength="8" autocomplete="new-password">
+        </label>
+        <button type="submit" class="btn">Activate account</button>
+    </form>
+    {{end}}
+</main>
+{{end}}
+{{end}}

@@ -40,6 +40,11 @@ func FullRoutes(deps *UIDeps) http.Handler {
 	mux.HandleFunc("GET /reset-password", accountH.ShowResetPassword)
 	mux.HandleFunc("POST /reset-password", RequireCSRF(accountH.DoResetPassword))
 
+	// Claim flow: users provisioned via the admin API set their password here.
+	claimH := ClaimHandler(deps)
+	mux.HandleFunc("GET /claim", claimH.ShowClaim)
+	mux.HandleFunc("POST /claim", RequireCSRF(claimH.DoClaim))
+
 	// Legal pages (public, no auth).
 	legalH := LegalHandler(deps)
 	mux.HandleFunc("GET /legal/terms", legalH.ShowTerms)

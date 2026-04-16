@@ -72,6 +72,11 @@ var templateFiles = []string{
 	"templates/reset_password.html",
 	"templates/abuse_report.html",
 	"templates/admin_abuse.html",
+	"templates/admin_apikeys.html",
+	"templates/admin_apikey_form.html",
+	"templates/admin_apikey_edit.html",
+	"templates/admin_apikey_created.html",
+	"templates/claim.html",
 }
 
 func parseTemplates() *template.Template {

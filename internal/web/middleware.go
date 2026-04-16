@@ -230,7 +230,7 @@ func AccountGuard() func(http.Handler) http.Handler {
 	exempt := []string{
 		"/account/email", "/login", "/logout", "/setup", "/register",
 		"/static/", "/storage/", "/.well-known/", "/oauth/", "/abuse/",
-		"/legal/", "/verify-email",
+		"/legal/", "/verify-email", "/claim",
 	}
 
 	return func(next http.Handler) http.Handler {
