@@ -39,6 +39,20 @@ func (h *registerHandler) ShowRegister(w http.ResponseWriter, r *http.Request) {
 	}
 
 	snap := h.deps.Settings.Load()
+
+	// External mode: redirect to the configured signup URL (typically a
+	// companion app that provisions accounts via the admin API).
+	if snap.RegistrationMode == "external" {
+		if snap.RegistrationExternalURL == "" {
+			h.deps.renderError(w, r, http.StatusServiceUnavailable,
+				"Registration Unavailable",
+				"External registration is enabled but no registration URL is configured.")
+			return
+		}
+		http.Redirect(w, r, snap.RegistrationExternalURL, http.StatusSeeOther)
+		return
+	}
+
 	content := &registerContent{
 		Closed:       snap.RegistrationMode == "closed",
 		ApprovalMode: snap.RegistrationMode == "approval",
@@ -51,6 +65,10 @@ func (h *registerHandler) ShowRegister(w http.ResponseWriter, r *http.Request) {
 func (h *registerHandler) DoRegister(w http.ResponseWriter, r *http.Request) {
 	snap := h.deps.Settings.Load()
 
+	if snap.RegistrationMode == "external" {
+		http.Error(w, "Registration is handled externally", http.StatusForbidden)
+		return
+	}
 	if snap.RegistrationMode != "open" && snap.RegistrationMode != "approval" {
 		http.Error(w, "Registration is closed", http.StatusForbidden)
 		return

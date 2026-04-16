@@ -351,6 +351,54 @@ func TestSetupValidation(t *testing.T) {
 	}
 }
 
+func TestExternalRegistrationRedirects(t *testing.T) {
+	ts, deps := setupTestServer(t, "external")
+
+	// Ensure at least one user exists so SetupGuard lets us through to /register.
+	_, err := deps.Repo.CreateUser(context.Background(), "admin", "password123", "", true, true)
+	if err != nil {
+		t.Fatalf("create admin: %v", err)
+	}
+	if err := deps.Settings.Set(context.Background(), "registration_external_url", "https://example.com/signup"); err != nil {
+		t.Fatalf("set url: %v", err)
+	}
+
+	client := &http.Client{CheckRedirect: func(req *http.Request, via []*http.Request) error {
+		return http.ErrUseLastResponse
+	}}
+	resp, err := client.Get(ts.URL + "/register")
+	if err != nil {
+		t.Fatalf("get /register: %v", err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusSeeOther {
+		t.Fatalf("expected 303, got %d", resp.StatusCode)
+	}
+	if loc := resp.Header.Get("Location"); loc != "https://example.com/signup" {
+		t.Fatalf("expected redirect to https://example.com/signup, got %q", loc)
+	}
+}
+
+func TestExternalRegistrationWithoutURL(t *testing.T) {
+	ts, deps := setupTestServer(t, "external")
+	_, err := deps.Repo.CreateUser(context.Background(), "admin", "password123", "", true, true)
+	if err != nil {
+		t.Fatalf("create admin: %v", err)
+	}
+
+	client := &http.Client{CheckRedirect: func(req *http.Request, via []*http.Request) error {
+		return http.ErrUseLastResponse
+	}}
+	resp, err := client.Get(ts.URL + "/register")
+	if err != nil {
+		t.Fatalf("get /register: %v", err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusServiceUnavailable {
+		t.Fatalf("expected 503 when URL unset, got %d", resp.StatusCode)
+	}
+}
+
 // getCSRFToken performs a GET request to the given URL and returns the CSRF
 // cookie value. Tests must include this value as the csrf_token form field.
 func getCSRFToken(t *testing.T, client *http.Client, url string) string {
