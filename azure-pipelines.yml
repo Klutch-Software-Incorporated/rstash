@@ -1,0 +1,103 @@
+name: $(Date:yyyy)$(Date:MM)$(Date:dd).$(Rev:r)
+
+trigger:
+  branches:
+    include:
+      - main
+
+pr: none
+
+pool:
+  vmImage: ubuntu-latest
+
+variables:
+  GO_VERSION: '1.22.2'
+  NODE_VERSION: '20.x'
+
+stages:
+  - stage: BuildTest
+    displayName: Build and Test
+    jobs:
+      - job: BuildTest
+        displayName: Build and Test
+        steps:
+          - task: GoTool@0
+            inputs:
+              version: $(GO_VERSION)
+            displayName: Install Go $(GO_VERSION)
+
+          - task: NodeTool@0
+            inputs:
+              versionSpec: $(NODE_VERSION)
+            displayName: Install Node $(NODE_VERSION)
+
+          - script: |
+              set -euo pipefail
+              curl -sL https://taskfile.dev/install.sh | sh -s -- -d -b /usr/local/bin
+              task --version
+            displayName: Install Task
+
+          - script: |
+              set -euo pipefail
+              # Build.BuildNumber was set by `name:` above, e.g. 20260416.1
+              DATE_PART="${BUILD_BUILDNUMBER%.*}"   # 20260416
+              COUNTER="${BUILD_BUILDNUMBER##*.}"    # 1
+              YEAR="${DATE_PART:0:4}"
+              # Strip leading zero from month (semver forbids leading zeros).
+              # Day stays 2-digit; the combined mmdd is still a valid number.
+              MONTH=$((10#${DATE_PART:4:2}))
+              DAY="${DATE_PART:6:2}"
+              VERSION="${YEAR}.${MONTH}${DAY}.${COUNTER}"
+              echo "Computed package version: ${VERSION}"
+              echo "##vso[task.setvariable variable=PackageVersion;isOutput=true]${VERSION}"
+            name: version
+            displayName: Compute package version
+
+          - script: go mod download
+            displayName: Download Go modules
+
+          - script: npm ci
+            workingDirectory: site
+            displayName: Install site dependencies
+
+          - script: task vet
+            displayName: task vet
+
+          - script: task test
+            displayName: task test
+
+          - script: task build
+            displayName: task build
+
+          - publish: dist
+            artifact: rstash-binaries
+            displayName: Publish pipeline artifact
+
+  - stage: PublishFeed
+    displayName: Publish to Azure Artifacts
+    dependsOn: BuildTest
+    condition: succeeded()
+    jobs:
+      - deployment: PublishUniversal
+        displayName: Publish Universal Package
+        environment: rstash-artifact-feed
+        variables:
+          PackageVersion: $[ stageDependencies.BuildTest.BuildTest.outputs['version.PackageVersion'] ]
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - download: current
+                  artifact: rstash-binaries
+
+                - task: UniversalPackages@0
+                  inputs:
+                    command: publish
+                    publishDirectory: $(Pipeline.Workspace)/rstash-binaries
+                    feedsToUsePublish: internal
+                    vstsFeedPublish: rstash/rstash
+                    vstsFeedPackagePublish: rstash
+                    versionOption: custom
+                    versionPublish: $(PackageVersion)
+                    packagePublishDescription: rstash $(PackageVersion) from commit $(Build.SourceVersion)
+                  displayName: Push binaries to Azure Artifacts feed
