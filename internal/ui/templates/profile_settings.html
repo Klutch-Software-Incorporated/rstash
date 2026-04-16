@@ -36,6 +36,18 @@
     <dd>draft-dejong-remotestorage-26</dd>
 </dl>
 
+{{if $.CustomLinks}}
+<h3>Linked Services</h3>
+<ul class="linked-services">
+    {{range $.CustomLinks}}
+    <li>
+        <a href="{{.URL}}"{{if .External}} rel="noopener noreferrer" target="_blank"{{end}}>{{.Label}}</a>
+        {{if .Description}}<span class="muted"> — {{.Description}}</span>{{end}}
+    </li>
+    {{end}}
+</ul>
+{{end}}
+
 {{if .IsSelf}}
 <div class="settings-grid">
     <div class="settings-card">

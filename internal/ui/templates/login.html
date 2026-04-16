@@ -6,6 +6,7 @@
         {{if .Error}}
             <div role="alert" class="alert-error">
                 {{.Error}}
+                {{if .DisabledMessage}}<div class="disabled-detail">{{safeHTML .DisabledMessage}}</div>{{end}}
             </div>
         {{end}}
     {{end}}

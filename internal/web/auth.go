@@ -23,9 +23,10 @@ func AuthHandler(deps *UIDeps) *authHandler {
 }
 
 type loginContent struct {
-	Username   string
-	Error      string
-	RedirectTo string
+	Username         string
+	Error            string
+	DisabledMessage  string // operator-configured HTML shown when account is disabled
+	RedirectTo       string
 }
 
 func (h *authHandler) ShowLogin(w http.ResponseWriter, r *http.Request) {
@@ -43,10 +44,10 @@ func (h *authHandler) DoLogin(w http.ResponseWriter, r *http.Request) {
 	username := strings.TrimSpace(r.FormValue("username"))
 	password := r.FormValue("password")
 
-	renderErr := func(msg string) {
+	renderErr := func(msg string, disabledHTML string) {
 		h.deps.Renderer.Render(w, "login", ui.PageData{
 			Title:            "Login — rstash",
-			Content:          &loginContent{Username: username, Error: msg},
+			Content:          &loginContent{Username: username, Error: msg, DisabledMessage: disabledHTML},
 			RegistrationMode: h.deps.Config.RegistrationMode,
 		})
 	}
@@ -56,14 +57,14 @@ func (h *authHandler) DoLogin(w http.ResponseWriter, r *http.Request) {
 		if errors.Is(err, auth.ErrInvalidCredentials) {
 			metrics.LoginFailuresTotal.Inc()
 			h.deps.Repo.Audit(r.Context(), db.SystemActorID, "auth.login_failed", "user", username, "invalid credentials")
-			renderErr("Invalid username or password.")
+			renderErr("Invalid username or password.", "")
 		} else if errors.Is(err, auth.ErrAccountPendingApproval) {
-			renderErr("Your account is pending approval.")
+			renderErr("Your account is pending approval.", "")
 		} else if errors.Is(err, auth.ErrAccountDisabled) {
-			renderErr("Your account has been disabled.")
+			renderErr("Your account has been disabled.", h.deps.Settings.Load().DisabledAccountMessage)
 		} else {
 			slog.Error("failed to authenticate", "error", err)
-			renderErr("An error occurred. Please try again.")
+			renderErr("An error occurred. Please try again.", "")
 		}
 		return
 	}
@@ -71,7 +72,7 @@ func (h *authHandler) DoLogin(w http.ResponseWriter, r *http.Request) {
 	sess, err := h.deps.Auth.CreateSession(r.Context(), user.ID, ClientIP(r))
 	if err != nil {
 		slog.Error("failed to create session", "error", err)
-		renderErr("An error occurred. Please try again.")
+		renderErr("An error occurred. Please try again.", "")
 		return
 	}
 

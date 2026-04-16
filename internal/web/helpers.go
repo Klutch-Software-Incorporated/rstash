@@ -28,6 +28,15 @@ func formatBytes(b int64) string {
 // Flash, RegistrationMode) populated from the request context and config.
 func (d *UIDeps) pageData(w http.ResponseWriter, r *http.Request, title string, content any) ui.PageData {
 	snap := d.Settings.Load()
+	links := make([]ui.CustomLinkView, 0, len(snap.CustomLinks))
+	for _, l := range snap.CustomLinks {
+		links = append(links, ui.CustomLinkView{
+			Label:       l.Label,
+			URL:         l.URL,
+			Description: l.Description,
+			External:    !strings.HasPrefix(l.URL, "/"),
+		})
+	}
 	return ui.PageData{
 		Title:            title,
 		CurrentUser:      userInfo(CurrentUser(r)),
@@ -41,6 +50,7 @@ func (d *UIDeps) pageData(w http.ResponseWriter, r *http.Request, title string, 
 		Version:          config.Version,
 		HasMailer:        d.Mailer != nil,
 		SiteName:         snap.SiteName,
+		CustomLinks:      links,
 	}
 }
 

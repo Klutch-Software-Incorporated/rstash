@@ -32,6 +32,16 @@ type PageData struct {
 	HasMailer        bool
 	HideHeader       bool
 	SiteName         string
+	CustomLinks      []CustomLinkView
+}
+
+// CustomLinkView is a render-safe copy of a settings.CustomLink. It's a
+// distinct type so the ui package has no import-cycle dependency on settings.
+type CustomLinkView struct {
+	Label       string
+	URL         string
+	Description string
+	External    bool // true for absolute URLs (add rel="noopener noreferrer")
 }
 
 // Renderer parses and renders HTML templates from the embedded filesystem.

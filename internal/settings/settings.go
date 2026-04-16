@@ -2,8 +2,10 @@ package settings
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log/slog"
+	"net/url"
 	"strconv"
 	"strings"
 	"sync"
@@ -12,6 +14,17 @@ import (
 	"rstash/internal/config"
 	"rstash/internal/db"
 )
+
+// CustomLink is a single entry in the custom_links list rendered in the user
+// dropdown and profile settings page.
+type CustomLink struct {
+	Label       string `json:"label"`
+	URL         string `json:"url"`
+	Description string `json:"description,omitempty"`
+}
+
+// maxCustomLinks caps the size of the list to keep the UI surface bounded.
+const maxCustomLinks = 10
 
 // Snapshot holds the current resolved settings (DB overrides merged with env defaults).
 type Snapshot struct {
@@ -37,6 +50,8 @@ type Snapshot struct {
 	CookieDomain         string // domain attribute for session/CSRF cookies; empty = host-only
 	RegistrationExternalURL string // target for /register redirect when mode=external
 	ExternalAccountURL      string // where externally-managed users manage email/delete
+	CustomLinks             []CustomLink // admin-configured links for user menu/profile
+	DisabledAccountMessage  string       // HTML shown on login-error for disabled users
 }
 
 // Settings provides runtime-configurable settings backed by the database.
@@ -164,9 +179,23 @@ func (snap *Snapshot) ValueMap() map[string]string {
 		"privacy_mode":           snap.PrivacyMode,
 		"privacy_content":        snap.PrivacyContent,
 		"cookie_domain":          snap.CookieDomain,
-		"registration_external_url": snap.RegistrationExternalURL,
-		"external_account_url":      snap.ExternalAccountURL,
+		"registration_external_url":   snap.RegistrationExternalURL,
+		"external_account_url":        snap.ExternalAccountURL,
+		"custom_links":                snap.customLinksRaw(),
+		"disabled_account_message":    snap.DisabledAccountMessage,
 	}
+}
+
+// customLinksRaw returns the JSON-encoded list for display/round-tripping.
+func (snap *Snapshot) customLinksRaw() string {
+	if len(snap.CustomLinks) == 0 {
+		return ""
+	}
+	b, err := json.Marshal(snap.CustomLinks)
+	if err != nil {
+		return ""
+	}
+	return string(b)
 }
 
 // buildSnapshot merges DB overrides on top of env defaults.
@@ -273,8 +302,61 @@ func (s *Settings) buildSnapshot(overrides map[string]string) *Snapshot {
 	if v, ok := overrides["external_account_url"]; ok {
 		snap.ExternalAccountURL = v
 	}
+	if v, ok := overrides["custom_links"]; ok && v != "" {
+		if links, err := parseCustomLinks(v); err == nil {
+			snap.CustomLinks = links
+		}
+	}
+	if v, ok := overrides["disabled_account_message"]; ok {
+		snap.DisabledAccountMessage = v
+	}
 
 	return snap
+}
+
+// parseCustomLinks decodes and validates the custom_links JSON array.
+// Invalid entries are rejected with an error so admin UI can surface them.
+func parseCustomLinks(raw string) ([]CustomLink, error) {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return nil, nil
+	}
+	var links []CustomLink
+	if err := json.Unmarshal([]byte(raw), &links); err != nil {
+		return nil, fmt.Errorf("invalid JSON: %w", err)
+	}
+	if len(links) > maxCustomLinks {
+		return nil, fmt.Errorf("too many links (max %d)", maxCustomLinks)
+	}
+	for i, l := range links {
+		if strings.TrimSpace(l.Label) == "" {
+			return nil, fmt.Errorf("link %d: label is required", i+1)
+		}
+		if err := validateLinkURL(l.URL); err != nil {
+			return nil, fmt.Errorf("link %d (%q): %w", i+1, l.Label, err)
+		}
+	}
+	return links, nil
+}
+
+// validateLinkURL accepts https:// absolute URLs or relative paths starting with /.
+// Other schemes are rejected to avoid javascript:/data: injection or accidental
+// http:// in a TLS deployment.
+func validateLinkURL(raw string) error {
+	if strings.HasPrefix(raw, "/") {
+		return nil
+	}
+	u, err := url.Parse(raw)
+	if err != nil {
+		return fmt.Errorf("invalid URL: %w", err)
+	}
+	if u.Scheme != "https" {
+		return fmt.Errorf("URL must be https:// or a relative path starting with /")
+	}
+	if u.Host == "" {
+		return fmt.Errorf("URL must include a host")
+	}
+	return nil
 }
 
 // validateSetting checks that a key is known, runtime-editable, and its value is valid.
@@ -286,6 +368,17 @@ func validateSetting(key, value string) error {
 	}
 	if !def.RuntimeEditable {
 		return fmt.Errorf("setting %q cannot be changed at runtime", key)
+	}
+
+	// Keys with structured values get special-cased validators so Set() rejects
+	// malformed input before the bad value ever lands in the DB.
+	switch key {
+	case "custom_links":
+		if strings.TrimSpace(value) == "" {
+			return nil
+		}
+		_, err := parseCustomLinks(value)
+		return err
 	}
 
 	switch def.InputType {
