@@ -22,6 +22,7 @@ type AdminDeps struct {
 func AdminRoutes(deps *AdminDeps) http.Handler {
 	mux := http.NewServeMux()
 
+	mux.HandleFunc("GET /api/admin/me", deps.getMe)
 	mux.HandleFunc("GET /api/admin/users", deps.listUsers)
 	mux.HandleFunc("GET /api/admin/users/{username}", deps.getUser)
 	mux.HandleFunc("POST /api/admin/users", deps.createUser)
