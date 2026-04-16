@@ -184,7 +184,7 @@ func (h *registerHandler) DoRegister(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Create session.
-	sess, err := h.deps.Auth.CreateSession(r.Context(), user.ID, ClientIP(r))
+	sess, err := h.deps.Auth.CreateSession(r.Context(), user.ID, h.deps.ClientIPForStorage(r))
 	if err != nil {
 		slog.Error("failed to create session", "error", err)
 		http.Redirect(w, r, "/login", http.StatusSeeOther)

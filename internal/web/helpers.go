@@ -1,10 +1,13 @@
 package web
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"net"
 	"net/http"
 	"strings"
+	"time"
 
 	"rstash/internal/config"
 	"rstash/internal/ui"
@@ -150,6 +153,30 @@ func ClientIP(r *http.Request) string {
 		return r.RemoteAddr
 	}
 	return host
+}
+
+// ClientIPForStorage returns an IP string suitable for persistence, normalized
+// per the log_client_ips setting:
+//   - "enabled" (default): the raw IP is returned as-is.
+//   - "hashed": SHA-256 over (today-UTC || IP), hex-encoded; still distinguishes
+//     sessions/events on the same day but cannot be converted back to identity.
+//     The daily salt rotation means cross-day correlation doesn't work either.
+//   - "disabled": empty string.
+func (d *UIDeps) ClientIPForStorage(r *http.Request) string {
+	ip := ClientIP(r)
+	if ip == "" {
+		return ""
+	}
+	switch d.Settings.Load().LogClientIPs {
+	case "disabled":
+		return ""
+	case "hashed":
+		salt := time.Now().UTC().Format("2006-01-02")
+		sum := sha256.Sum256([]byte(salt + "|" + ip))
+		return hex.EncodeToString(sum[:])
+	default:
+		return ip
+	}
 }
 
 // validatePassword checks that a password meets minimum requirements.

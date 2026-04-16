@@ -44,6 +44,8 @@ type Config struct {
 	CookieDomain         string  // cookie domain (empty = host-only)
 	BandwidthMode        string  // "off" or "user"
 	BandwidthQuotaUser   int64   // default per-user monthly egress (bytes)
+	AuditRetentionDays   int     // 0 = forever
+	LogClientIPs         string  // "enabled", "hashed", "disabled"
 }
 
 // ParseDSN splits a DSN string into its scheme and path components.
@@ -99,6 +101,8 @@ func Load() *Config {
 		RefreshTokenLifetime: "90d",
 		BandwidthMode:        "user",
 		BandwidthQuotaUser:   bandwidthUser,
+		AuditRetentionDays:   0,
+		LogClientIPs:         "enabled",
 	}
 }
 

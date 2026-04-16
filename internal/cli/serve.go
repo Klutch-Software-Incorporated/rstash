@@ -310,6 +310,36 @@ func runServe(cmd *cobra.Command, args []string) error {
 	bandwidthTracker.Start(ctx)
 	defer bandwidthTracker.Stop(context.Background())
 
+	// Audit retention worker: once-daily prune when audit_retention_days > 0.
+	go func() {
+		ticker := time.NewTicker(24 * time.Hour)
+		defer ticker.Stop()
+		runPrune := func() {
+			days := runtimeSettings.Load().AuditRetentionDays
+			if days <= 0 {
+				return
+			}
+			cutoff := time.Now().UTC().AddDate(0, 0, -days)
+			n, err := repo.PruneAuditEntriesOlderThan(context.Background(), cutoff)
+			if err != nil {
+				slog.Error("audit retention prune", "error", err)
+				return
+			}
+			if n > 0 {
+				slog.Info("audit retention pruned", "count", n, "days", days)
+			}
+		}
+		runPrune()
+		for {
+			select {
+			case <-ticker.C:
+				runPrune()
+			case <-ctx.Done():
+				return
+			}
+		}
+	}()
+
 	// Session cleanup goroutine.
 	go func() {
 		ticker := time.NewTicker(1 * time.Hour)

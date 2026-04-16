@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"time"
 
 	"rstash/internal/model"
 )
@@ -116,6 +117,16 @@ func (r *Repository) AnonymizeAuditEntriesForUser(ctx context.Context, userID in
 	// Replace username mentions in details for other rows.
 	_ = username // kept for signature stability / future exact-match replacement
 	return nil
+}
+
+// PruneAuditEntriesOlderThan deletes audit rows older than the given time.
+// Returns the number of rows removed. Used by the retention worker.
+func (r *Repository) PruneAuditEntriesOlderThan(ctx context.Context, cutoff time.Time) (int64, error) {
+	res := r.db.WithContext(ctx).Where("created_at < ?", cutoff).Delete(&model.AuditEntry{})
+	if res.Error != nil {
+		return 0, fmt.Errorf("prune audit entries: %w", res.Error)
+	}
+	return res.RowsAffected, nil
 }
 
 // CountAuditEntries returns the total number of audit log entries.

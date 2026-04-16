@@ -100,13 +100,13 @@ func (h *claimHandler) DoClaim(w http.ResponseWriter, r *http.Request) {
 	_ = h.deps.Repo.ClearPasswordResetToken(r.Context(), user.ID)
 
 	// Create a session and log the user in.
-	sess, err := h.deps.Auth.CreateSession(r.Context(), user.ID, ClientIP(r))
+	sess, err := h.deps.Auth.CreateSession(r.Context(), user.ID, h.deps.ClientIPForStorage(r))
 	if err != nil {
 		slog.Error("claim: create session", "error", err)
 		http.Redirect(w, r, "/login", http.StatusSeeOther)
 		return
 	}
-	_ = h.deps.Repo.UpdateUserLastLogin(r.Context(), user.ID, ClientIP(r))
+	_ = h.deps.Repo.UpdateUserLastLogin(r.Context(), user.ID, h.deps.ClientIPForStorage(r))
 	h.deps.Repo.Audit(r.Context(), user.ID, "user.claimed", "user", fmt.Sprintf("%d", user.ID), user.Username)
 	if h.deps.Webhooks != nil {
 		claimedAt := time.Now().UTC().Format(time.RFC3339)

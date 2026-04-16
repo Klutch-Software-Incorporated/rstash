@@ -764,7 +764,7 @@ func (h *profileHandler) ChangePassword(w http.ResponseWriter, r *http.Request) 
 	if err := h.deps.Auth.TerminateAllSessions(r.Context(), target.ID); err != nil {
 		slog.Error("failed to terminate sessions after password change", "error", err)
 	}
-	newSess, err := h.deps.Auth.CreateSession(r.Context(), target.ID, ClientIP(r))
+	newSess, err := h.deps.Auth.CreateSession(r.Context(), target.ID, h.deps.ClientIPForStorage(r))
 	if err != nil {
 		slog.Error("failed to create new session after password change", "error", err)
 	} else {

@@ -59,6 +59,7 @@ func FullRoutes(deps *UIDeps) http.Handler {
 	mux.HandleFunc("GET /legal/terms", legalH.ShowTerms)
 	mux.HandleFunc("GET /legal/privacy", legalH.ShowPrivacy)
 	mux.HandleFunc("GET /legal/licenses", legalH.ShowLicenses)
+	mux.HandleFunc("GET /legal/cookies", legalH.ShowCookies)
 
 	// Abuse reporting (public, no auth).
 	abuseH := AbuseHandler(deps)

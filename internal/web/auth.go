@@ -69,14 +69,14 @@ func (h *authHandler) DoLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	sess, err := h.deps.Auth.CreateSession(r.Context(), user.ID, ClientIP(r))
+	sess, err := h.deps.Auth.CreateSession(r.Context(), user.ID, h.deps.ClientIPForStorage(r))
 	if err != nil {
 		slog.Error("failed to create session", "error", err)
 		renderErr("An error occurred. Please try again.", "")
 		return
 	}
 
-	if err := h.deps.Repo.UpdateUserLastLogin(r.Context(), user.ID, ClientIP(r)); err != nil {
+	if err := h.deps.Repo.UpdateUserLastLogin(r.Context(), user.ID, h.deps.ClientIPForStorage(r)); err != nil {
 		slog.Error("failed to update last login", "error", err)
 	}
 

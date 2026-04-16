@@ -54,6 +54,8 @@ type Snapshot struct {
 	DisabledAccountMessage  string       // HTML shown on login-error for disabled users
 	BandwidthMode           string       // "off" or "user" — monthly egress enforcement
 	BandwidthQuotaUser      int64        // default per-user monthly egress in bytes
+	AuditRetentionDays      int          // 0 = forever; > 0 = prune entries older than N days
+	LogClientIPs            string       // "enabled", "hashed", or "disabled"
 }
 
 // Settings provides runtime-configurable settings backed by the database.
@@ -187,6 +189,8 @@ func (snap *Snapshot) ValueMap() map[string]string {
 		"disabled_account_message":    snap.DisabledAccountMessage,
 		"bandwidth_mode":              snap.BandwidthMode,
 		"bandwidth_quota_user":        config.FormatByteSize(snap.BandwidthQuotaUser),
+		"audit_retention_days":        strconv.Itoa(snap.AuditRetentionDays),
+		"log_client_ips":              snap.LogClientIPs,
 	}
 }
 
@@ -226,6 +230,8 @@ func (s *Settings) buildSnapshot(overrides map[string]string) *Snapshot {
 		CookieDomain:         s.defaults.CookieDomain,
 		BandwidthMode:        s.defaults.BandwidthMode,
 		BandwidthQuotaUser:   s.defaults.BandwidthQuotaUser,
+		AuditRetentionDays:   s.defaults.AuditRetentionDays,
+		LogClientIPs:         s.defaults.LogClientIPs,
 	}
 
 	if overrides == nil {
@@ -323,6 +329,14 @@ func (s *Settings) buildSnapshot(overrides map[string]string) *Snapshot {
 		if n, err := config.ParseByteSize(v); err == nil {
 			snap.BandwidthQuotaUser = n
 		}
+	}
+	if v, ok := overrides["audit_retention_days"]; ok {
+		if n, err := strconv.Atoi(v); err == nil && n >= 0 {
+			snap.AuditRetentionDays = n
+		}
+	}
+	if v, ok := overrides["log_client_ips"]; ok {
+		snap.LogClientIPs = v
 	}
 
 	return snap
