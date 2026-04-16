@@ -253,6 +253,54 @@ func TestAdminAPI_SetUserQuota(t *testing.T) {
 	}
 }
 
+func TestAdminAPI_SetUserEmail(t *testing.T) {
+	deps, repo := setupAdminTest(t)
+	handler := AdminRoutes(deps)
+
+	_, err := repo.CreateUser(t.Context(), "emailed", "password123", "old@example.com", false, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	body := `{"email":"new@example.com","verified":true}`
+	req := httptest.NewRequest("PUT", "/api/admin/users/emailed/email", bytes.NewReader([]byte(body)))
+	req.Header.Set("X-API-Key", testAPIKey)
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+
+	user, _ := repo.GetUserByUsername(t.Context(), "emailed")
+	if user.Email == nil || *user.Email != "new@example.com" {
+		t.Fatalf("expected email to be updated, got %v", user.Email)
+	}
+	if !user.EmailVerified {
+		t.Error("expected EmailVerified=true")
+	}
+}
+
+func TestAdminAPI_SetUserEmail_Conflict(t *testing.T) {
+	deps, repo := setupAdminTest(t)
+	handler := AdminRoutes(deps)
+
+	_, _ = repo.CreateUser(t.Context(), "alice", "password123", "alice@example.com", false, true)
+	_, _ = repo.CreateUser(t.Context(), "bob", "password123", "bob@example.com", false, true)
+
+	body := `{"email":"alice@example.com"}`
+	req := httptest.NewRequest("PUT", "/api/admin/users/bob/email", bytes.NewReader([]byte(body)))
+	req.Header.Set("X-API-Key", testAPIKey)
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, req)
+
+	if w.Code != http.StatusConflict {
+		t.Fatalf("expected 409, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
 func TestAdminAPI_DisableUser(t *testing.T) {
 	deps, repo := setupAdminTest(t)
 	handler := AdminRoutes(deps)

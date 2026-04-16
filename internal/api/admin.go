@@ -33,6 +33,7 @@ func AdminRoutes(deps *AdminDeps) http.Handler {
 	mux.HandleFunc("GET /api/admin/users/{username}", deps.getUser)
 	mux.HandleFunc("POST /api/admin/users", deps.createUser)
 	mux.HandleFunc("PUT /api/admin/users/{username}/quota", deps.setUserQuota)
+	mux.HandleFunc("PUT /api/admin/users/{username}/email", deps.setUserEmail)
 	mux.HandleFunc("PUT /api/admin/users/{username}/disable", deps.setUserDisabled)
 	mux.HandleFunc("DELETE /api/admin/users/{username}", deps.deleteUser)
 	mux.HandleFunc("GET /api/admin/stats", deps.getStats)
@@ -290,6 +291,56 @@ func (d *AdminDeps) setUserQuota(w http.ResponseWriter, r *http.Request) {
 
 	d.Repo.Audit(r.Context(), 0, "admin_api.user.quota", "user", username, "")
 
+	writeJSON(w, http.StatusOK, map[string]string{"ok": "true"})
+}
+
+func (d *AdminDeps) setUserEmail(w http.ResponseWriter, r *http.Request) {
+	username := r.PathValue("username")
+
+	var req struct {
+		Email    string `json:"email"`
+		Verified bool   `json:"verified"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid JSON body")
+		return
+	}
+	if req.Email == "" {
+		writeError(w, http.StatusBadRequest, "email is required")
+		return
+	}
+
+	email, err := db.ValidateEmail(req.Email)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	user, err := d.Repo.GetUserByUsername(r.Context(), username)
+	if err != nil || user == nil {
+		writeError(w, http.StatusNotFound, "user not found")
+		return
+	}
+
+	// Ensure the new email isn't already taken by someone else.
+	if existing, _ := d.Repo.GetUserByEmail(r.Context(), email); existing != nil && existing.ID != user.ID {
+		writeError(w, http.StatusConflict, "email is already in use by another account")
+		return
+	}
+
+	if err := d.Repo.UpdateUserEmail(r.Context(), user.ID, email); err != nil {
+		slog.Error("admin API: update email", "error", err)
+		writeError(w, http.StatusInternalServerError, "failed to update email")
+		return
+	}
+
+	if req.Verified {
+		if err := d.Repo.VerifyUserEmail(r.Context(), user.ID); err != nil {
+			slog.Error("admin API: verify email", "error", err)
+		}
+	}
+
+	d.Repo.Audit(r.Context(), 0, "admin_api.user.email_updated", "user", username, email)
 	writeJSON(w, http.StatusOK, map[string]string{"ok": "true"})
 }
 
