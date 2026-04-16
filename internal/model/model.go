@@ -23,6 +23,20 @@ type User struct {
 	EmailVerifyExpiry  *time.Time
 	PasswordResetToken  *string    `gorm:"size:255"`
 	PasswordResetExpiry *time.Time
+
+	// ExternallyManaged is true for accounts provisioned via the admin API
+	// with provision=true (typically by a companion signup/billing app).
+	// When true, the rstash web UI redirects email/delete flows to an
+	// external management URL instead of handling them locally.
+	ExternallyManaged bool `gorm:"not null;default:false"`
+}
+
+// IsUnclaimed returns true when a user was provisioned via the admin API
+// but has not yet completed the /claim flow to set their password and log in.
+// Detected by the combination of an active password-reset token and a
+// never-logged-in state.
+func (u *User) IsUnclaimed() bool {
+	return u.LastLoginAt == nil && u.PasswordResetToken != nil && *u.PasswordResetToken != ""
 }
 
 type OAuthClient struct {

@@ -206,6 +206,15 @@ func SettingDefs() []SettingDef {
 			RuntimeEditable: true,
 		},
 		{
+			Key:             "external_account_url",
+			Group:           "Access",
+			Label:           "External account management URL",
+			Description:     "Where externally-managed users go to change their email or delete their account.",
+			Help:            "For users flagged ExternallyManaged (created via admin API with provision=true), rstash disables local email editing and self-service account deletion. Instead, those UI surfaces link to this URL so the companion app (e.g. a billing portal) can own identity changes. Ignored when no externally-managed users exist.",
+			InputType:       InputText,
+			RuntimeEditable: true,
+		},
+		{
 			Key:             "log_level",
 			EnvVar:          EnvLogLevel,
 			Group:           "Monitoring",

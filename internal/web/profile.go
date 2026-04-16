@@ -280,6 +280,12 @@ type profileSettingsContent struct {
 	IsSelf        bool
 	IsAdmin       bool
 
+	// ExternallyManaged flags the account for an external billing/identity app.
+	// When true, the local Change Email form is hidden and replaced with a
+	// link to ExternalAccountURL.
+	ExternallyManaged  bool
+	ExternalAccountURL string
+
 	// Admin-only when viewing another user
 	TargetUser *profileTargetUser
 }
@@ -372,19 +378,21 @@ func (h *profileHandler) ShowSettings(w http.ResponseWriter, r *http.Request) {
 	}
 
 	content := &profileSettingsContent{
-		BaseURL:       h.deps.Config.BaseURL,
-		Host:          host,
-		Username:      target.Username,
-		Email:         emailStr,
-		EmailVerified: target.EmailVerified,
-		CreatedAt:     target.CreatedAt.Format("2006-01-02 15:04:05"),
-		Tokens:    tokenRows,
-		Sessions:  sessRows,
-		QuotaMode: snap.QuotaMode,
-		Stats:     hs,
-		URLPrefix: prefix,
-		IsSelf:    isSelf,
-		IsAdmin:   currentUser.IsAdmin,
+		BaseURL:            h.deps.Config.BaseURL,
+		Host:               host,
+		Username:           target.Username,
+		Email:              emailStr,
+		EmailVerified:      target.EmailVerified,
+		CreatedAt:          target.CreatedAt.Format("2006-01-02 15:04:05"),
+		Tokens:             tokenRows,
+		Sessions:           sessRows,
+		QuotaMode:          snap.QuotaMode,
+		Stats:              hs,
+		URLPrefix:          prefix,
+		IsSelf:             isSelf,
+		IsAdmin:            currentUser.IsAdmin,
+		ExternallyManaged:  target.ExternallyManaged,
+		ExternalAccountURL: snap.ExternalAccountURL,
 	}
 
 	if !isSelf && currentUser.IsAdmin {
@@ -658,6 +666,14 @@ func (h *profileHandler) ChangeEmail(w http.ResponseWriter, r *http.Request) {
 
 	target := TargetUser(r)
 	prefix := urlPrefix(r)
+
+	// Externally-managed users can't change email locally — billing/companion app owns it.
+	if target.ExternallyManaged {
+		ui.SetFlashError(w, "Your email is managed externally. Update it in your account portal.")
+		http.Redirect(w, r, prefix+"/settings", http.StatusSeeOther)
+		return
+	}
+
 	emailRaw := r.FormValue("email")
 
 	emailAddr, err := db.ValidateEmail(emailRaw)

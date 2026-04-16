@@ -36,6 +36,7 @@ type Snapshot struct {
 	PrivacyContent       string
 	CookieDomain         string // domain attribute for session/CSRF cookies; empty = host-only
 	RegistrationExternalURL string // target for /register redirect when mode=external
+	ExternalAccountURL      string // where externally-managed users manage email/delete
 }
 
 // Settings provides runtime-configurable settings backed by the database.
@@ -164,6 +165,7 @@ func (snap *Snapshot) ValueMap() map[string]string {
 		"privacy_content":        snap.PrivacyContent,
 		"cookie_domain":          snap.CookieDomain,
 		"registration_external_url": snap.RegistrationExternalURL,
+		"external_account_url":      snap.ExternalAccountURL,
 	}
 }
 
@@ -267,6 +269,9 @@ func (s *Settings) buildSnapshot(overrides map[string]string) *Snapshot {
 	}
 	if v, ok := overrides["registration_external_url"]; ok {
 		snap.RegistrationExternalURL = v
+	}
+	if v, ok := overrides["external_account_url"]; ok {
+		snap.ExternalAccountURL = v
 	}
 
 	return snap
