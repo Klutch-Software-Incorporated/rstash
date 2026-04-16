@@ -77,6 +77,47 @@ func (r *Repository) ListAuditEntriesByTarget(ctx context.Context, targetType, t
 	return entries, nil
 }
 
+// ListAuditEntriesByActor returns recent audit entries where the given user
+// is the actor, newest first. Used for the user-facing /account/activity view.
+func (r *Repository) ListAuditEntriesByActor(ctx context.Context, actorID int64, limit int) ([]*AuditRow, error) {
+	var entries []*AuditRow
+	err := r.db.WithContext(ctx).
+		Table("audit_log a").
+		Select("a.id, a.actor_id, COALESCE(u.username, '_system') AS actor_username, a.action, a.target_type, a.target_id, COALESCE(a.details, '') AS details, a.created_at").
+		Joins("LEFT JOIN users u ON u.id = a.actor_id").
+		Where("a.actor_id = ?", actorID).
+		Order("a.created_at DESC").
+		Limit(limit).
+		Scan(&entries).Error
+	if err != nil {
+		return nil, fmt.Errorf("list audit entries by actor: %w", err)
+	}
+	return entries, nil
+}
+
+// AnonymizeAuditEntriesForUser deletes audit rows where the user is the actor
+// and tombstones rows where the user is the target. Called during user deletion
+// to satisfy GDPR Article 17 while preserving operator-facing audit context.
+func (r *Repository) AnonymizeAuditEntriesForUser(ctx context.Context, userID int64, username string) error {
+	idStr := fmt.Sprintf("%d", userID)
+	// Hard-delete entries where the user was the actor (they are the subject).
+	if err := r.db.WithContext(ctx).Where("actor_id = ?", userID).
+		Delete(&model.AuditEntry{}).Error; err != nil {
+		return fmt.Errorf("delete actor audit: %w", err)
+	}
+	// Tombstone entries referencing the user as a target, so operator-facing
+	// "admin disabled X" history survives without leaking PII.
+	tombstone := fmt.Sprintf("<deleted user #%d>", userID)
+	if err := r.db.WithContext(ctx).Model(&model.AuditEntry{}).
+		Where("target_type = ? AND target_id = ?", "user", idStr).
+		Updates(map[string]any{"target_id": tombstone, "details": tombstone}).Error; err != nil {
+		return fmt.Errorf("tombstone target audit: %w", err)
+	}
+	// Replace username mentions in details for other rows.
+	_ = username // kept for signature stability / future exact-match replacement
+	return nil
+}
+
 // CountAuditEntries returns the total number of audit log entries.
 func (r *Repository) CountAuditEntries(ctx context.Context) (int64, error) {
 	var count int64

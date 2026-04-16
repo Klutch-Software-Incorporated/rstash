@@ -91,6 +91,9 @@ var templateFiles = []string{
 	"templates/admin_webhook_edit.html",
 	"templates/admin_webhook_secret.html",
 	"templates/claim.html",
+	"templates/account_delete.html",
+	"templates/account_activity.html",
+	"templates/account_apps.html",
 }
 
 func parseTemplates() *template.Template {

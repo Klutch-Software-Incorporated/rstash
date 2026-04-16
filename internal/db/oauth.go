@@ -131,6 +131,21 @@ func (r *Repository) DeleteOAuthTokensByUserID(ctx context.Context, userID int64
 	return nil
 }
 
+// DeleteUserOAuthTokensForClient deletes all OAuth (and refresh) tokens the
+// user has issued to a specific client. Returns the number of access tokens removed.
+func (r *Repository) DeleteUserOAuthTokensForClient(ctx context.Context, userID int64, clientID string) (int64, error) {
+	res := r.db.WithContext(ctx).Where("user_id = ? AND client_id = ?", userID, clientID).
+		Delete(&model.OAuthToken{})
+	if res.Error != nil {
+		return 0, fmt.Errorf("delete oauth tokens: %w", res.Error)
+	}
+	if err := r.db.WithContext(ctx).Where("user_id = ? AND client_id = ?", userID, clientID).
+		Delete(&model.RefreshToken{}).Error; err != nil {
+		return 0, fmt.Errorf("delete refresh tokens: %w", err)
+	}
+	return res.RowsAffected, nil
+}
+
 // DeleteExpiredOAuthTokens removes all expired tokens.
 func (r *Repository) DeleteExpiredOAuthTokens(ctx context.Context) error {
 	now := time.Now().UTC()

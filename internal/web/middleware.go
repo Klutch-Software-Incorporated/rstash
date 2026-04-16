@@ -228,7 +228,9 @@ func SetupGuard(authSvc auth.Service) func(http.Handler) http.Handler {
 // to /account/email. Routes that must remain accessible are exempted.
 func AccountGuard() func(http.Handler) http.Handler {
 	exempt := []string{
-		"/account/email", "/login", "/logout", "/setup", "/register",
+		"/account/email", "/account/delete", "/account/export",
+		"/account/activity", "/account/apps",
+		"/login", "/logout", "/setup", "/register",
 		"/static/", "/storage/", "/.well-known/", "/oauth/", "/abuse/",
 		"/legal/", "/verify-email", "/claim",
 	}

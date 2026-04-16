@@ -45,6 +45,15 @@ func FullRoutes(deps *UIDeps) http.Handler {
 	mux.HandleFunc("GET /claim", claimH.ShowClaim)
 	mux.HandleFunc("POST /claim", RequireCSRF(claimH.DoClaim))
 
+	// GDPR-facing self-service pages: delete, export, activity, OAuth apps.
+	rightsH := AccountRightsHandler(deps)
+	mux.HandleFunc("GET /account/delete", rightsH.ShowDelete)
+	mux.HandleFunc("POST /account/delete", RequireCSRF(rightsH.DoDelete))
+	mux.HandleFunc("GET /account/export", rightsH.DoExport)
+	mux.HandleFunc("GET /account/activity", rightsH.ShowActivity)
+	mux.HandleFunc("GET /account/apps", rightsH.ShowOAuthApps)
+	mux.HandleFunc("POST /account/apps/revoke", RequireCSRF(rightsH.RevokeOAuthApp))
+
 	// Legal pages (public, no auth).
 	legalH := LegalHandler(deps)
 	mux.HandleFunc("GET /legal/terms", legalH.ShowTerms)
