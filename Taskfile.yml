@@ -36,6 +36,7 @@ tasks:
 
   test:
     desc: Run all tests
+    deps: [collect-licenses, site:embed]
     cmds:
       - go test ./...
 
@@ -46,6 +47,7 @@ tasks:
 
   vet:
     desc: Run go vet on all packages
+    deps: [collect-licenses, site:embed]
     cmds:
       - go vet ./...
 
