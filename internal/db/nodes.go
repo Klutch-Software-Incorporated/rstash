@@ -274,7 +274,6 @@ func (r *Repository) GetUserModuleStats(ctx context.Context, userID int64) ([]*M
 	return result, nil
 }
 
-// GetRecentUserNodes returns the most recently modified non-folder nodes for a user.
 // ListUserNodes returns all document nodes owned by the user, ordered by path.
 // Used for data exports (GDPR Article 15/20).
 func (r *Repository) ListUserNodes(ctx context.Context, userID int64) ([]*model.Node, error) {
@@ -289,6 +288,7 @@ func (r *Repository) ListUserNodes(ctx context.Context, userID int64) ([]*model.
 	return nodes, nil
 }
 
+// GetRecentUserNodes returns the most recently modified non-folder nodes for a user.
 func (r *Repository) GetRecentUserNodes(ctx context.Context, userID int64, limit int) ([]*model.Node, error) {
 	var nodes []*model.Node
 	err := r.db.WithContext(ctx).
