@@ -42,6 +42,7 @@ type Config struct {
 	TLSCacheDir          string  // RSTASH_TLS_CACHE — autocert cache directory
 	EmailDSN             string  // RSTASH_EMAIL — email provider DSN
 	APIKey               string  // RSTASH_API_KEY — admin API key
+	CookieDomain         string  // cookie domain (empty = host-only)
 }
 
 // ParseDSN splits a DSN string into its scheme and path components.

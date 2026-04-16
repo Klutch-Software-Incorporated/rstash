@@ -11,6 +11,7 @@ import (
 
 	"rstash/internal/auth"
 	"rstash/internal/model"
+	"rstash/internal/settings"
 	"rstash/internal/ui"
 )
 
@@ -28,7 +29,7 @@ const csrfCookieName = "rstash_csrf"
 
 // AuthLoader returns middleware that reads the session cookie and loads
 // the user into the request context.
-func AuthLoader(authSvc auth.Service, secureCookies bool) func(http.Handler) http.Handler {
+func AuthLoader(authSvc auth.Service, settings *settings.Settings, secureCookies bool) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			cookie, err := r.Cookie(auth.SessionCookieName)
@@ -45,7 +46,7 @@ func AuthLoader(authSvc auth.Service, secureCookies bool) func(http.Handler) htt
 			}
 			if sess == nil {
 				// Expired or invalid — clear cookie.
-				auth.ClearSessionCookie(w, secureCookies)
+				auth.ClearSessionCookie(w, settings.Load().CookieDomain, secureCookies)
 				next.ServeHTTP(w, r)
 				return
 			}
@@ -57,7 +58,7 @@ func AuthLoader(authSvc auth.Service, secureCookies bool) func(http.Handler) htt
 			}
 
 			if user.Disabled || !user.Approved {
-				auth.ClearSessionCookie(w, secureCookies)
+				auth.ClearSessionCookie(w, settings.Load().CookieDomain, secureCookies)
 				next.ServeHTTP(w, r)
 				return
 			}
@@ -84,7 +85,7 @@ func CurrentSession(r *http.Request) *model.Session {
 // EnsureCSRFCookie is middleware that sets a rstash_csrf cookie on every response
 // if one is not already present. The cookie value is stored in context so that
 // CSRFToken() can return it for template rendering on pre-auth pages.
-func EnsureCSRFCookie(secureCookies bool) func(http.Handler) http.Handler {
+func EnsureCSRFCookie(settings *settings.Settings, secureCookies bool) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			var token string
@@ -101,6 +102,7 @@ func EnsureCSRFCookie(secureCookies bool) func(http.Handler) http.Handler {
 					Name:     csrfCookieName,
 					Value:    token,
 					Path:     "/",
+					Domain:   settings.Load().CookieDomain,
 					HttpOnly: true,
 					Secure:   secureCookies,
 					SameSite: http.SameSiteLaxMode,

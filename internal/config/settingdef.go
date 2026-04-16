@@ -189,6 +189,15 @@ func SettingDefs() []SettingDef {
 
 		// ── Access (runtime-editable, no env var) ──
 		{
+			Key:             "cookie_domain",
+			Group:           "Access",
+			Label:           "Cookie domain",
+			Description:     "Parent domain for session/CSRF cookies (e.g. \".example.com\"). Empty = host-only.",
+			Help:            "When set, the session and CSRF cookies are scoped to this domain, making them visible to all subdomains. Useful for integrating companion apps on subdomains (e.g. a billing or admin app at billing.example.com). When empty, cookies are host-only (default, most secure). SECURITY: enabling this means any subdomain of the configured parent receives the session cookie — treat all subdomains as first-party-trusted. Format: include the leading dot for cross-subdomain sharing (\".example.com\"), or no dot for apex-only (\"example.com\"). Changes take effect on next login.",
+			InputType:       InputText,
+			RuntimeEditable: true,
+		},
+		{
 			Key:             "registration_mode",
 			Group:           "Access",
 			Label:           "Registration mode",

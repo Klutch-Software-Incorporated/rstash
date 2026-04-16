@@ -239,7 +239,7 @@ func runServe(cmd *cobra.Command, args []string) error {
 	// OAuth authorize routes (need auth loader + setup guard for session cookie support).
 	oauthH := web.OAuthHandler(uiDeps)
 	oauthWrap := func(h http.HandlerFunc) http.Handler {
-		return web.AuthLoader(localAuth, secureCookies)(
+		return web.AuthLoader(localAuth, runtimeSettings, secureCookies)(
 			web.SetupGuard(localAuth)(http.HandlerFunc(h)),
 		)
 	}
@@ -248,8 +248,8 @@ func runServe(cmd *cobra.Command, args []string) error {
 
 	// Web UI routes.
 	uiHandler := web.FullRoutes(uiDeps)
-	wrapped := web.AuthLoader(localAuth, secureCookies)(
-		web.EnsureCSRFCookie(secureCookies)(
+	wrapped := web.AuthLoader(localAuth, runtimeSettings, secureCookies)(
+		web.EnsureCSRFCookie(runtimeSettings, secureCookies)(
 			web.SetupGuard(localAuth)(
 				web.AccountGuard()(uiHandler),
 			),

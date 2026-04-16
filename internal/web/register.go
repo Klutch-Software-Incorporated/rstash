@@ -174,7 +174,7 @@ func (h *registerHandler) DoRegister(w http.ResponseWriter, r *http.Request) {
 	}
 
 	h.deps.Repo.Audit(r.Context(), user.ID, "user.registered", "user", fmt.Sprintf("%d", user.ID), username)
-	auth.SetSessionCookie(w, sess.Token, h.deps.SecureCookies)
+	auth.SetSessionCookie(w, sess.Token, h.deps.Settings.Load().CookieDomain, h.deps.SecureCookies)
 	ui.SetFlash(w, "Account created successfully.")
 	http.Redirect(w, r, "/", http.StatusSeeOther)
 }

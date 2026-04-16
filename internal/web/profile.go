@@ -752,7 +752,7 @@ func (h *profileHandler) ChangePassword(w http.ResponseWriter, r *http.Request) 
 	if err != nil {
 		slog.Error("failed to create new session after password change", "error", err)
 	} else {
-		auth.SetSessionCookie(w, newSess.Token, h.deps.SecureCookies)
+		auth.SetSessionCookie(w, newSess.Token, h.deps.Settings.Load().CookieDomain, h.deps.SecureCookies)
 	}
 
 	ui.SetFlash(w, "Password changed successfully.")

@@ -80,7 +80,7 @@ func (h *authHandler) DoLogin(w http.ResponseWriter, r *http.Request) {
 	}
 
 	h.deps.Repo.Audit(r.Context(), user.ID, "auth.login", "user", fmt.Sprintf("%d", user.ID), username)
-	auth.SetSessionCookie(w, sess.Token, h.deps.SecureCookies)
+	auth.SetSessionCookie(w, sess.Token, h.deps.Settings.Load().CookieDomain, h.deps.SecureCookies)
 
 	// Redirect to the originally requested page, or home.
 	redirectTo := r.FormValue("redirect")
@@ -103,6 +103,6 @@ func (h *authHandler) DoLogout(w http.ResponseWriter, r *http.Request) {
 		h.deps.Repo.Audit(r.Context(), user.ID, "auth.logout", "user", fmt.Sprintf("%d", user.ID), user.Username)
 	}
 
-	auth.ClearSessionCookie(w, h.deps.SecureCookies)
+	auth.ClearSessionCookie(w, h.deps.Settings.Load().CookieDomain, h.deps.SecureCookies)
 	http.Redirect(w, r, "/", http.StatusSeeOther)
 }

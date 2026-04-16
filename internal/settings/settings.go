@@ -34,6 +34,7 @@ type Snapshot struct {
 	TOSContent           string
 	PrivacyMode          string // "off", "text", "url"
 	PrivacyContent       string
+	CookieDomain         string // domain attribute for session/CSRF cookies; empty = host-only
 }
 
 // Settings provides runtime-configurable settings backed by the database.
@@ -160,6 +161,7 @@ func (snap *Snapshot) ValueMap() map[string]string {
 		"tos_content":            snap.TOSContent,
 		"privacy_mode":           snap.PrivacyMode,
 		"privacy_content":        snap.PrivacyContent,
+		"cookie_domain":          snap.CookieDomain,
 	}
 }
 
@@ -184,6 +186,7 @@ func (s *Settings) buildSnapshot(overrides map[string]string) *Snapshot {
 		TOSContent:           s.defaults.TOSContent,
 		PrivacyMode:          s.defaults.PrivacyMode,
 		PrivacyContent:       s.defaults.PrivacyContent,
+		CookieDomain:         s.defaults.CookieDomain,
 	}
 
 	if overrides == nil {
@@ -256,6 +259,9 @@ func (s *Settings) buildSnapshot(overrides map[string]string) *Snapshot {
 	}
 	if v, ok := overrides["privacy_content"]; ok {
 		snap.PrivacyContent = v
+	}
+	if v, ok := overrides["cookie_domain"]; ok {
+		snap.CookieDomain = v
 	}
 
 	return snap
