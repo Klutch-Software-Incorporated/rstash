@@ -306,7 +306,7 @@ func writeServiceError(w http.ResponseWriter, err error) {
 		http.Error(w, "payload too large", http.StatusRequestEntityTooLarge)
 	case errors.Is(err, storage.ErrQuotaExceeded):
 		http.Error(w, "quota exceeded", http.StatusInsufficientStorage)
-	case errors.Is(err, storage.ErrBandwidthExceeded):
+	case errors.Is(err, storage.ErrEgressExceeded):
 		// 429 per draft-dejong-remotestorage-26 §5 ("rate limiting") and RFC 6585.
 		// We use 429 rather than 507 because 507 means "storage is full" which is
 		// about the blob store, not transfer, and implies a permanent condition.
@@ -319,7 +319,7 @@ func writeServiceError(w http.ResponseWriter, err error) {
 			secs = 1
 		}
 		w.Header().Set("Retry-After", strconv.Itoa(secs))
-		http.Error(w, "bandwidth exceeded", http.StatusTooManyRequests)
+		http.Error(w, "egress exceeded", http.StatusTooManyRequests)
 	case errors.Is(err, storage.ErrContentRejected):
 		http.Error(w, err.Error(), http.StatusUnsupportedMediaType)
 	default:

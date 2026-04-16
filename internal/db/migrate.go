@@ -25,7 +25,7 @@ func Migrate(gormDB *gorm.DB) error {
 		&model.APIKey{},
 		&model.WebhookSubscription{},
 		&model.WebhookDelivery{},
-		&model.BandwidthUsage{},
+		&model.EgressUsage{},
 	); err != nil {
 		return fmt.Errorf("auto migrate: %w", err)
 	}

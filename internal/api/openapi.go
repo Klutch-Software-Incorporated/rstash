@@ -173,7 +173,7 @@ func createUserSchema() *openapi3.Schema {
 			"email_verified":        schemaRef("boolean", ""),
 			"provision":             schemaRef("boolean", ""),
 			"quota_bytes":           quotaFieldRef("Storage quota in bytes. 0 = use server default."),
-			"bandwidth_quota_bytes": quotaFieldRef("Monthly egress quota in bytes. 0 = use server default."),
+			"egress_quota_bytes":    quotaFieldRef("Monthly egress quota in bytes. 0 = use server default."),
 		},
 	}
 }
@@ -231,9 +231,9 @@ func schemaRef(typ, format string) *openapi3.SchemaRef {
 	return &openapi3.SchemaRef{Value: s}
 }
 
-// quotaFieldRef returns the schema for a quota field (storage or bandwidth).
+// quotaFieldRef returns the schema for a quota field (storage or egress).
 // Values must be non-negative; zero has the special meaning "use the server
-// default" (quota_user or bandwidth_quota_user settings).
+// default" (quota_user or egress_quota_user settings).
 func quotaFieldRef(description string) *openapi3.SchemaRef {
 	zero := float64(0)
 	return &openapi3.SchemaRef{Value: &openapi3.Schema{

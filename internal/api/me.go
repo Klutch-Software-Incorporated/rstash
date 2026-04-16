@@ -19,8 +19,8 @@ type meResponse struct {
 	EmailVerified       bool    `json:"email_verified"`
 	StorageQuotaBytes   int64   `json:"storage_quota_bytes"`
 	StorageUsedBytes    int64   `json:"storage_used_bytes"`
-	BandwidthQuotaBytes int64   `json:"bandwidth_quota_bytes,omitempty"`
-	BandwidthUsedBytes  int64   `json:"bandwidth_used_bytes,omitempty"`
+	EgressQuotaBytes    int64   `json:"egress_quota_bytes,omitempty"`
+	EgressUsedBytes     int64   `json:"egress_used_bytes,omitempty"`
 	AccountState        string  `json:"account_state"`
 	ExternallyManaged   bool    `json:"externally_managed,omitempty"`
 	CreatedAt           string  `json:"created_at"`
@@ -80,12 +80,12 @@ func (d *AdminDeps) getMe(w http.ResponseWriter, r *http.Request) {
 		resp.StorageUsedBytes = stats.TotalBytes
 	}
 
-	// Bandwidth fields are omitted from the JSON when both are zero (see the
-	// omitempty tags above), which effectively hides them when bandwidth_mode=off.
-	if bw, _ := d.Repo.GetBandwidthUsage(ctx, user.ID, db.CurrentPeriod()); bw != nil {
-		resp.BandwidthUsedBytes = bw.BytesOut
+	// Egress fields are omitted from the JSON when both are zero (see the
+	// omitempty tags above), which effectively hides them when egress_mode=off.
+	if eg, _ := d.Repo.GetEgressUsage(ctx, user.ID, db.CurrentPeriod()); eg != nil {
+		resp.EgressUsedBytes = eg.BytesOut
 	}
-	resp.BandwidthQuotaBytes = user.BandwidthQuota
+	resp.EgressQuotaBytes = user.EgressQuota
 
 	writeJSON(w, http.StatusOK, map[string]any{"data": resp})
 }

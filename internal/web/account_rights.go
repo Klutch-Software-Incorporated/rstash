@@ -108,7 +108,7 @@ type exportProfile struct {
 	EmailVerified  bool    `json:"email_verified"`
 	CreatedAt      string  `json:"created_at"`
 	StorageQuota   int64   `json:"storage_quota_bytes"`
-	BandwidthQuota int64   `json:"bandwidth_quota_bytes"`
+	EgressQuota    int64   `json:"egress_quota_bytes"`
 }
 
 type exportSession struct {
@@ -153,7 +153,7 @@ func (h *accountRightsHandler) DoExport(w http.ResponseWriter, r *http.Request) 
 			EmailVerified:  user.EmailVerified,
 			CreatedAt:      user.CreatedAt.Format(time.RFC3339),
 			StorageQuota:   user.StorageQuota,
-			BandwidthQuota: user.BandwidthQuota,
+			EgressQuota:    user.EgressQuota,
 		},
 		ExportedAt: time.Now().UTC().Format(time.RFC3339),
 	}

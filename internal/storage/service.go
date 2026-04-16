@@ -76,7 +76,7 @@ type Service struct {
 	repo      *db.Repository
 	blobs     blob.Store
 	quota     *QuotaChecker
-	bandwidth *BandwidthTracker // optional — nil disables all egress tracking
+	egress *EgressTracker // optional — nil disables all egress tracking
 	scanner   ContentScanner
 }
 
@@ -85,8 +85,8 @@ func (s *Service) SetScanner(sc ContentScanner) {
 	s.scanner = sc
 }
 
-// SetBandwidthTracker installs the egress tracker used by GetDocument.
-func (s *Service) SetBandwidthTracker(bt *BandwidthTracker) { s.bandwidth = bt }
+// SetEgressTracker installs the egress tracker used by GetDocument.
+func (s *Service) SetEgressTracker(et *EgressTracker) { s.egress = et }
 
 // NewService creates a new storage service.
 func NewService(repo *db.Repository, blobs blob.Store, quota *QuotaChecker) *Service {
@@ -207,14 +207,14 @@ func (s *Service) GetDocument(ctx context.Context, userID int64, path string, co
 		return nil, ErrNotModified
 	}
 
-	// Bandwidth enforcement: hot-path returns early when disabled.
-	if s.bandwidth != nil {
+	// Egress enforcement: hot-path returns early when disabled.
+	if s.egress != nil {
 		user, _ := s.repo.GetUserByID(ctx, userID)
 		var override int64
 		if user != nil {
-			override = user.BandwidthQuota
+			override = user.EgressQuota
 		}
-		if err := s.bandwidth.CheckServe(ctx, userID, node.ContentLength, override); err != nil {
+		if err := s.egress.CheckServe(ctx, userID, node.ContentLength, override); err != nil {
 			return nil, err
 		}
 	}
@@ -226,8 +226,8 @@ func (s *Service) GetDocument(ctx context.Context, userID int64, path string, co
 
 	// Record egress only after the blob is in-hand so an error on the
 	// fetch path doesn't charge the user for bytes they won't receive.
-	if s.bandwidth != nil {
-		s.bandwidth.Record(userID, node.ContentLength)
+	if s.egress != nil {
+		s.egress.Record(userID, node.ContentLength)
 	}
 
 	return &GetResult{

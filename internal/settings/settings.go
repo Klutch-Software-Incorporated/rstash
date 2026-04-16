@@ -52,8 +52,8 @@ type Snapshot struct {
 	ExternalAccountURL      string // where externally-managed users manage email/delete
 	CustomLinks             []CustomLink // admin-configured links for user menu/profile
 	DisabledAccountMessage  string       // HTML shown on login-error for disabled users
-	BandwidthMode           string       // "off" or "user" — monthly egress enforcement
-	BandwidthQuotaUser      int64        // default per-user monthly egress in bytes
+	EgressMode              string       // "off" or "user" — monthly egress enforcement
+	EgressQuotaUser         int64        // default per-user monthly egress in bytes
 	AuditRetentionDays      int          // 0 = forever; > 0 = prune entries older than N days
 	LogClientIPs            string       // "enabled", "hashed", or "disabled"
 }
@@ -187,8 +187,8 @@ func (snap *Snapshot) ValueMap() map[string]string {
 		"external_account_url":        snap.ExternalAccountURL,
 		"custom_links":                snap.customLinksRaw(),
 		"disabled_account_message":    snap.DisabledAccountMessage,
-		"bandwidth_mode":              snap.BandwidthMode,
-		"bandwidth_quota_user":        config.FormatByteSize(snap.BandwidthQuotaUser),
+		"egress_mode":                 snap.EgressMode,
+		"egress_quota_user":           config.FormatByteSize(snap.EgressQuotaUser),
 		"audit_retention_days":        strconv.Itoa(snap.AuditRetentionDays),
 		"log_client_ips":              snap.LogClientIPs,
 	}
@@ -228,8 +228,8 @@ func (s *Settings) buildSnapshot(overrides map[string]string) *Snapshot {
 		PrivacyMode:          s.defaults.PrivacyMode,
 		PrivacyContent:       s.defaults.PrivacyContent,
 		CookieDomain:         s.defaults.CookieDomain,
-		BandwidthMode:        s.defaults.BandwidthMode,
-		BandwidthQuotaUser:   s.defaults.BandwidthQuotaUser,
+		EgressMode:           s.defaults.EgressMode,
+		EgressQuotaUser:      s.defaults.EgressQuotaUser,
 		AuditRetentionDays:   s.defaults.AuditRetentionDays,
 		LogClientIPs:         s.defaults.LogClientIPs,
 	}
@@ -322,12 +322,12 @@ func (s *Settings) buildSnapshot(overrides map[string]string) *Snapshot {
 	if v, ok := overrides["disabled_account_message"]; ok {
 		snap.DisabledAccountMessage = v
 	}
-	if v, ok := overrides["bandwidth_mode"]; ok {
-		snap.BandwidthMode = v
+	if v, ok := overrides["egress_mode"]; ok {
+		snap.EgressMode = v
 	}
-	if v, ok := overrides["bandwidth_quota_user"]; ok {
+	if v, ok := overrides["egress_quota_user"]; ok {
 		if n, err := config.ParseByteSize(v); err == nil {
-			snap.BandwidthQuotaUser = n
+			snap.EgressQuotaUser = n
 		}
 	}
 	if v, ok := overrides["audit_retention_days"]; ok {

@@ -227,14 +227,14 @@ func TestAdminAPI_SetUserQuota_RejectsNegative(t *testing.T) {
 	}
 }
 
-func TestAdminAPI_SetUserBandwidthQuota_RejectsNegative(t *testing.T) {
+func TestAdminAPI_SetUserEgressQuota_RejectsNegative(t *testing.T) {
 	deps, repo := setupAdminTest(t)
 	handler := AdminRoutes(deps)
 
 	_, _ = repo.CreateUser(t.Context(), "neg2", "password123", "", false, true)
 
 	body := `{"quota_bytes":-500}`
-	req := httptest.NewRequest("PUT", "/api/admin/users/neg2/bandwidth_quota", bytes.NewReader([]byte(body)))
+	req := httptest.NewRequest("PUT", "/api/admin/users/neg2/egress_quota", bytes.NewReader([]byte(body)))
 	req.Header.Set("X-API-Key", testAPIKey)
 	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()

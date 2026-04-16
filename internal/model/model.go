@@ -30,10 +30,11 @@ type User struct {
 	// external management URL instead of handling them locally.
 	ExternallyManaged bool `gorm:"not null;default:false"`
 
-	// BandwidthQuota is the per-user egress limit in bytes per calendar
-	// month. 0 = use the server default (bandwidth_quota_user setting).
-	// Enforced only when bandwidth_mode=user.
-	BandwidthQuota int64 `gorm:"not null;default:0"`
+	// EgressQuota is the per-user egress limit in bytes per calendar month.
+	// 0 = use the server default (egress_quota_user setting). Enforced only
+	// when egress_mode=user. Uploads are bounded separately by storage
+	// quota and max_upload_size, not by this value.
+	EgressQuota int64 `gorm:"not null;default:0"`
 }
 
 // IsUnclaimed returns true when a user was provisioned via the admin API
@@ -176,10 +177,10 @@ type WebhookSubscription struct {
 	CreatedAt     time.Time `gorm:"not null;autoCreateTime"`
 }
 
-// BandwidthUsage tracks per-user egress bytes by calendar-month period
+// EgressUsage tracks per-user egress bytes by calendar-month period
 // ("YYYY-MM"). Uploads are not counted. Enforcement happens in the storage
 // service via GetDocument before the response body is written.
-type BandwidthUsage struct {
+type EgressUsage struct {
 	UserID    int64     `gorm:"primaryKey;autoIncrement:false"`
 	Period    string    `gorm:"primaryKey;size:7"`
 	BytesOut  int64     `gorm:"not null;default:0"`

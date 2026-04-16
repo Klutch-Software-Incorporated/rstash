@@ -42,8 +42,8 @@ type Config struct {
 	TLSCacheDir          string  // RSTASH_TLS_CACHE — autocert cache directory
 	EmailDSN             string  // RSTASH_EMAIL — email provider DSN
 	CookieDomain         string  // cookie domain (empty = host-only)
-	BandwidthMode        string  // "off" or "user"
-	BandwidthQuotaUser   int64   // default per-user monthly egress (bytes)
+	EgressMode           string  // "off" or "user"
+	EgressQuotaUser      int64   // default per-user monthly egress (bytes)
 	AuditRetentionDays   int     // 0 = forever
 	LogClientIPs         string  // "enabled", "hashed", "disabled"
 }
@@ -65,7 +65,7 @@ func ParseDSN(dsn string) (scheme, path string, err error) {
 func Load() *Config {
 	quotaTotal, _ := ParseByteSize("50GB")
 	maxUpload, _ := ParseByteSize("50MB")
-	bandwidthUser, _ := ParseByteSize("500GB")
+	egressUser, _ := ParseByteSize("500GB")
 
 	return &Config{
 		// Boot-critical: read from env vars.
@@ -99,8 +99,8 @@ func Load() *Config {
 		TokenLifetime:        "30d",
 		RefreshTokens:        "enabled",
 		RefreshTokenLifetime: "90d",
-		BandwidthMode:        "user",
-		BandwidthQuotaUser:   bandwidthUser,
+		EgressMode:           "user",
+		EgressQuotaUser:      egressUser,
 		AuditRetentionDays:   0,
 		LogClientIPs:         "enabled",
 	}

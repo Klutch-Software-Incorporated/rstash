@@ -133,21 +133,21 @@ func runServe(cmd *cobra.Command, args []string) error {
 		})
 	})
 
-	// Initialize bandwidth tracker (egress counting + enforcement).
-	bandwidthTracker := storage.NewBandwidthTracker(storage.BandwidthConfig{
-		Mode:      snap.BandwidthMode,
-		UserLimit: snap.BandwidthQuotaUser,
+	// Initialize egress tracker (outbound-transfer counting + enforcement).
+	egressTracker := storage.NewEgressTracker(storage.EgressConfig{
+		Mode:      snap.EgressMode,
+		UserLimit: snap.EgressQuotaUser,
 	}, repo)
 	runtimeSettings.OnChange(func(s *settings.Snapshot) {
-		bandwidthTracker.UpdateConfig(storage.BandwidthConfig{
-			Mode:      s.BandwidthMode,
-			UserLimit: s.BandwidthQuotaUser,
+		egressTracker.UpdateConfig(storage.EgressConfig{
+			Mode:      s.EgressMode,
+			UserLimit: s.EgressQuotaUser,
 		})
 	})
 
 	// Initialize storage service.
 	storageSvc := storage.NewService(repo, blobs, quotaChecker)
-	storageSvc.SetBandwidthTracker(bandwidthTracker)
+	storageSvc.SetEgressTracker(egressTracker)
 
 	// Initialize content scanner.
 	mimeScanner := storage.NewMIMEScanner(func() string {
@@ -306,9 +306,9 @@ func runServe(cmd *cobra.Command, args []string) error {
 	webhookWorker.Start(ctx)
 	defer webhookWorker.Stop()
 
-	// Bandwidth tracker flush loop (batches per-user counters to disk).
-	bandwidthTracker.Start(ctx)
-	defer bandwidthTracker.Stop(context.Background())
+	// Egress tracker flush loop (batches per-user counters to disk).
+	egressTracker.Start(ctx)
+	defer egressTracker.Stop(context.Background())
 
 	// Audit retention worker: once-daily prune when audit_retention_days > 0.
 	go func() {

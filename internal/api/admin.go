@@ -41,8 +41,8 @@ func AdminRoutes(deps *AdminDeps) http.Handler {
 	mux.HandleFunc("POST /api/admin/users/{username}/enable", deps.enableUser)
 	mux.HandleFunc("DELETE /api/admin/users/{username}", deps.deleteUser)
 	mux.HandleFunc("GET /api/admin/users/{username}/usage", deps.getUserUsage)
-	mux.HandleFunc("PUT /api/admin/users/{username}/bandwidth_quota", deps.setUserBandwidthQuota)
-	mux.HandleFunc("POST /api/admin/users/{username}/reset_bandwidth", deps.resetUserBandwidth)
+	mux.HandleFunc("PUT /api/admin/users/{username}/egress_quota", deps.setUserEgressQuota)
+	mux.HandleFunc("POST /api/admin/users/{username}/reset_egress", deps.resetUserEgress)
 	mux.HandleFunc("GET /api/admin/stats", deps.getStats)
 
 	return RequireAPIKey(deps.Repo, deps.RateLimiter)(jsonContentType(mux))
@@ -177,7 +177,7 @@ func (d *AdminDeps) createUser(w http.ResponseWriter, r *http.Request) {
 		EmailVerified       bool   `json:"email_verified"`
 		Provision           bool   `json:"provision"`
 		QuotaBytes          int64  `json:"quota_bytes"`
-		BandwidthQuotaBytes int64  `json:"bandwidth_quota_bytes"`
+		EgressQuotaBytes    int64  `json:"egress_quota_bytes"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid JSON body")
@@ -195,8 +195,8 @@ func (d *AdminDeps) createUser(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "quota_bytes must be >= 0 (0 means use the server default)")
 		return
 	}
-	if req.BandwidthQuotaBytes < 0 {
-		writeError(w, http.StatusBadRequest, "bandwidth_quota_bytes must be >= 0 (0 means use the server default)")
+	if req.EgressQuotaBytes < 0 {
+		writeError(w, http.StatusBadRequest, "egress_quota_bytes must be >= 0 (0 means use the server default)")
 		return
 	}
 
@@ -226,11 +226,11 @@ func (d *AdminDeps) createUser(w http.ResponseWriter, r *http.Request) {
 		user.StorageQuota = req.QuotaBytes
 	}
 
-	if req.BandwidthQuotaBytes > 0 {
-		if err := d.Repo.UpdateUserBandwidthQuota(r.Context(), user.ID, req.BandwidthQuotaBytes); err != nil {
-			slog.Error("admin API: set bandwidth quota on create", "error", err)
+	if req.EgressQuotaBytes > 0 {
+		if err := d.Repo.UpdateUserEgressQuota(r.Context(), user.ID, req.EgressQuotaBytes); err != nil {
+			slog.Error("admin API: set egress quota on create", "error", err)
 		}
-		user.BandwidthQuota = req.BandwidthQuotaBytes
+		user.EgressQuota = req.EgressQuotaBytes
 	}
 
 	if req.EmailVerified && user.Email != nil {
@@ -454,15 +454,15 @@ func (d *AdminDeps) getUserUsage(w http.ResponseWriter, r *http.Request) {
 
 	stats, _ := d.Repo.GetUserStorageStats(r.Context(), user.ID)
 	period := db.CurrentPeriod()
-	bw, _ := d.Repo.GetBandwidthUsage(r.Context(), user.ID, period)
+	eg, _ := d.Repo.GetEgressUsage(r.Context(), user.ID, period)
 
 	storageUsed := int64(0)
 	if stats != nil {
 		storageUsed = stats.TotalBytes
 	}
-	bandwidthUsed := int64(0)
-	if bw != nil {
-		bandwidthUsed = bw.BytesOut
+	egressUsed := int64(0)
+	if eg != nil {
+		egressUsed = eg.BytesOut
 	}
 
 	writeJSON(w, http.StatusOK, map[string]any{
@@ -471,16 +471,16 @@ func (d *AdminDeps) getUserUsage(w http.ResponseWriter, r *http.Request) {
 				"quota_bytes": user.StorageQuota,
 				"used_bytes":  storageUsed,
 			},
-			"bandwidth": map[string]any{
-				"quota_bytes": user.BandwidthQuota,
-				"used_bytes":  bandwidthUsed,
+			"egress": map[string]any{
+				"quota_bytes": user.EgressQuota,
+				"used_bytes":  egressUsed,
 				"period":      period,
 			},
 		},
 	})
 }
 
-func (d *AdminDeps) setUserBandwidthQuota(w http.ResponseWriter, r *http.Request) {
+func (d *AdminDeps) setUserEgressQuota(w http.ResponseWriter, r *http.Request) {
 	username := r.PathValue("username")
 	var req struct {
 		QuotaBytes int64 `json:"quota_bytes"`
@@ -498,28 +498,28 @@ func (d *AdminDeps) setUserBandwidthQuota(w http.ResponseWriter, r *http.Request
 		writeError(w, http.StatusNotFound, "user not found")
 		return
 	}
-	if err := d.Repo.UpdateUserBandwidthQuota(r.Context(), user.ID, req.QuotaBytes); err != nil {
-		slog.Error("admin API: set bandwidth quota", "error", err)
-		writeError(w, http.StatusInternalServerError, "failed to update bandwidth quota")
+	if err := d.Repo.UpdateUserEgressQuota(r.Context(), user.ID, req.QuotaBytes); err != nil {
+		slog.Error("admin API: set egress quota", "error", err)
+		writeError(w, http.StatusInternalServerError, "failed to update egress quota")
 		return
 	}
-	d.Repo.Audit(r.Context(), 0, "admin_api.user.bandwidth_quota", "user", username, "")
+	d.Repo.Audit(r.Context(), 0, "admin_api.user.egress_quota", "user", username, "")
 	writeJSON(w, http.StatusOK, map[string]string{"ok": "true"})
 }
 
-func (d *AdminDeps) resetUserBandwidth(w http.ResponseWriter, r *http.Request) {
+func (d *AdminDeps) resetUserEgress(w http.ResponseWriter, r *http.Request) {
 	username := r.PathValue("username")
 	user, err := d.Repo.GetUserByUsername(r.Context(), username)
 	if err != nil || user == nil {
 		writeError(w, http.StatusNotFound, "user not found")
 		return
 	}
-	if err := d.Repo.ResetBandwidthUsage(r.Context(), user.ID, db.CurrentPeriod()); err != nil {
-		slog.Error("admin API: reset bandwidth", "error", err)
-		writeError(w, http.StatusInternalServerError, "failed to reset bandwidth")
+	if err := d.Repo.ResetEgressUsage(r.Context(), user.ID, db.CurrentPeriod()); err != nil {
+		slog.Error("admin API: reset egress", "error", err)
+		writeError(w, http.StatusInternalServerError, "failed to reset egress")
 		return
 	}
-	d.Repo.Audit(r.Context(), 0, "admin_api.user.reset_bandwidth", "user", username, "")
+	d.Repo.Audit(r.Context(), 0, "admin_api.user.reset_egress", "user", username, "")
 	writeJSON(w, http.StatusOK, map[string]string{"ok": "true"})
 }
 
