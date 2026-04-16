@@ -213,7 +213,7 @@ func runServe(cmd *cobra.Command, args []string) error {
 
 	// Admin JSON API (keys managed via admin UI).
 	apiKeyLimiter := api.NewAPIKeyRateLimiter()
-	adminDeps := &api.AdminDeps{Repo: repo, Storage: storageSvc, RateLimiter: apiKeyLimiter}
+	adminDeps := &api.AdminDeps{Repo: repo, Storage: storageSvc, BaseURL: cfg.BaseURL, RateLimiter: apiKeyLimiter}
 	mux.Handle("/api/admin/", api.AdminRoutes(adminDeps))
 	mux.HandleFunc("GET /api/admin/openapi.json", api.ServeOpenAPISpec(api.AdminOpenAPISpec()))
 

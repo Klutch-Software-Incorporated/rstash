@@ -1,6 +1,8 @@
 package api
 
 import (
+	cryptoRand "crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"log/slog"
 	"net/http"
@@ -14,6 +16,8 @@ import (
 type AdminDeps struct {
 	Repo    *db.Repository
 	Storage *storage.Service
+	// BaseURL is used to construct claim URLs when provisioning users.
+	BaseURL string
 	// RateLimiter enforces per-APIKey RateLimitRPM. Nil disables rate limiting
 	// (e.g. in tests).
 	RateLimiter *APIKeyRateLimiter
@@ -154,38 +158,111 @@ func (d *AdminDeps) getUser(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"data": au})
 }
 
+// claimTokenLifetime is how long a provisioning claim token remains valid.
+const claimTokenLifetime = 24 * time.Hour
+
 func (d *AdminDeps) createUser(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		Username string `json:"username"`
-		Password string `json:"password"`
-		Email    string `json:"email"`
+		Username      string `json:"username"`
+		Password      string `json:"password"`
+		Email         string `json:"email"`
+		EmailVerified bool   `json:"email_verified"`
+		Provision     bool   `json:"provision"`
+		QuotaBytes    int64  `json:"quota_bytes"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid JSON body")
 		return
 	}
-	if req.Username == "" || req.Password == "" {
-		writeError(w, http.StatusBadRequest, "username and password are required")
+	if req.Username == "" {
+		writeError(w, http.StatusBadRequest, "username is required")
+		return
+	}
+	if !req.Provision && req.Password == "" {
+		writeError(w, http.StatusBadRequest, "password is required (or set provision=true to issue a claim token)")
 		return
 	}
 
-	user, err := d.Repo.CreateUser(r.Context(), req.Username, req.Password, req.Email, false, true)
+	password := req.Password
+	if req.Provision {
+		// Unguessable placeholder — password login will fail until claim.
+		rand, err := randomHex(32)
+		if err != nil {
+			slog.Error("admin API: generate placeholder password", "error", err)
+			writeError(w, http.StatusInternalServerError, "failed to prepare account")
+			return
+		}
+		password = rand
+	}
+
+	user, err := d.Repo.CreateUser(r.Context(), req.Username, password, req.Email, false, true)
 	if err != nil {
 		slog.Error("admin API: create user", "error", err)
 		writeError(w, http.StatusConflict, err.Error())
 		return
 	}
 
-	d.Repo.Audit(r.Context(), 0, "admin_api.user.create", "user", user.Username, "")
+	if req.QuotaBytes > 0 {
+		if err := d.Repo.UpdateUserQuota(r.Context(), user.ID, req.QuotaBytes); err != nil {
+			slog.Error("admin API: set quota on create", "error", err)
+		}
+		user.StorageQuota = req.QuotaBytes
+	}
 
-	writeJSON(w, http.StatusCreated, map[string]any{
+	if req.EmailVerified && user.Email != nil {
+		if err := d.Repo.VerifyUserEmail(r.Context(), user.ID); err != nil {
+			slog.Error("admin API: verify email on create", "error", err)
+		}
+		user.EmailVerified = true
+	}
+
+	resp := map[string]any{
 		"data": apiUser{
-			Username:  user.Username,
-			Email:     user.Email,
-			Approved:  user.Approved,
-			CreatedAt: user.CreatedAt.Format(time.RFC3339),
+			Username:     user.Username,
+			Email:        user.Email,
+			Approved:     user.Approved,
+			StorageQuota: user.StorageQuota,
+			CreatedAt:    user.CreatedAt.Format(time.RFC3339),
 		},
-	})
+	}
+
+	if req.Provision {
+		// Mark as externally managed and issue a claim token.
+		if err := d.Repo.SetExternallyManaged(r.Context(), user.ID, true); err != nil {
+			slog.Error("admin API: set externally_managed", "error", err)
+		}
+		token, err := randomHex(32)
+		if err != nil {
+			slog.Error("admin API: generate claim token", "error", err)
+			writeError(w, http.StatusInternalServerError, "failed to generate claim token")
+			return
+		}
+		expiry := time.Now().UTC().Add(claimTokenLifetime)
+		if err := d.Repo.SetPasswordResetToken(r.Context(), user.ID, token, expiry); err != nil {
+			slog.Error("admin API: set claim token", "error", err)
+			writeError(w, http.StatusInternalServerError, "failed to save claim token")
+			return
+		}
+
+		claimURL := d.BaseURL + "/claim?token=" + token
+		resp["claim_url"] = claimURL
+		resp["claim_token_expires_at"] = expiry.Format(time.RFC3339)
+
+		d.Repo.Audit(r.Context(), 0, "admin_api.user.provisioned", "user", user.Username, "")
+	} else {
+		d.Repo.Audit(r.Context(), 0, "admin_api.user.create", "user", user.Username, "")
+	}
+
+	writeJSON(w, http.StatusCreated, resp)
+}
+
+// randomHex returns n random bytes encoded as 2n hex chars.
+func randomHex(n int) (string, error) {
+	b := make([]byte, n)
+	if _, err := cryptoRand.Read(b); err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(b), nil
 }
 
 func (d *AdminDeps) setUserQuota(w http.ResponseWriter, r *http.Request) {

@@ -154,6 +154,78 @@ func TestAdminAPI_CreateUser(t *testing.T) {
 	}
 }
 
+func TestAdminAPI_CreateUser_Provision(t *testing.T) {
+	deps, repo := setupAdminTest(t)
+	deps.BaseURL = "https://rstash.example.com"
+	handler := AdminRoutes(deps)
+
+	body := `{"username":"provisioned","email":"p@example.com","email_verified":true,"provision":true,"quota_bytes":1073741824}`
+	req := httptest.NewRequest("POST", "/api/admin/users", bytes.NewReader([]byte(body)))
+	req.Header.Set("X-API-Key", testAPIKey)
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, req)
+
+	if w.Code != http.StatusCreated {
+		t.Fatalf("expected 201, got %d: %s", w.Code, w.Body.String())
+	}
+
+	var resp struct {
+		Data                  apiUser `json:"data"`
+		ClaimURL              string  `json:"claim_url"`
+		ClaimTokenExpiresAt   string  `json:"claim_token_expires_at"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if resp.ClaimURL == "" {
+		t.Fatal("expected claim_url in response")
+	}
+	if resp.ClaimTokenExpiresAt == "" {
+		t.Fatal("expected claim_token_expires_at in response")
+	}
+
+	user, err := repo.GetUserByUsername(t.Context(), "provisioned")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if user == nil {
+		t.Fatal("user not created")
+	}
+	if !user.ExternallyManaged {
+		t.Error("expected ExternallyManaged=true")
+	}
+	if !user.EmailVerified {
+		t.Error("expected EmailVerified=true")
+	}
+	if user.StorageQuota != 1073741824 {
+		t.Errorf("expected quota 1073741824, got %d", user.StorageQuota)
+	}
+	if user.PasswordResetToken == nil || *user.PasswordResetToken == "" {
+		t.Error("expected claim token to be set")
+	}
+	if !user.IsUnclaimed() {
+		t.Error("expected user to be IsUnclaimed")
+	}
+}
+
+func TestAdminAPI_CreateUser_ProvisionRequiresNoPassword(t *testing.T) {
+	deps, _ := setupAdminTest(t)
+	handler := AdminRoutes(deps)
+
+	// Missing both password AND provision flag should 400.
+	body := `{"username":"foo","email":"foo@example.com"}`
+	req := httptest.NewRequest("POST", "/api/admin/users", bytes.NewReader([]byte(body)))
+	req.Header.Set("X-API-Key", testAPIKey)
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
 func TestAdminAPI_SetUserQuota(t *testing.T) {
 	deps, repo := setupAdminTest(t)
 	handler := AdminRoutes(deps)
