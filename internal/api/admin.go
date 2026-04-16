@@ -37,7 +37,8 @@ func AdminRoutes(deps *AdminDeps) http.Handler {
 	mux.HandleFunc("POST /api/admin/users", deps.createUser)
 	mux.HandleFunc("PUT /api/admin/users/{username}/quota", deps.setUserQuota)
 	mux.HandleFunc("PUT /api/admin/users/{username}/email", deps.setUserEmail)
-	mux.HandleFunc("PUT /api/admin/users/{username}/disable", deps.setUserDisabled)
+	mux.HandleFunc("POST /api/admin/users/{username}/disable", deps.disableUser)
+	mux.HandleFunc("POST /api/admin/users/{username}/enable", deps.enableUser)
 	mux.HandleFunc("DELETE /api/admin/users/{username}", deps.deleteUser)
 	mux.HandleFunc("GET /api/admin/users/{username}/usage", deps.getUserUsage)
 	mux.HandleFunc("PUT /api/admin/users/{username}/bandwidth_quota", deps.setUserBandwidthQuota)
@@ -366,16 +367,21 @@ func (d *AdminDeps) setUserEmail(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]string{"ok": "true"})
 }
 
-func (d *AdminDeps) setUserDisabled(w http.ResponseWriter, r *http.Request) {
-	username := r.PathValue("username")
+// disableUser disables a user account. No request body. Idempotent:
+// calling this on an already-disabled user returns 200 and re-emits
+// the webhook (so downstream subscribers can be re-synced if needed).
+func (d *AdminDeps) disableUser(w http.ResponseWriter, r *http.Request) {
+	d.setDisabledState(w, r, true)
+}
 
-	var req struct {
-		Disabled bool `json:"disabled"`
-	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeError(w, http.StatusBadRequest, "invalid JSON body")
-		return
-	}
+// enableUser clears the disabled flag on a user account. No request body.
+// Idempotent: same behavior as disableUser when already enabled.
+func (d *AdminDeps) enableUser(w http.ResponseWriter, r *http.Request) {
+	d.setDisabledState(w, r, false)
+}
+
+func (d *AdminDeps) setDisabledState(w http.ResponseWriter, r *http.Request, disabled bool) {
+	username := r.PathValue("username")
 
 	user, err := d.Repo.GetUserByUsername(r.Context(), username)
 	if err != nil || user == nil {
@@ -383,18 +389,20 @@ func (d *AdminDeps) setUserDisabled(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := d.Repo.UpdateUserDisabled(r.Context(), user.ID, req.Disabled); err != nil {
-		slog.Error("admin API: set disabled", "error", err)
+	if err := d.Repo.UpdateUserDisabled(r.Context(), user.ID, disabled); err != nil {
+		slog.Error("admin API: set disabled", "error", err, "disabled", disabled)
 		writeError(w, http.StatusInternalServerError, "failed to update user")
 		return
 	}
 
-	d.Repo.Audit(r.Context(), 0, "admin_api.user.disable", "user", username, "")
+	action := "admin_api.user.enabled"
+	event := "user.enabled"
+	if disabled {
+		action = "admin_api.user.disabled"
+		event = "user.disabled"
+	}
+	d.Repo.Audit(r.Context(), 0, action, "user", username, "")
 	if d.Webhooks != nil {
-		event := "user.enabled"
-		if req.Disabled {
-			event = "user.disabled"
-		}
 		d.Webhooks.Emit(r.Context(), event, map[string]any{"username": username})
 	}
 

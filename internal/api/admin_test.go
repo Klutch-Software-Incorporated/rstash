@@ -310,10 +310,8 @@ func TestAdminAPI_DisableUser(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	body := `{"disabled":true}`
-	req := httptest.NewRequest("PUT", "/api/admin/users/eve/disable", bytes.NewReader([]byte(body)))
+	req := httptest.NewRequest("POST", "/api/admin/users/eve/disable", nil)
 	req.Header.Set("X-API-Key", testAPIKey)
-	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
 	handler.ServeHTTP(w, req)
 
@@ -324,6 +322,33 @@ func TestAdminAPI_DisableUser(t *testing.T) {
 	user, _ := repo.GetUserByUsername(t.Context(), "eve")
 	if !user.Disabled {
 		t.Fatal("expected user to be disabled")
+	}
+}
+
+func TestAdminAPI_EnableUser(t *testing.T) {
+	deps, repo := setupAdminTest(t)
+	handler := AdminRoutes(deps)
+
+	u, err := repo.CreateUser(t.Context(), "gina", "password123", "", false, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := repo.UpdateUserDisabled(t.Context(), u.ID, true); err != nil {
+		t.Fatal(err)
+	}
+
+	req := httptest.NewRequest("POST", "/api/admin/users/gina/enable", nil)
+	req.Header.Set("X-API-Key", testAPIKey)
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+
+	user, _ := repo.GetUserByUsername(t.Context(), "gina")
+	if user.Disabled {
+		t.Fatal("expected user to be enabled (Disabled=false)")
 	}
 }
 
