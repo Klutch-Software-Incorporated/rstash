@@ -35,13 +35,14 @@ func NewEmitter(repo *db.Repository) *Emitter {
 // Emit fanouts an event to all active subscriptions that match the event name.
 // Errors from subscription lookup are logged but not returned — webhook delivery
 // should never block the calling flow.
-func (e *Emitter) Emit(ctx context.Context, event string, data any) {
+func (e *Emitter) Emit(ctx context.Context, event Event, data any) {
 	if e == nil || e.repo == nil {
 		return
 	}
-	subs, err := e.repo.ListActiveWebhookSubscriptionsForEvent(ctx, event)
+	name := string(event)
+	subs, err := e.repo.ListActiveWebhookSubscriptionsForEvent(ctx, name)
 	if err != nil {
-		slog.Error("webhook: list subscriptions", "event", event, "error", err)
+		slog.Error("webhook: list subscriptions", "event", name, "error", err)
 		return
 	}
 	if len(subs) == 0 {
@@ -49,24 +50,24 @@ func (e *Emitter) Emit(ctx context.Context, event string, data any) {
 	}
 
 	payload, err := json.Marshal(map[string]any{
-		"event":     event,
+		"event":     name,
 		"timestamp": time.Now().UTC().Format(time.RFC3339Nano),
 		"data":      data,
 	})
 	if err != nil {
-		slog.Error("webhook: marshal payload", "event", event, "error", err)
+		slog.Error("webhook: marshal payload", "event", name, "error", err)
 		return
 	}
 
 	for _, s := range subs {
 		d := &model.WebhookDelivery{
 			SubscriptionID: s.ID,
-			Event:          event,
+			Event:          name,
 			Payload:        payload,
 			NextAttemptAt:  time.Now().UTC(),
 		}
 		if err := e.repo.CreateWebhookDelivery(ctx, d); err != nil {
-			slog.Error("webhook: create delivery", "sub", s.ID, "event", event, "error", err)
+			slog.Error("webhook: create delivery", "sub", s.ID, "event", name, "error", err)
 		}
 	}
 }

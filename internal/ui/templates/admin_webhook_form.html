@@ -18,11 +18,9 @@
     </label>
     <fieldset>
         <legend>Events</legend>
-        <label><input type="checkbox" name="events" value="user.claimed"> user.claimed</label><br>
-        <label><input type="checkbox" name="events" value="user.email_changed"> user.email_changed</label><br>
-        <label><input type="checkbox" name="events" value="user.disabled"> user.disabled</label><br>
-        <label><input type="checkbox" name="events" value="user.enabled"> user.enabled</label><br>
-        <label><input type="checkbox" name="events" value="user.deleted"> user.deleted</label><br>
+        {{range .KnownEvents}}
+        <label><input type="checkbox" name="events" value="{{.}}"> {{.}}</label><br>
+        {{end}}
         <label><input type="checkbox" name="events" value="*"> * (all events)</label>
     </fieldset>
     <label>

@@ -358,7 +358,7 @@ func (d *AdminDeps) setUserEmail(w http.ResponseWriter, r *http.Request) {
 
 	d.Repo.Audit(r.Context(), 0, "admin_api.user.email_updated", "user", username, email)
 	if d.Webhooks != nil {
-		d.Webhooks.Emit(r.Context(), "user.email_changed", map[string]any{
+		d.Webhooks.Emit(r.Context(), webhooks.EventUserEmailChanged, map[string]any{
 			"username":   username,
 			"new_email":  email,
 			"changed_by": "admin_api",
@@ -396,10 +396,10 @@ func (d *AdminDeps) setDisabledState(w http.ResponseWriter, r *http.Request, dis
 	}
 
 	action := "admin_api.user.enabled"
-	event := "user.enabled"
+	event := webhooks.EventUserEnabled
 	if disabled {
 		action = "admin_api.user.disabled"
-		event = "user.disabled"
+		event = webhooks.EventUserDisabled
 	}
 	d.Repo.Audit(r.Context(), 0, action, "user", username, "")
 	if d.Webhooks != nil {
@@ -426,7 +426,7 @@ func (d *AdminDeps) deleteUser(w http.ResponseWriter, r *http.Request) {
 
 	d.Repo.Audit(r.Context(), 0, "admin_api.user.delete", "user", username, "")
 	if d.Webhooks != nil {
-		d.Webhooks.Emit(r.Context(), "user.deleted", map[string]any{"username": username})
+		d.Webhooks.Emit(r.Context(), webhooks.EventUserDeleted, map[string]any{"username": username})
 	}
 
 	writeJSON(w, http.StatusOK, map[string]string{"ok": "true"})

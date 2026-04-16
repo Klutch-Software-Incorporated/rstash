@@ -10,6 +10,7 @@ import (
 
 	"rstash/internal/auth"
 	"rstash/internal/ui"
+	"rstash/internal/webhooks"
 )
 
 // accountRightsHandler serves the user-facing GDPR surfaces: self-service
@@ -82,7 +83,7 @@ func (h *accountRightsHandler) DoDelete(w http.ResponseWriter, r *http.Request) 
 	}
 
 	if h.deps.Webhooks != nil {
-		h.deps.Webhooks.Emit(r.Context(), "user.deleted", map[string]any{"username": user.Username})
+		h.deps.Webhooks.Emit(r.Context(), webhooks.EventUserDeleted, map[string]any{"username": user.Username})
 	}
 
 	auth.ClearSessionCookie(w, snap.CookieDomain, h.deps.SecureCookies)

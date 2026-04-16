@@ -19,11 +19,9 @@
     <fieldset>
         <legend>Events</legend>
         {{$events := .Subscription.Events}}
-        <label><input type="checkbox" name="events" value="user.claimed" {{if or (eq $events "*") (containsEvent $events "user.claimed")}}checked{{end}}> user.claimed</label><br>
-        <label><input type="checkbox" name="events" value="user.email_changed" {{if or (eq $events "*") (containsEvent $events "user.email_changed")}}checked{{end}}> user.email_changed</label><br>
-        <label><input type="checkbox" name="events" value="user.disabled" {{if or (eq $events "*") (containsEvent $events "user.disabled")}}checked{{end}}> user.disabled</label><br>
-        <label><input type="checkbox" name="events" value="user.enabled" {{if or (eq $events "*") (containsEvent $events "user.enabled")}}checked{{end}}> user.enabled</label><br>
-        <label><input type="checkbox" name="events" value="user.deleted" {{if or (eq $events "*") (containsEvent $events "user.deleted")}}checked{{end}}> user.deleted</label><br>
+        {{range .KnownEvents}}
+        <label><input type="checkbox" name="events" value="{{.}}" {{if or (eq $events "*") (containsEvent $events .)}}checked{{end}}> {{.}}</label><br>
+        {{end}}
         <label><input type="checkbox" name="events" value="*" {{if eq $events "*"}}checked{{end}}> * (all events)</label>
     </fieldset>
     <label>

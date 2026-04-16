@@ -43,15 +43,19 @@ type webhookFormContent struct {
 	Subscription *model.WebhookSubscription
 	Error        string
 	RawSecret    string // shown once after create/regenerate
+	KnownEvents  []string // event names for rendering subscription checkboxes
 }
 
-// knownEvents is the closed set of events users can subscribe to in v1.
-var knownEvents = []string{
-	"user.claimed",
-	"user.email_changed",
-	"user.disabled",
-	"user.enabled",
-	"user.deleted",
+// knownEventStrings returns the wire values of every webhook event this
+// build knows about. Sourced from the canonical list in the webhooks
+// package so adding a new event is one place.
+func knownEventStrings() []string {
+	events := webhooks.AllEvents()
+	out := make([]string, len(events))
+	for i, e := range events {
+		out[i] = string(e)
+	}
+	return out
 }
 
 // ShowList renders GET /admin/webhooks.
@@ -91,6 +95,7 @@ func (h *webhooksHandler) ShowList(w http.ResponseWriter, r *http.Request) {
 func (h *webhooksHandler) ShowNew(w http.ResponseWriter, r *http.Request) {
 	h.deps.Renderer.Render(w, "admin_webhook_form", h.deps.adminPageData(w, r, "New Webhook — Admin", "webhooks", &webhookFormContent{
 		Subscription: &model.WebhookSubscription{Active: true},
+		KnownEvents:  knownEventStrings(),
 	}))
 }
 
@@ -107,6 +112,7 @@ func (h *webhooksHandler) DoCreate(w http.ResponseWriter, r *http.Request) {
 		h.deps.Renderer.Render(w, "admin_webhook_form", h.deps.adminPageData(w, r, "New Webhook — Admin", "webhooks", &webhookFormContent{
 			Subscription: sub,
 			Error:        msg,
+			KnownEvents:  knownEventStrings(),
 		}))
 	}
 
@@ -150,6 +156,7 @@ func (h *webhooksHandler) ShowEdit(w http.ResponseWriter, r *http.Request) {
 	}
 	h.deps.Renderer.Render(w, "admin_webhook_edit", h.deps.adminPageData(w, r, "Edit Webhook — Admin", "webhooks", &webhookFormContent{
 		Subscription: sub,
+		KnownEvents:  knownEventStrings(),
 	}))
 }
 
@@ -175,6 +182,7 @@ func (h *webhooksHandler) DoUpdate(w http.ResponseWriter, r *http.Request) {
 		h.deps.Renderer.Render(w, "admin_webhook_edit", h.deps.adminPageData(w, r, "Edit Webhook — Admin", "webhooks", &webhookFormContent{
 			Subscription: sub,
 			Error:        msg,
+			KnownEvents:  knownEventStrings(),
 		}))
 		return
 	}
@@ -243,16 +251,13 @@ func normalizeEvents(values []string) string {
 		return "*"
 	}
 	parts := make([]string, 0, len(set))
-	for _, e := range knownEvents {
+	for _, e := range knownEventStrings() {
 		if set[e] {
 			parts = append(parts, e)
 		}
 	}
 	return strings.Join(parts, " ")
 }
-
-// KnownWebhookEvents is exposed for the admin UI to render event checkboxes.
-func KnownWebhookEvents() []string { return knownEvents }
 
 func auditWebhook(deps *UIDeps, r *http.Request, action string, sub *model.WebhookSubscription) {
 	actor := CurrentUser(r)

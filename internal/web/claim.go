@@ -8,6 +8,7 @@ import (
 
 	"rstash/internal/auth"
 	"rstash/internal/ui"
+	"rstash/internal/webhooks"
 )
 
 type claimHandler struct {
@@ -114,7 +115,7 @@ func (h *claimHandler) DoClaim(w http.ResponseWriter, r *http.Request) {
 		if user.Email != nil {
 			data["email"] = *user.Email
 		}
-		h.deps.Webhooks.Emit(r.Context(), "user.claimed", data)
+		h.deps.Webhooks.Emit(r.Context(), webhooks.EventUserClaimed, data)
 	}
 	auth.SetSessionCookie(w, sess.Token, h.deps.Settings.Load().CookieDomain, h.deps.SecureCookies)
 	ui.SetFlash(w, "Welcome! Your account is activated.")
