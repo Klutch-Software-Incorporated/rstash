@@ -12,7 +12,7 @@ The target audience is technical self-hosters running personal or small family/f
 servers. The design prioritizes a "just run it and go" experience — run `rstash` to
 start the server and complete setup through the web UI.
 
-Source control is managed via Fossil, not git.
+Source control is managed via Git (Azure DevOps remote).
 
 ## Build & Run Commands
 

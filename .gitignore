@@ -1,0 +1,69 @@
+# Build output
+build/
+dist/
+*.exe
+nul
+
+# Go runtime artifacts
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
+
+# Dependencies
+node_modules/
+
+# Flutter/Dart generated
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.metadata
+
+# IDE and editor
+.idea/
+.vscode/
+.claude/
+.task/
+*.iml
+*.ipr
+*.iws
+*.swp
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Android
+android/.gradle/
+android/.kotlin/
+android/local.properties
+android/key.properties
+android/**/*.keystore
+android/**/*.jks
+
+# Windows
+windows/flutter/ephemeral/
+
+# Astro / Site
+astro/dist/
+astro/.astro/
+site/dist/
+site/.astro/
+internal/ui/site/
+
+# Infrastructure
+infra/pulumi/node_modules/
+infra/pulumi/.env
+infra/.env.generated
+infra/.caddy-image.tar
+infra/.fossil-image.tar
+
+# Fossil artifacts (kept locally as backup during migration)
+_FOSSIL_
+.fslckout
+*.fossil
+.fossil-settings/
+
+# TLS
+certs/
