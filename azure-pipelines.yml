@@ -145,22 +145,19 @@ stages:
                     packagePublishDescription: rstash $(PackageVersion) from commit $(Build.SourceVersion)
                   displayName: Push binaries to Azure Artifacts feed
 
-                # TODO: Docker image push to ACR. Removed for now because
-                # Azure Pipelines validates service connections at compile
-                # time, before the step's `condition:` is evaluated — so
-                # referencing a service connection that doesn't yet exist
-                # fails the pipeline even if the step would never run.
-                # Add back once rstash-infra provisions the ACR and we wire
-                # up the service connection in Azure DevOps:
-                #
-                #   - task: Docker@2
-                #     inputs:
-                #       command: buildAndPush
-                #       containerRegistry: <service-connection-name>
-                #       repository: rstash
-                #       Dockerfile: Dockerfile
-                #       tags: |
-                #         $(PackageVersion)
-                #         latest
-                #       arguments: --build-arg VERSION=$(PackageVersion)
-                #     displayName: Build and push image to ACR
+                # Docker image build + push to ACR. rstash-infra now
+                # provisions the registry (rstprdacreus2001) and the
+                # Azure DevOps service connection (rstash-acr-eus2) wires
+                # this pipeline to it. Tags the image with both the dated
+                # version and `latest` so App Service can pin either.
+                - task: Docker@2
+                  inputs:
+                    command: buildAndPush
+                    containerRegistry: rstash-acr-eus2
+                    repository: rstash
+                    Dockerfile: Dockerfile
+                    tags: |
+                      $(PackageVersion)
+                      latest
+                    arguments: --build-arg VERSION=$(PackageVersion)
+                  displayName: Build and push image to ACR
