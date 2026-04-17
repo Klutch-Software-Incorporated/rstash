@@ -5,7 +5,13 @@ trigger:
     include:
       - main
 
-pr: none
+# Validate every PR as well — same BuildTest stage runs, but PublishFeed is
+# gated below so only main-branch builds publish artifacts.
+pr:
+  branches:
+    include:
+      - "*"
+  drafts: false
 
 pool:
   vmImage: ubuntu-latest
@@ -76,7 +82,10 @@ stages:
   - stage: PublishFeed
     displayName: Publish to Azure Artifacts
     dependsOn: BuildTest
-    condition: succeeded()
+    # Only publish on main-branch CI runs, never on PR validation runs.
+    # Build.Reason is "PullRequest" for PR triggers; Build.SourceBranch is
+    # "refs/heads/main" on main-branch pushes.
+    condition: and(succeeded(), ne(variables['Build.Reason'], 'PullRequest'), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
     jobs:
       - deployment: PublishUniversal
         displayName: Publish Universal Package
