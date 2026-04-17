@@ -2,12 +2,23 @@ package blob
 
 import (
 	"fmt"
+	"slices"
 
 	"rstash/internal/db"
 )
 
+// SupportedSchemes is the canonical list of DSN schemes the blob package
+// knows how to open. It's the source of truth consulted by both openInner
+// (below) and internal/config.Validate — the two can't drift out of sync
+// without breaking compilation.
+var SupportedSchemes = []string{"sqlite", "fs", "postgres", "mysql", "mssql", "s3", "azureblob"}
+
+// IsSupportedScheme returns true if scheme is one rstash can open.
+func IsSupportedScheme(scheme string) bool {
+	return slices.Contains(SupportedSchemes, scheme)
+}
+
 // OpenStore opens a blob store from a DSN scheme and path.
-// Supported schemes: sqlite, fs, postgres, mysql, mssql, s3.
 //
 // When RSTASH_BLOB_KEY is set (base64 of 32 bytes), the returned store is
 // wrapped with AES-256-GCM encryption. Writes encrypt; reads auto-detect

@@ -6,6 +6,8 @@ import (
 	"net"
 	"net/url"
 	"strings"
+
+	"rstash/internal/blob"
 )
 
 // Validate checks all configuration values and returns an error describing
@@ -46,16 +48,13 @@ func (c *Config) Validate() error {
 		}
 	}
 
-	// BlobDSN
+	// BlobDSN. Accepted schemes come from the blob package itself — the
+	// ground-truth list consulted by openInner. Adding a backend there
+	// automatically makes it valid here.
 	if blobScheme, _, err := ParseDSN(c.BlobDSN); err != nil {
 		errs = append(errs, fmt.Errorf("%s: %v", EnvBlob, err))
-	} else {
-		switch blobScheme {
-		case "sqlite", "fs", "postgres", "mysql", "mssql", "s3":
-			// ok
-		default:
-			errs = append(errs, fmt.Errorf("%s: unsupported blob backend scheme %q (supported: sqlite, fs, postgres, mysql, mssql, s3)", EnvBlob, blobScheme))
-		}
+	} else if !blob.IsSupportedScheme(blobScheme) {
+		errs = append(errs, fmt.Errorf("%s: unsupported blob backend scheme %q (supported: %s)", EnvBlob, blobScheme, strings.Join(blob.SupportedSchemes, ", ")))
 	}
 
 	// LogLevel
