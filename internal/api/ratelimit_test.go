@@ -172,6 +172,61 @@ func TestMiddleware_DeniedReturns429WithRetryAfter(t *testing.T) {
 	}
 }
 
+func TestUserRateLimit_KeysByUsername(t *testing.T) {
+	rl := NewRateLimiter(1, 2) // rate=1/sec, burst=2 so each user gets 2 free requests
+	defer rl.Stop()
+
+	handler := UserRateLimit(rl)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+
+	send := func(user string) int {
+		req := httptest.NewRequest("GET", "/storage/"+user+"/notes/foo", nil)
+		req.SetPathValue("user", user)
+		rec := httptest.NewRecorder()
+		handler.ServeHTTP(rec, req)
+		return rec.Code
+	}
+
+	// Alice uses her whole burst.
+	for i := 0; i < 2; i++ {
+		if code := send("alice"); code != http.StatusOK {
+			t.Fatalf("alice req %d: expected 200, got %d", i+1, code)
+		}
+	}
+
+	// Alice's next request hits the cap.
+	if code := send("alice"); code != http.StatusTooManyRequests {
+		t.Fatalf("alice over-cap req: expected 429, got %d", code)
+	}
+
+	// Bob has his own bucket and is unaffected by alice.
+	for i := 0; i < 2; i++ {
+		if code := send("bob"); code != http.StatusOK {
+			t.Fatalf("bob req %d: expected 200 (not affected by alice), got %d", i+1, code)
+		}
+	}
+}
+
+func TestUserRateLimit_DisabledWhenRateZero(t *testing.T) {
+	rl := NewRateLimiter(0, 0) // disabled
+	defer rl.Stop()
+
+	handler := UserRateLimit(rl)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+
+	for i := 0; i < 100; i++ {
+		req := httptest.NewRequest("GET", "/storage/alice/notes/foo", nil)
+		req.SetPathValue("user", "alice")
+		rec := httptest.NewRecorder()
+		handler.ServeHTTP(rec, req)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("req %d denied when limiter disabled", i)
+		}
+	}
+}
+
 func TestClientIP(t *testing.T) {
 	tests := []struct {
 		name       string

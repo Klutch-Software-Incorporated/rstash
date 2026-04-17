@@ -139,6 +139,39 @@ func RateLimit(limiter *RateLimiter) func(http.Handler) http.Handler {
 	}
 }
 
+// UserRateLimit returns middleware that enforces per-user rate limiting on
+// storage routes. The {user} path value must be set by the mux before this
+// middleware runs; if it's empty, the middleware passes through.
+//
+// Per-user limits complement the per-IP limiter: one user rotating through
+// many IPs (CGNAT, mobile, VPN) can evade per-IP caps. The per-user bucket
+// ties abuse budget to the account, not the network path.
+//
+// When the limiter's rate is 0, Allow returns immediately — effectively
+// zero cost, so it's safe to always wrap.
+func UserRateLimit(limiter *RateLimiter) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			user := r.PathValue("user")
+			if user == "" {
+				next.ServeHTTP(w, r)
+				return
+			}
+			allowed, retryAfter := limiter.Allow("user:" + user)
+			if !allowed {
+				secs := int(math.Ceil(retryAfter.Seconds()))
+				if secs < 1 {
+					secs = 1
+				}
+				w.Header().Set("Retry-After", strconv.Itoa(secs))
+				http.Error(w, "Too Many Requests", http.StatusTooManyRequests)
+				return
+			}
+			next.ServeHTTP(w, r)
+		})
+	}
+}
+
 // clientIP extracts the IP address from the request's RemoteAddr.
 func clientIP(r *http.Request) string {
 	host, _, err := net.SplitHostPort(r.RemoteAddr)

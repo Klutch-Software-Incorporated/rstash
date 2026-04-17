@@ -291,6 +291,29 @@ func SettingDefs() []SettingDef {
 			RuntimeEditable: true,
 			NumberMin:       "0",
 		},
+		{
+			Key:             "user_rate_limit_rate",
+			Group:           "Rate Limiting",
+			Label:           "Per-user rate limit",
+			Description:     "Max storage requests per second per user account (0 = disabled).",
+			Help:            "Per-user rate limit on storage requests (/storage/{user}/...), complementing the per-IP rate_limit_rate. Useful for tying abuse budget to an account rather than a network path, so a user rotating through multiple IPs (CGNAT, mobile, VPN) can't evade the per-IP cap. Set to 0 to disable — recommended default for self-hosters. Commercial operators hosting paying users will typically want something like 5–20. Changes take effect immediately.",
+			Default:         "0",
+			InputType:       InputNumber,
+			RuntimeEditable: true,
+			NumberMin:       "0",
+			NumberStep:      "0.1",
+		},
+		{
+			Key:             "user_rate_limit_burst",
+			Group:           "Rate Limiting",
+			Label:           "Per-user rate limit burst",
+			Description:     "Max burst of requests per user before throttling (0 = disabled).",
+			Help:            "Burst capacity (token-bucket size) for the per-user rate limiter. Must be at least 1 when user_rate_limit_rate is set. Leave at 0 when per-user limiting is disabled. Changes take effect immediately.",
+			Default:         "20",
+			InputType:       InputNumber,
+			RuntimeEditable: true,
+			NumberMin:       "0",
+		},
 
 		// ── Storage (runtime-editable, no env var) ──
 		{

@@ -19,8 +19,10 @@ type Config struct {
 	BlobDSN          string  // RSTASH_BLOB — blob store DSN (e.g. sqlite:blobs.db, fs:/path)
 	RegistrationMode string  // RSTASH_REGISTRATION — "open" or "closed"
 	LogLevel         string  // RSTASH_LOG_LEVEL — "debug", "info", "warn", "error"
-	RateLimitRate    float64 // RSTASH_RATE_LIMIT — requests/sec per IP (0 = disabled)
-	RateLimitBurst   int     // RSTASH_RATE_BURST — max burst size
+	RateLimitRate      float64 // RSTASH_RATE_LIMIT — requests/sec per IP (0 = disabled)
+	RateLimitBurst     int     // RSTASH_RATE_BURST — max burst size
+	UserRateLimitRate  float64 // requests/sec per user on storage routes (0 = disabled)
+	UserRateLimitBurst int     // per-user burst size
 	QuotaMode        string  // RSTASH_QUOTA_MODE — "off", "total", "user"
 	QuotaTotal       int64   // RSTASH_QUOTA_TOTAL — bytes (parsed from human-readable)
 	QuotaUser        int64   // RSTASH_QUOTA_USER — bytes (parsed from human-readable)
@@ -90,8 +92,10 @@ func Load() *Config {
 		PrivacyMode:      "text",
 		PrivacyContent:   defaultPrivacyContent,
 		RegistrationMode: "closed",
-		RateLimitRate:    10,
-		RateLimitBurst:   20,
+		RateLimitRate:      10,
+		RateLimitBurst:     20,
+		UserRateLimitRate:  0, // disabled by default; opt in for commercial tier
+		UserRateLimitBurst: 20,
 		QuotaMode:        "total",
 		QuotaTotal:       quotaTotal,
 		QuotaUser:        0,

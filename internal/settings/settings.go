@@ -31,8 +31,10 @@ type Snapshot struct {
 	MetricsMode      string
 	RegistrationMode string
 	LogLevel         string
-	RateLimitRate    float64
-	RateLimitBurst   int
+	RateLimitRate      float64
+	RateLimitBurst     int
+	UserRateLimitRate  float64 // per-user storage request rate (0 = disabled)
+	UserRateLimitBurst int     // per-user burst capacity
 	QuotaMode        string
 	QuotaTotal       int64
 	QuotaUser        int64
@@ -166,8 +168,10 @@ func (snap *Snapshot) ValueMap() map[string]string {
 		"metrics_mode":      snap.MetricsMode,
 		"registration_mode": snap.RegistrationMode,
 		"log_level":         snap.LogLevel,
-		"rate_limit_rate":   fmt.Sprintf("%g", snap.RateLimitRate),
-		"rate_limit_burst":  fmt.Sprintf("%d", snap.RateLimitBurst),
+		"rate_limit_rate":        fmt.Sprintf("%g", snap.RateLimitRate),
+		"rate_limit_burst":       fmt.Sprintf("%d", snap.RateLimitBurst),
+		"user_rate_limit_rate":   fmt.Sprintf("%g", snap.UserRateLimitRate),
+		"user_rate_limit_burst":  fmt.Sprintf("%d", snap.UserRateLimitBurst),
 		"quota_mode":        snap.QuotaMode,
 		"quota_total":       config.FormatByteSize(snap.QuotaTotal),
 		"quota_user":        config.FormatByteSize(snap.QuotaUser),
@@ -214,6 +218,8 @@ func (s *Settings) buildSnapshot(overrides map[string]string) *Snapshot {
 		LogLevel:             s.defaults.LogLevel,
 		RateLimitRate:        s.defaults.RateLimitRate,
 		RateLimitBurst:       s.defaults.RateLimitBurst,
+		UserRateLimitRate:    s.defaults.UserRateLimitRate,
+		UserRateLimitBurst:   s.defaults.UserRateLimitBurst,
 		QuotaMode:            s.defaults.QuotaMode,
 		QuotaTotal:           s.defaults.QuotaTotal,
 		QuotaUser:            s.defaults.QuotaUser,
@@ -255,6 +261,16 @@ func (s *Settings) buildSnapshot(overrides map[string]string) *Snapshot {
 	if v, ok := overrides["rate_limit_burst"]; ok {
 		if i, err := strconv.Atoi(v); err == nil {
 			snap.RateLimitBurst = i
+		}
+	}
+	if v, ok := overrides["user_rate_limit_rate"]; ok {
+		if f, err := strconv.ParseFloat(v, 64); err == nil {
+			snap.UserRateLimitRate = f
+		}
+	}
+	if v, ok := overrides["user_rate_limit_burst"]; ok {
+		if i, err := strconv.Atoi(v); err == nil {
+			snap.UserRateLimitBurst = i
 		}
 	}
 	if v, ok := overrides["quota_mode"]; ok {

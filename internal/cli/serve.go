@@ -226,9 +226,18 @@ func runServe(cmd *cobra.Command, args []string) error {
 		},
 	)))
 	mux.Handle("POST /oauth/revoke", api.CORS(api.OAuthRevoke(repo)))
-	mux.Handle("/storage/{user}/{path...}", api.CORS(api.Storage(repo, storageSvc, func() int64 {
+
+	// Per-user rate limiter on storage routes. Zero rate = disabled (default);
+	// the Allow() call short-circuits immediately so there's no runtime cost
+	// for self-hosters who haven't opted in.
+	userLimiter := api.NewRateLimiter(snap.UserRateLimitRate, snap.UserRateLimitBurst)
+	defer userLimiter.Stop()
+	runtimeSettings.OnChange(func(s *settings.Snapshot) {
+		userLimiter.UpdateConfig(s.UserRateLimitRate, s.UserRateLimitBurst)
+	})
+	mux.Handle("/storage/{user}/{path...}", api.CORS(api.UserRateLimit(userLimiter)(api.Storage(repo, storageSvc, func() int64 {
 		return runtimeSettings.Load().MaxUploadSize
-	})))
+	}))))
 
 	// Admin JSON API (keys managed via admin UI).
 	apiKeyLimiter := api.NewAPIKeyRateLimiter()
