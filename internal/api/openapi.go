@@ -84,12 +84,21 @@ func AdminOpenAPISpec() *openapi3.T {
 
 	spec.Paths.Set("/api/admin/users/{username}/disable", &openapi3.PathItem{
 		Parameters: []*openapi3.ParameterRef{usernameParam()},
-		Put: &openapi3.Operation{
-			Summary:     "Disable/enable user",
-			OperationID: "setUserDisabled",
-			Description: "Disables or enables a user account.",
-			RequestBody: &openapi3.RequestBodyRef{Value: jsonBody(disableRequestSchema())},
-			Responses:   openapi3.NewResponses(withResponse(200, "User updated", okResponseSchema())),
+		Post: &openapi3.Operation{
+			Summary:     "Disable user",
+			OperationID: "disableUser",
+			Description: "Marks a user account disabled. Idempotent. No request body.",
+			Responses:   openapi3.NewResponses(withResponse(200, "User disabled", okResponseSchema())),
+		},
+	})
+
+	spec.Paths.Set("/api/admin/users/{username}/enable", &openapi3.PathItem{
+		Parameters: []*openapi3.ParameterRef{usernameParam()},
+		Post: &openapi3.Operation{
+			Summary:     "Enable user",
+			OperationID: "enableUser",
+			Description: "Clears the disabled flag on a user account. Idempotent. No request body.",
+			Responses:   openapi3.NewResponses(withResponse(200, "User enabled", okResponseSchema())),
 		},
 	})
 
@@ -156,11 +165,15 @@ func errorSchema() *openapi3.Schema {
 func createUserSchema() *openapi3.Schema {
 	return &openapi3.Schema{
 		Type:     &openapi3.Types{"object"},
-		Required: []string{"username", "password"},
+		Required: []string{"username"},
 		Properties: openapi3.Schemas{
-			"username": schemaRef("string", ""),
-			"password": schemaRef("string", ""),
-			"email":    schemaRef("string", ""),
+			"username":              schemaRef("string", ""),
+			"password":              schemaRef("string", ""),
+			"email":                 schemaRef("string", ""),
+			"email_verified":        schemaRef("boolean", ""),
+			"provision":             schemaRef("boolean", ""),
+			"quota_bytes":           quotaFieldRef("Storage quota in bytes. 0 = use server default."),
+			"egress_quota_bytes":    quotaFieldRef("Monthly egress quota in bytes. 0 = use server default."),
 		},
 	}
 }
@@ -170,17 +183,7 @@ func quotaRequestSchema() *openapi3.Schema {
 		Type:     &openapi3.Types{"object"},
 		Required: []string{"quota_bytes"},
 		Properties: openapi3.Schemas{
-			"quota_bytes": schemaRef("integer", "int64"),
-		},
-	}
-}
-
-func disableRequestSchema() *openapi3.Schema {
-	return &openapi3.Schema{
-		Type:     &openapi3.Types{"object"},
-		Required: []string{"disabled"},
-		Properties: openapi3.Schemas{
-			"disabled": schemaRef("boolean", ""),
+			"quota_bytes": quotaFieldRef("Storage quota in bytes. 0 = use server default."),
 		},
 	}
 }
@@ -226,6 +229,19 @@ func schemaRef(typ, format string) *openapi3.SchemaRef {
 		s.Format = format
 	}
 	return &openapi3.SchemaRef{Value: s}
+}
+
+// quotaFieldRef returns the schema for a quota field (storage or egress).
+// Values must be non-negative; zero has the special meaning "use the server
+// default" (quota_user or egress_quota_user settings).
+func quotaFieldRef(description string) *openapi3.SchemaRef {
+	zero := float64(0)
+	return &openapi3.SchemaRef{Value: &openapi3.Schema{
+		Type:        &openapi3.Types{"integer"},
+		Format:      "int64",
+		Min:         &zero,
+		Description: description,
+	}}
 }
 
 func usernameParam() *openapi3.ParameterRef {

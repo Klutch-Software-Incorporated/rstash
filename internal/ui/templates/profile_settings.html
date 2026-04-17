@@ -36,10 +36,28 @@
     <dd>draft-dejong-remotestorage-26</dd>
 </dl>
 
+{{if $.CustomLinks}}
+<h3>Linked Services</h3>
+<ul class="linked-services">
+    {{range $.CustomLinks}}
+    <li>
+        <a href="{{.URL}}"{{if .External}} rel="noopener noreferrer" target="_blank"{{end}}>{{.Label}}</a>
+        {{if .Description}}<span class="muted"> — {{.Description}}</span>{{end}}
+    </li>
+    {{end}}
+</ul>
+{{end}}
+
 {{if .IsSelf}}
 <div class="settings-grid">
     <div class="settings-card">
         <h3>Change Email</h3>
+        {{if .ExternallyManaged}}
+        <p class="muted">Your email is managed by an external service.</p>
+        {{if .ExternalAccountURL}}
+        <p><a class="btn" href="{{.ExternalAccountURL}}">Manage account</a></p>
+        {{end}}
+        {{else}}
         <form method="POST" action="{{.URLPrefix}}/settings/email">
             <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
             <div>
@@ -48,6 +66,7 @@
             </div>
             <button type="submit">Update Email</button>
         </form>
+        {{end}}
     </div>
     <div class="settings-card">
         <h3>Change Password</h3>
@@ -69,6 +88,15 @@
         </form>
     </div>
 </div>
+
+<h3>Your data</h3>
+<ul>
+    <li><a href="/account/activity">View activity log</a> — recent actions on your account</li>
+    <li><a href="/account/export">Download your data</a> — machine-readable JSON export</li>
+    <li><a href="/account/apps">Authorized apps</a> — revoke third-party OAuth access</li>
+    <li><a href="/account/delete">Delete your account</a> — permanent</li>
+</ul>
+
 {{end}}
 
 <h2>Active Sessions</h2>

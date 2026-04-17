@@ -8,6 +8,7 @@ import (
 	"rstash/internal/settings"
 	"rstash/internal/storage"
 	"rstash/internal/ui"
+	"rstash/internal/webhooks"
 )
 
 // UIDeps holds the dependencies needed by UI handlers.
@@ -18,7 +19,8 @@ type UIDeps struct {
 	Config        *config.Config
 	Storage       *storage.Service
 	Settings      *settings.Settings
-	Mailer        email.Mailer // nil when email not configured
+	Mailer        email.Mailer        // nil when email not configured
+	Webhooks      *webhooks.Emitter   // nil disables webhook emission
 	SecureCookies bool   // true when base URL scheme is https
 	LogFile       string // path to log file (empty = no file logging)
 }

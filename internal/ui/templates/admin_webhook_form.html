@@ -1,0 +1,41 @@
+{{define "admin_webhook_form"}}
+{{template "admin_nav" $}}
+{{with .Content}}
+
+<h2>Add webhook subscription</h2>
+
+{{if .Error}}<div role="alert" class="alert-error">{{.Error}}</div>{{end}}
+
+<form method="post" action="/admin/webhooks">
+    <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
+    <label>
+        Name
+        <input type="text" name="name" value="{{.Subscription.Name}}" required autofocus maxlength="255">
+    </label>
+    <label>
+        URL
+        <input type="url" name="url" value="{{.Subscription.URL}}" required placeholder="https://example.com/webhooks/rstash">
+    </label>
+    <fieldset>
+        <legend>Events</legend>
+        {{range .KnownEvents}}
+        <label><input type="checkbox" name="events" value="{{.}}"> {{.}}</label><br>
+        {{end}}
+        <label><input type="checkbox" name="events" value="*"> * (all events)</label>
+    </fieldset>
+    <label>
+        <input type="checkbox" name="active" value="on" {{if .Subscription.Active}}checked{{end}}> Active
+    </label>
+    <p>
+        <button type="submit" class="btn">Create subscription</button>
+        <a href="/admin/webhooks">Cancel</a>
+    </p>
+</form>
+
+<p class="muted">
+    A signing secret is generated server-side and shown once on the next screen. Copy it
+    immediately — you'll need it to verify <code>X-Rstash-Signature</code> on incoming deliveries.
+</p>
+
+{{end}}
+{{end}}

@@ -1,0 +1,47 @@
+{{define "admin_apikey_edit"}}
+{{template "admin_nav" $}}
+{{with .Content}}
+
+<h2>Edit API key</h2>
+
+{{if .Error}}
+<div role="alert" class="alert-error">{{.Error}}</div>
+{{end}}
+
+<form method="post" action="/admin/api-keys/{{.Key.ID}}">
+    <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
+    <label>
+        Name
+        <input type="text" name="name" value="{{.Key.Name}}" required maxlength="255">
+    </label>
+    <label>
+        Description
+        <textarea name="description" rows="2" maxlength="1024">{{.Key.Description}}</textarea>
+    </label>
+    <label>
+        Rate limit (requests per minute)
+        <input type="number" name="rate_limit_rpm" value="{{.Key.RateLimitRPM}}" min="0" step="1">
+    </label>
+    <p>
+        Current prefix: <code>{{.Key.KeyPrefix}}…</code>
+    </p>
+    <label>
+        <input type="checkbox" name="regenerate" value="on">
+        Regenerate key (invalidates the current one)
+    </label>
+    <p>
+        <button type="submit" class="btn">Save</button>
+        <a href="/admin/api-keys">Cancel</a>
+    </p>
+</form>
+
+<hr>
+
+<h3>Delete key</h3>
+<form method="post" action="/admin/api-keys/{{.Key.ID}}/delete" onsubmit="return confirm('Delete API key &quot;{{.Key.Name}}&quot;? Any clients using it will stop working.');">
+    <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
+    <button type="submit" class="btn btn-danger">Delete key</button>
+</form>
+
+{{end}}
+{{end}}

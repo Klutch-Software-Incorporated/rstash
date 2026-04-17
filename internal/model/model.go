@@ -23,6 +23,26 @@ type User struct {
 	EmailVerifyExpiry  *time.Time
 	PasswordResetToken  *string    `gorm:"size:255"`
 	PasswordResetExpiry *time.Time
+
+	// ExternallyManaged is true for accounts provisioned via the admin API
+	// with provision=true (typically by a companion signup/billing app).
+	// When true, the rstash web UI redirects email/delete flows to an
+	// external management URL instead of handling them locally.
+	ExternallyManaged bool `gorm:"not null;default:false"`
+
+	// EgressQuota is the per-user egress limit in bytes per calendar month.
+	// 0 = use the server default (egress_quota_user setting). Enforced only
+	// when egress_mode=user. Uploads are bounded separately by storage
+	// quota and max_upload_size, not by this value.
+	EgressQuota int64 `gorm:"not null;default:0"`
+}
+
+// IsUnclaimed returns true when a user was provisioned via the admin API
+// but has not yet completed the /claim flow to set their password and log in.
+// Detected by the combination of an active password-reset token and a
+// never-logged-in state.
+func (u *User) IsUnclaimed() bool {
+	return u.LastLoginAt == nil && u.PasswordResetToken != nil && *u.PasswordResetToken != ""
 }
 
 type OAuthClient struct {
@@ -123,4 +143,62 @@ type EmailSend struct {
 	Status    string    `gorm:"size:16;not null"` // "sent", "failed"
 	Error     string    `gorm:"size:1024"`
 	CreatedAt time.Time `gorm:"not null;index"`
+}
+
+// APIKey is an admin API credential issued and managed via the admin UI.
+// The raw key is shown once at creation; only the bcrypt hash is stored.
+// KeyPrefix (first 8 hex chars) is indexed for fast lookup before bcrypt compare.
+type APIKey struct {
+	ID           int64     `gorm:"primaryKey;autoIncrement"`
+	Name         string    `gorm:"size:255;not null"`
+	Description  string    `gorm:"size:1024;default:''"`
+	KeyHash      string    `gorm:"size:255;not null"`
+	KeyPrefix    string    `gorm:"size:16;index;not null"`
+	RateLimitRPM int       `gorm:"not null;default:60"`
+	LastUsedAt   *time.Time
+	CreatedAt    time.Time `gorm:"not null;autoCreateTime"`
+}
+
+// WebhookSubscription is an admin-registered HTTP endpoint that receives
+// state-change events from rstash. Deliveries are HMAC-signed with Secret
+// (shown once at creation) and retried with exponential backoff via the
+// WebhookDelivery outbox.
+type WebhookSubscription struct {
+	ID            int64     `gorm:"primaryKey;autoIncrement"`
+	Name          string    `gorm:"size:255;not null"`
+	URL           string    `gorm:"size:2048;not null"`
+	Secret        string    `gorm:"size:255;not null"`
+	Events        string    `gorm:"size:1024;not null"` // space-separated, "*" = all
+	Active        bool      `gorm:"not null;default:true"`
+	LastSuccessAt *time.Time
+	LastErrorAt   *time.Time
+	LastError     string    `gorm:"size:1024;default:''"`
+	FailureCount  int       `gorm:"not null;default:0"`
+	CreatedAt     time.Time `gorm:"not null;autoCreateTime"`
+}
+
+// EgressUsage tracks per-user egress bytes by calendar-month period
+// ("YYYY-MM"). Uploads are not counted. Enforcement happens in the storage
+// service via GetDocument before the response body is written.
+type EgressUsage struct {
+	UserID    int64     `gorm:"primaryKey;autoIncrement:false"`
+	Period    string    `gorm:"primaryKey;size:7"`
+	BytesOut  int64     `gorm:"not null;default:0"`
+	UpdatedAt time.Time `gorm:"not null;autoUpdateTime"`
+}
+
+// WebhookDelivery is a queued delivery attempt in the outbox. The worker
+// picks rows where DeliveredAt IS NULL and NextAttemptAt <= now, POSTs
+// the payload, and either marks DeliveredAt or schedules retry via
+// exponential backoff.
+type WebhookDelivery struct {
+	ID             int64     `gorm:"primaryKey;autoIncrement"`
+	SubscriptionID int64     `gorm:"not null;index"`
+	Event          string    `gorm:"size:64;not null"`
+	Payload        []byte    `gorm:"not null"`
+	Attempts       int       `gorm:"not null;default:0"`
+	LastError      string    `gorm:"size:1024;default:''"`
+	NextAttemptAt  time.Time `gorm:"not null;index"`
+	DeliveredAt    *time.Time
+	CreatedAt      time.Time `gorm:"not null;autoCreateTime"`
 }

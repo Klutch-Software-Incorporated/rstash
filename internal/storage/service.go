@@ -73,16 +73,20 @@ type DeleteResult struct {
 
 // Service orchestrates storage operations (blob + node + ETags).
 type Service struct {
-	repo    *db.Repository
-	blobs   blob.Store
-	quota   *QuotaChecker
-	scanner ContentScanner
+	repo      *db.Repository
+	blobs     blob.Store
+	quota     *QuotaChecker
+	egress *EgressTracker // optional — nil disables all egress tracking
+	scanner   ContentScanner
 }
 
 // SetScanner sets the content scanner used to inspect uploads.
 func (s *Service) SetScanner(sc ContentScanner) {
 	s.scanner = sc
 }
+
+// SetEgressTracker installs the egress tracker used by GetDocument.
+func (s *Service) SetEgressTracker(et *EgressTracker) { s.egress = et }
 
 // NewService creates a new storage service.
 func NewService(repo *db.Repository, blobs blob.Store, quota *QuotaChecker) *Service {
@@ -203,9 +207,27 @@ func (s *Service) GetDocument(ctx context.Context, userID int64, path string, co
 		return nil, ErrNotModified
 	}
 
+	// Egress enforcement: hot-path returns early when disabled.
+	if s.egress != nil {
+		user, _ := s.repo.GetUserByID(ctx, userID)
+		var override int64
+		if user != nil {
+			override = user.EgressQuota
+		}
+		if err := s.egress.CheckServe(ctx, userID, node.ContentLength, override); err != nil {
+			return nil, err
+		}
+	}
+
 	content, err := s.blobs.Get(ctx, userID, path)
 	if err != nil {
 		return nil, err
+	}
+
+	// Record egress only after the blob is in-hand so an error on the
+	// fetch path doesn't charge the user for bytes they won't receive.
+	if s.egress != nil {
+		s.egress.Record(userID, node.ContentLength)
 	}
 
 	return &GetResult{

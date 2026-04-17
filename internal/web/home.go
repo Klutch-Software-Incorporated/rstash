@@ -26,6 +26,14 @@ type homeStats struct {
 	OAuthApps    int64
 	StorageBytes int64 // raw bytes for meter
 	QuotaBytes   int64 // raw bytes for meter max
+
+	// Egress (populated only when egress_mode=user)
+	EgressUsed       string // human-readable used bytes for current period
+	EgressQuota      string // human-readable limit
+	EgressPercent    int    // 0–100
+	EgressUsedBytes  int64  // raw bytes for meter
+	EgressQuotaBytes int64  // raw bytes for meter max
+	EgressPeriod     string // "YYYY-MM" label for the current billing period
 }
 
 type moduleRow struct {

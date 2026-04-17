@@ -7,7 +7,9 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"strconv"
 	"strings"
+	"time"
 	"unicode/utf8"
 
 	"rstash/internal/db"
@@ -304,6 +306,20 @@ func writeServiceError(w http.ResponseWriter, err error) {
 		http.Error(w, "payload too large", http.StatusRequestEntityTooLarge)
 	case errors.Is(err, storage.ErrQuotaExceeded):
 		http.Error(w, "quota exceeded", http.StatusInsufficientStorage)
+	case errors.Is(err, storage.ErrEgressExceeded):
+		// 429 per draft-dejong-remotestorage-26 §5 ("rate limiting") and RFC 6585.
+		// We use 429 rather than 507 because 507 means "storage is full" which is
+		// about the blob store, not transfer, and implies a permanent condition.
+		// 429 + Retry-After matches the "retry after the window resets" semantic
+		// that clients and HTTP libraries already understand.
+		now := time.Now().UTC()
+		nextMonth := time.Date(now.Year(), now.Month()+1, 1, 0, 0, 0, 0, time.UTC)
+		secs := int(nextMonth.Sub(now).Seconds())
+		if secs < 1 {
+			secs = 1
+		}
+		w.Header().Set("Retry-After", strconv.Itoa(secs))
+		http.Error(w, "egress exceeded", http.StatusTooManyRequests)
 	case errors.Is(err, storage.ErrContentRejected):
 		http.Error(w, err.Error(), http.StatusUnsupportedMediaType)
 	default:

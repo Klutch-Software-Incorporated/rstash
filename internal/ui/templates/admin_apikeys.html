@@ -1,0 +1,47 @@
+{{define "admin_apikeys"}}
+{{template "admin_nav" $}}
+{{with .Content}}
+
+<h2>API Keys</h2>
+<p>
+    API keys authenticate external services calling the admin JSON API at <code>/api/admin/*</code>.
+    Each key has its own rate limit and audit trail. The raw key is shown only once at creation.
+</p>
+
+<p><a class="btn" href="/admin/api-keys/new">Create API key</a></p>
+
+{{if .Keys}}
+<table class="responsive-table">
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Description</th>
+            <th>Prefix</th>
+            <th>Rate (RPM)</th>
+            <th>Last used</th>
+            <th>Created</th>
+            <th></th>
+        </tr>
+    </thead>
+    <tbody>
+        {{range .Keys}}
+        <tr>
+            <td data-label="Name">{{.Name}}</td>
+            <td data-label="Description">{{.Description}}</td>
+            <td data-label="Prefix"><code>{{.KeyPrefix}}…</code></td>
+            <td data-label="Rate (RPM)">{{.RateLimitRPM}}</td>
+            <td data-label="Last used">{{if .LastUsedAt}}{{.LastUsedAt}}{{else}}—{{end}}</td>
+            <td data-label="Created">{{.CreatedAt}}</td>
+            <td data-label="Actions">
+                <a href="/admin/api-keys/{{.ID}}">Edit</a>
+            </td>
+        </tr>
+        {{end}}
+    </tbody>
+</table>
+{{else}}
+<p class="empty-state">No API keys yet. Create one to integrate external services with the admin API.</p>
+{{end}}
+
+{{end}}
+{{end}}

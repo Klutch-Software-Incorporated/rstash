@@ -39,6 +39,20 @@ func (h *registerHandler) ShowRegister(w http.ResponseWriter, r *http.Request) {
 	}
 
 	snap := h.deps.Settings.Load()
+
+	// External mode: redirect to the configured signup URL (typically a
+	// companion app that provisions accounts via the admin API).
+	if snap.RegistrationMode == "external" {
+		if snap.RegistrationExternalURL == "" {
+			h.deps.renderError(w, r, http.StatusServiceUnavailable,
+				"Registration Unavailable",
+				"External registration is enabled but no registration URL is configured.")
+			return
+		}
+		http.Redirect(w, r, snap.RegistrationExternalURL, http.StatusSeeOther)
+		return
+	}
+
 	content := &registerContent{
 		Closed:       snap.RegistrationMode == "closed",
 		ApprovalMode: snap.RegistrationMode == "approval",
@@ -51,6 +65,10 @@ func (h *registerHandler) ShowRegister(w http.ResponseWriter, r *http.Request) {
 func (h *registerHandler) DoRegister(w http.ResponseWriter, r *http.Request) {
 	snap := h.deps.Settings.Load()
 
+	if snap.RegistrationMode == "external" {
+		http.Error(w, "Registration is handled externally", http.StatusForbidden)
+		return
+	}
 	if snap.RegistrationMode != "open" && snap.RegistrationMode != "approval" {
 		http.Error(w, "Registration is closed", http.StatusForbidden)
 		return
@@ -166,7 +184,7 @@ func (h *registerHandler) DoRegister(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Create session.
-	sess, err := h.deps.Auth.CreateSession(r.Context(), user.ID, ClientIP(r))
+	sess, err := h.deps.Auth.CreateSession(r.Context(), user.ID, h.deps.ClientIPForStorage(r))
 	if err != nil {
 		slog.Error("failed to create session", "error", err)
 		http.Redirect(w, r, "/login", http.StatusSeeOther)
@@ -174,7 +192,7 @@ func (h *registerHandler) DoRegister(w http.ResponseWriter, r *http.Request) {
 	}
 
 	h.deps.Repo.Audit(r.Context(), user.ID, "user.registered", "user", fmt.Sprintf("%d", user.ID), username)
-	auth.SetSessionCookie(w, sess.Token, h.deps.SecureCookies)
+	auth.SetSessionCookie(w, sess.Token, h.deps.Settings.Load().CookieDomain, h.deps.SecureCookies)
 	ui.SetFlash(w, "Account created successfully.")
 	http.Redirect(w, r, "/", http.StatusSeeOther)
 }

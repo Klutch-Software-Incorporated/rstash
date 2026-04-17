@@ -7,6 +7,7 @@ import (
 	"net/url"
 	"strings"
 	"testing"
+	"time"
 
 	"rstash/internal/auth"
 	"rstash/internal/config"
@@ -15,6 +16,10 @@ import (
 	"rstash/internal/ui"
 	"rstash/internal/web"
 )
+
+func timeNowPlus(d time.Duration) time.Time {
+	return time.Now().UTC().Add(d)
+}
 
 func setupTestServer(t *testing.T, regMode string) (*httptest.Server, *web.UIDeps) {
 	t.Helper()
@@ -47,8 +52,8 @@ func setupTestServer(t *testing.T, regMode string) (*httptest.Server, *web.UIDep
 	}
 
 	uiHandler := web.FullRoutes(deps)
-	wrapped := web.AuthLoader(localAuth, false)(
-		web.EnsureCSRFCookie(false)(
+	wrapped := web.AuthLoader(localAuth, runtimeSettings, false)(
+		web.EnsureCSRFCookie(runtimeSettings, false)(
 			web.SetupGuard(localAuth)(uiHandler),
 		),
 	)
@@ -348,6 +353,150 @@ func TestSetupValidation(t *testing.T) {
 	resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("expected 200 for password mismatch, got %d", resp.StatusCode)
+	}
+}
+
+func TestExternalRegistrationRedirects(t *testing.T) {
+	ts, deps := setupTestServer(t, "external")
+
+	// Ensure at least one user exists so SetupGuard lets us through to /register.
+	_, err := deps.Repo.CreateUser(context.Background(), "admin", "password123", "", true, true)
+	if err != nil {
+		t.Fatalf("create admin: %v", err)
+	}
+	if err := deps.Settings.Set(context.Background(), "registration_external_url", "https://example.com/signup"); err != nil {
+		t.Fatalf("set url: %v", err)
+	}
+
+	client := &http.Client{CheckRedirect: func(req *http.Request, via []*http.Request) error {
+		return http.ErrUseLastResponse
+	}}
+	resp, err := client.Get(ts.URL + "/register")
+	if err != nil {
+		t.Fatalf("get /register: %v", err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusSeeOther {
+		t.Fatalf("expected 303, got %d", resp.StatusCode)
+	}
+	if loc := resp.Header.Get("Location"); loc != "https://example.com/signup" {
+		t.Fatalf("expected redirect to https://example.com/signup, got %q", loc)
+	}
+}
+
+func TestClaimFlow(t *testing.T) {
+	ts, deps := setupTestServer(t, "closed")
+
+	// Simulate an admin-API-provisioned user.
+	user, err := deps.Repo.CreateUser(context.Background(), "newuser", "placeholderpwd1234567", "new@example.com", false, true)
+	if err != nil {
+		t.Fatalf("create user: %v", err)
+	}
+	_ = deps.Repo.SetExternallyManaged(context.Background(), user.ID, true)
+	token := "claim-token-abc123"
+	if err := deps.Repo.SetPasswordResetToken(context.Background(), user.ID, token, timeNowPlus(24*time.Hour)); err != nil {
+		t.Fatalf("set token: %v", err)
+	}
+
+	jar := &simpleCookieJar{cookies: make(map[string][]*http.Cookie)}
+	client := &http.Client{
+		Jar: jar,
+		CheckRedirect: func(req *http.Request, via []*http.Request) error {
+			return http.ErrUseLastResponse
+		},
+	}
+
+	// GET /claim with the token should succeed and set a CSRF cookie.
+	resp, err := client.Get(ts.URL + "/claim?token=" + token)
+	if err != nil {
+		t.Fatalf("get /claim: %v", err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("expected 200 for GET /claim, got %d", resp.StatusCode)
+	}
+
+	var csrfToken string
+	for _, c := range resp.Cookies() {
+		if c.Name == "rstash_csrf" {
+			csrfToken = c.Value
+		}
+	}
+	if csrfToken == "" {
+		t.Fatal("expected rstash_csrf cookie")
+	}
+
+	// POST /claim with new password.
+	form := url.Values{
+		"token":            {token},
+		"password":         {"newpassword123"},
+		"password_confirm": {"newpassword123"},
+	}
+	resp = postWithCSRF(t, client, ts.URL+"/claim", csrfToken, form)
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusSeeOther {
+		t.Fatalf("expected 303 after claim, got %d", resp.StatusCode)
+	}
+
+	// Session cookie should be set.
+	var hasSession bool
+	for _, c := range resp.Cookies() {
+		if c.Name == "rstash_session" && c.Value != "" {
+			hasSession = true
+		}
+	}
+	if !hasSession {
+		t.Fatal("expected rstash_session cookie after claim")
+	}
+
+	// User's claim token should be cleared and they can log in with new password.
+	updated, err := deps.Repo.GetUserByID(context.Background(), user.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if updated.PasswordResetToken != nil && *updated.PasswordResetToken != "" {
+		t.Error("expected claim token to be cleared after claim")
+	}
+}
+
+func TestClaimFlow_InvalidToken(t *testing.T) {
+	ts, deps := setupTestServer(t, "closed")
+	// Need a user to exist so SetupGuard doesn't redirect to /setup.
+	_, err := deps.Repo.CreateUser(context.Background(), "admin", "password123", "", true, true)
+	if err != nil {
+		t.Fatalf("create admin: %v", err)
+	}
+
+	client := &http.Client{CheckRedirect: func(req *http.Request, via []*http.Request) error {
+		return http.ErrUseLastResponse
+	}}
+	resp, err := client.Get(ts.URL + "/claim?token=does-not-exist")
+	if err != nil {
+		t.Fatalf("get /claim: %v", err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("expected 200 (error page), got %d", resp.StatusCode)
+	}
+}
+
+func TestExternalRegistrationWithoutURL(t *testing.T) {
+	ts, deps := setupTestServer(t, "external")
+	_, err := deps.Repo.CreateUser(context.Background(), "admin", "password123", "", true, true)
+	if err != nil {
+		t.Fatalf("create admin: %v", err)
+	}
+
+	client := &http.Client{CheckRedirect: func(req *http.Request, via []*http.Request) error {
+		return http.ErrUseLastResponse
+	}}
+	resp, err := client.Get(ts.URL + "/register")
+	if err != nil {
+		t.Fatalf("get /register: %v", err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusServiceUnavailable {
+		t.Fatalf("expected 503 when URL unset, got %d", resp.StatusCode)
 	}
 }
 

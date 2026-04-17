@@ -21,6 +21,25 @@ type legalContent struct {
 	Body  string
 }
 
+// ShowCookies handles GET /legal/cookies. Lists the essential cookies
+// rstash sets, why, and their scope. No tracking/analytics cookies.
+func (h *legalHandler) ShowCookies(w http.ResponseWriter, r *http.Request) {
+	snap := h.deps.Settings.Load()
+	scope := "host-only"
+	if snap.CookieDomain != "" {
+		scope = snap.CookieDomain
+	}
+	body := "Cookies used by this site\n\n" +
+		"This site uses only the cookies listed below. They are essential for sign-in and security and do not require consent under GDPR. No tracking, analytics, or third-party cookies are set.\n\n" +
+		"rstash_session — authentication session token. HttpOnly, SameSite=Lax, 7-day lifetime. Scope: " + scope + ".\n\n" +
+		"rstash_csrf — CSRF token pair (double-submit). HttpOnly, SameSite=Lax. Scope: " + scope + ".\n\n" +
+		"If you clear these cookies you will be signed out.\n"
+	h.deps.Renderer.Render(w, "legal", h.deps.pageData(w, r, "Cookies — rstash", &legalContent{
+		Title: "Cookies",
+		Body:  body,
+	}))
+}
+
 // ShowTerms handles GET /legal/terms.
 func (h *legalHandler) ShowTerms(w http.ResponseWriter, r *http.Request) {
 	snap := h.deps.Settings.Load()

@@ -19,8 +19,10 @@ type Config struct {
 	BlobDSN          string  // RSTASH_BLOB — blob store DSN (e.g. sqlite:blobs.db, fs:/path)
 	RegistrationMode string  // RSTASH_REGISTRATION — "open" or "closed"
 	LogLevel         string  // RSTASH_LOG_LEVEL — "debug", "info", "warn", "error"
-	RateLimitRate    float64 // RSTASH_RATE_LIMIT — requests/sec per IP (0 = disabled)
-	RateLimitBurst   int     // RSTASH_RATE_BURST — max burst size
+	RateLimitRate      float64 // RSTASH_RATE_LIMIT — requests/sec per IP (0 = disabled)
+	RateLimitBurst     int     // RSTASH_RATE_BURST — max burst size
+	UserRateLimitRate  float64 // requests/sec per user on storage routes (0 = disabled)
+	UserRateLimitBurst int     // per-user burst size
 	QuotaMode        string  // RSTASH_QUOTA_MODE — "off", "total", "user"
 	QuotaTotal       int64   // RSTASH_QUOTA_TOTAL — bytes (parsed from human-readable)
 	QuotaUser        int64   // RSTASH_QUOTA_USER — bytes (parsed from human-readable)
@@ -41,7 +43,11 @@ type Config struct {
 	TLSMode              string  // RSTASH_TLS_MODE — "off", "manual", "auto", or "" (auto-detect)
 	TLSCacheDir          string  // RSTASH_TLS_CACHE — autocert cache directory
 	EmailDSN             string  // RSTASH_EMAIL — email provider DSN
-	APIKey               string  // RSTASH_API_KEY — admin API key
+	CookieDomain         string  // cookie domain (empty = host-only)
+	EgressMode           string  // "off" or "user"
+	EgressQuotaUser      int64   // default per-user monthly egress (bytes)
+	AuditRetentionDays   int     // 0 = forever
+	LogClientIPs         string  // "enabled", "hashed", "disabled"
 }
 
 // ParseDSN splits a DSN string into its scheme and path components.
@@ -61,6 +67,7 @@ func ParseDSN(dsn string) (scheme, path string, err error) {
 func Load() *Config {
 	quotaTotal, _ := ParseByteSize("50GB")
 	maxUpload, _ := ParseByteSize("50MB")
+	egressUser, _ := ParseByteSize("500GB")
 
 	return &Config{
 		// Boot-critical: read from env vars.
@@ -75,7 +82,6 @@ func Load() *Config {
 		TLSMode:     os.Getenv(EnvTLSMode),
 		TLSCacheDir: envOrDefault(EnvTLSCache, "./certs"),
 		EmailDSN:    os.Getenv(EnvEmail),
-		APIKey:      os.Getenv(EnvAPIKey),
 
 		// Runtime-editable: sane defaults, changed via CLI/admin UI.
 		SiteName:         "rstash",
@@ -86,8 +92,10 @@ func Load() *Config {
 		PrivacyMode:      "text",
 		PrivacyContent:   defaultPrivacyContent,
 		RegistrationMode: "closed",
-		RateLimitRate:    10,
-		RateLimitBurst:   20,
+		RateLimitRate:      10,
+		RateLimitBurst:     20,
+		UserRateLimitRate:  0, // disabled by default; opt in for commercial tier
+		UserRateLimitBurst: 20,
 		QuotaMode:        "total",
 		QuotaTotal:       quotaTotal,
 		QuotaUser:        0,
@@ -95,6 +103,10 @@ func Load() *Config {
 		TokenLifetime:        "30d",
 		RefreshTokens:        "enabled",
 		RefreshTokenLifetime: "90d",
+		EgressMode:           "user",
+		EgressQuotaUser:      egressUser,
+		AuditRetentionDays:   0,
+		LogClientIPs:         "enabled",
 	}
 }
 
@@ -160,6 +172,5 @@ func (c *Config) ValueMap() map[string]string {
 		"tls_mode":               c.TLSMode,
 		"tls_cache":              c.TLSCacheDir,
 		"email_dsn":              c.EmailDSN,
-		"api_key":                maskSecret(c.APIKey),
 	}
 }

@@ -32,6 +32,16 @@ type PageData struct {
 	HasMailer        bool
 	HideHeader       bool
 	SiteName         string
+	CustomLinks      []CustomLinkView
+}
+
+// CustomLinkView is a render-safe copy of a settings.CustomLink. It's a
+// distinct type so the ui package has no import-cycle dependency on settings.
+type CustomLinkView struct {
+	Label       string
+	URL         string
+	Description string
+	External    bool // true for absolute URLs (add rel="noopener noreferrer")
 }
 
 // Renderer parses and renders HTML templates from the embedded filesystem.
@@ -72,6 +82,19 @@ var templateFiles = []string{
 	"templates/reset_password.html",
 	"templates/abuse_report.html",
 	"templates/admin_abuse.html",
+	"templates/admin_apikeys.html",
+	"templates/admin_apikey_form.html",
+	"templates/admin_apikey_edit.html",
+	"templates/admin_apikey_created.html",
+	"templates/admin_webhooks.html",
+	"templates/admin_webhook_form.html",
+	"templates/admin_webhook_edit.html",
+	"templates/admin_webhook_secret.html",
+	"templates/claim.html",
+	"templates/account_delete.html",
+	"templates/account_activity.html",
+	"templates/account_apps.html",
+	"templates/admin_api_docs.html",
 }
 
 func parseTemplates() *template.Template {
@@ -79,6 +102,14 @@ func parseTemplates() *template.Template {
 		"eq":       func(a, b string) bool { return a == b },
 		"split":    strings.Split,
 		"safeHTML": func(s string) template.HTML { return template.HTML(s) },
+		"containsEvent": func(list, needle string) bool {
+			for _, e := range strings.Fields(list) {
+				if e == needle {
+					return true
+				}
+			}
+			return false
+		},
 	}
 	tmpl, err := template.New("").Funcs(funcMap).ParseFS(Templates, templateFiles...)
 	if err != nil {

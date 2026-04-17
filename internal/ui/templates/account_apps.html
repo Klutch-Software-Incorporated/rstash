@@ -1,0 +1,37 @@
+{{define "account_apps"}}
+{{with .Content}}
+<main class="container">
+    <h1>Authorized apps</h1>
+    <p>
+        Third-party apps that have been granted access to your rstash account.
+        Revoke any app here to immediately invalidate its access tokens.
+    </p>
+
+    {{if .Apps}}
+    <table class="responsive-table">
+        <thead>
+            <tr><th>App</th><th>Permissions</th><th>Authorized</th><th></th></tr>
+        </thead>
+        <tbody>
+            {{range .Apps}}
+            <tr>
+                <td data-label="App"><code>{{.ClientID}}</code></td>
+                <td data-label="Permissions"><code>{{.Scopes}}</code></td>
+                <td data-label="Authorized">{{.CreatedAt}}</td>
+                <td data-label="Actions">
+                    <form method="POST" action="/account/apps/revoke" onsubmit="return confirm('Revoke access for {{.ClientID}}?');">
+                        <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
+                        <input type="hidden" name="client_id" value="{{.ClientID}}">
+                        <button type="submit" class="btn btn-danger">Revoke</button>
+                    </form>
+                </td>
+            </tr>
+            {{end}}
+        </tbody>
+    </table>
+    {{else}}
+    <p class="empty-state">You haven't authorized any third-party apps.</p>
+    {{end}}
+</main>
+{{end}}
+{{end}}

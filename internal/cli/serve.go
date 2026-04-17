@@ -27,6 +27,7 @@ import (
 	"rstash/internal/storage"
 	"rstash/internal/ui"
 	"rstash/internal/web"
+	"rstash/internal/webhooks"
 
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/spf13/cobra"
@@ -132,8 +133,21 @@ func runServe(cmd *cobra.Command, args []string) error {
 		})
 	})
 
+	// Initialize egress tracker (outbound-transfer counting + enforcement).
+	egressTracker := storage.NewEgressTracker(storage.EgressConfig{
+		Mode:      snap.EgressMode,
+		UserLimit: snap.EgressQuotaUser,
+	}, repo)
+	runtimeSettings.OnChange(func(s *settings.Snapshot) {
+		egressTracker.UpdateConfig(storage.EgressConfig{
+			Mode:      s.EgressMode,
+			UserLimit: s.EgressQuotaUser,
+		})
+	})
+
 	// Initialize storage service.
 	storageSvc := storage.NewService(repo, blobs, quotaChecker)
+	storageSvc.SetEgressTracker(egressTracker)
 
 	// Initialize content scanner.
 	mimeScanner := storage.NewMIMEScanner(func() string {
@@ -169,6 +183,10 @@ func runServe(cmd *cobra.Command, args []string) error {
 	secureCookies := strings.HasPrefix(cfg.BaseURL, "https://") ||
 		effectiveTLSMode == "manual" || effectiveTLSMode == "auto"
 
+	// Webhook outbox: emitter is shared across the admin API and UI handlers.
+	// The worker is started after the signal context is created below.
+	webhookEmitter := webhooks.NewEmitter(repo)
+
 	// UI dependencies (shared by UI handlers and OAuth).
 	uiDeps := &web.UIDeps{
 		Auth:          localAuth,
@@ -178,6 +196,7 @@ func runServe(cmd *cobra.Command, args []string) error {
 		Storage:       storageSvc,
 		Settings:      runtimeSettings,
 		Mailer:        mailer,
+		Webhooks:      webhookEmitter,
 		SecureCookies: secureCookies,
 		LogFile:       cfg.LogFile,
 	}
@@ -207,17 +226,24 @@ func runServe(cmd *cobra.Command, args []string) error {
 		},
 	)))
 	mux.Handle("POST /oauth/revoke", api.CORS(api.OAuthRevoke(repo)))
-	mux.Handle("/storage/{user}/{path...}", api.CORS(api.Storage(repo, storageSvc, func() int64 {
-		return runtimeSettings.Load().MaxUploadSize
-	})))
 
-	// Admin JSON API (optional, gated on RSTASH_API_KEY).
-	adminDeps := &api.AdminDeps{Repo: repo, Storage: storageSvc, APIKey: cfg.APIKey}
+	// Per-user rate limiter on storage routes. Zero rate = disabled (default);
+	// the Allow() call short-circuits immediately so there's no runtime cost
+	// for self-hosters who haven't opted in.
+	userLimiter := api.NewRateLimiter(snap.UserRateLimitRate, snap.UserRateLimitBurst)
+	defer userLimiter.Stop()
+	runtimeSettings.OnChange(func(s *settings.Snapshot) {
+		userLimiter.UpdateConfig(s.UserRateLimitRate, s.UserRateLimitBurst)
+	})
+	mux.Handle("/storage/{user}/{path...}", api.CORS(api.UserRateLimit(userLimiter)(api.Storage(repo, storageSvc, func() int64 {
+		return runtimeSettings.Load().MaxUploadSize
+	}))))
+
+	// Admin JSON API (keys managed via admin UI).
+	apiKeyLimiter := api.NewAPIKeyRateLimiter()
+	adminDeps := &api.AdminDeps{Repo: repo, Storage: storageSvc, BaseURL: cfg.BaseURL, RateLimiter: apiKeyLimiter, Webhooks: webhookEmitter}
 	mux.Handle("/api/admin/", api.AdminRoutes(adminDeps))
 	mux.HandleFunc("GET /api/admin/openapi.json", api.ServeOpenAPISpec(api.AdminOpenAPISpec()))
-	if cfg.APIKey != "" {
-		slog.Info("admin API enabled")
-	}
 
 	// Static file server from embedded assets.
 	staticFS, err := fs.Sub(ui.Static, "static")
@@ -239,7 +265,7 @@ func runServe(cmd *cobra.Command, args []string) error {
 	// OAuth authorize routes (need auth loader + setup guard for session cookie support).
 	oauthH := web.OAuthHandler(uiDeps)
 	oauthWrap := func(h http.HandlerFunc) http.Handler {
-		return web.AuthLoader(localAuth, secureCookies)(
+		return web.AuthLoader(localAuth, runtimeSettings, secureCookies)(
 			web.SetupGuard(localAuth)(http.HandlerFunc(h)),
 		)
 	}
@@ -248,8 +274,8 @@ func runServe(cmd *cobra.Command, args []string) error {
 
 	// Web UI routes.
 	uiHandler := web.FullRoutes(uiDeps)
-	wrapped := web.AuthLoader(localAuth, secureCookies)(
-		web.EnsureCSRFCookie(secureCookies)(
+	wrapped := web.AuthLoader(localAuth, runtimeSettings, secureCookies)(
+		web.EnsureCSRFCookie(runtimeSettings, secureCookies)(
 			web.SetupGuard(localAuth)(
 				web.AccountGuard()(uiHandler),
 			),
@@ -283,6 +309,45 @@ func runServe(cmd *cobra.Command, args []string) error {
 	// Graceful shutdown on SIGINT/SIGTERM.
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
+
+	// Webhook delivery worker (drains the outbox with exponential-backoff retries).
+	webhookWorker := webhooks.NewWorker(repo)
+	webhookWorker.Start(ctx)
+	defer webhookWorker.Stop()
+
+	// Egress tracker flush loop (batches per-user counters to disk).
+	egressTracker.Start(ctx)
+	defer egressTracker.Stop(context.Background())
+
+	// Audit retention worker: once-daily prune when audit_retention_days > 0.
+	go func() {
+		ticker := time.NewTicker(24 * time.Hour)
+		defer ticker.Stop()
+		runPrune := func() {
+			days := runtimeSettings.Load().AuditRetentionDays
+			if days <= 0 {
+				return
+			}
+			cutoff := time.Now().UTC().AddDate(0, 0, -days)
+			n, err := repo.PruneAuditEntriesOlderThan(context.Background(), cutoff)
+			if err != nil {
+				slog.Error("audit retention prune", "error", err)
+				return
+			}
+			if n > 0 {
+				slog.Info("audit retention pruned", "count", n, "days", days)
+			}
+		}
+		runPrune()
+		for {
+			select {
+			case <-ticker.C:
+				runPrune()
+			case <-ctx.Done():
+				return
+			}
+		}
+	}()
 
 	// Session cleanup goroutine.
 	go func() {

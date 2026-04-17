@@ -2,8 +2,10 @@ package settings
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log/slog"
+	"net/url"
 	"strconv"
 	"strings"
 	"sync"
@@ -13,13 +15,26 @@ import (
 	"rstash/internal/db"
 )
 
+// CustomLink is a single entry in the custom_links list rendered in the user
+// dropdown and profile settings page.
+type CustomLink struct {
+	Label       string `json:"label"`
+	URL         string `json:"url"`
+	Description string `json:"description,omitempty"`
+}
+
+// maxCustomLinks caps the size of the list to keep the UI surface bounded.
+const maxCustomLinks = 10
+
 // Snapshot holds the current resolved settings (DB overrides merged with env defaults).
 type Snapshot struct {
 	MetricsMode      string
 	RegistrationMode string
 	LogLevel         string
-	RateLimitRate    float64
-	RateLimitBurst   int
+	RateLimitRate      float64
+	RateLimitBurst     int
+	UserRateLimitRate  float64 // per-user storage request rate (0 = disabled)
+	UserRateLimitBurst int     // per-user burst capacity
 	QuotaMode        string
 	QuotaTotal       int64
 	QuotaUser        int64
@@ -34,6 +49,15 @@ type Snapshot struct {
 	TOSContent           string
 	PrivacyMode          string // "off", "text", "url"
 	PrivacyContent       string
+	CookieDomain         string // domain attribute for session/CSRF cookies; empty = host-only
+	RegistrationExternalURL string // target for /register redirect when mode=external
+	ExternalAccountURL      string // where externally-managed users manage email/delete
+	CustomLinks             []CustomLink // admin-configured links for user menu/profile
+	DisabledAccountMessage  string       // HTML shown on login-error for disabled users
+	EgressMode              string       // "off" or "user" — monthly egress enforcement
+	EgressQuotaUser         int64        // default per-user monthly egress in bytes
+	AuditRetentionDays      int          // 0 = forever; > 0 = prune entries older than N days
+	LogClientIPs            string       // "enabled", "hashed", or "disabled"
 }
 
 // Settings provides runtime-configurable settings backed by the database.
@@ -144,8 +168,10 @@ func (snap *Snapshot) ValueMap() map[string]string {
 		"metrics_mode":      snap.MetricsMode,
 		"registration_mode": snap.RegistrationMode,
 		"log_level":         snap.LogLevel,
-		"rate_limit_rate":   fmt.Sprintf("%g", snap.RateLimitRate),
-		"rate_limit_burst":  fmt.Sprintf("%d", snap.RateLimitBurst),
+		"rate_limit_rate":        fmt.Sprintf("%g", snap.RateLimitRate),
+		"rate_limit_burst":       fmt.Sprintf("%d", snap.RateLimitBurst),
+		"user_rate_limit_rate":   fmt.Sprintf("%g", snap.UserRateLimitRate),
+		"user_rate_limit_burst":  fmt.Sprintf("%d", snap.UserRateLimitBurst),
 		"quota_mode":        snap.QuotaMode,
 		"quota_total":       config.FormatByteSize(snap.QuotaTotal),
 		"quota_user":        config.FormatByteSize(snap.QuotaUser),
@@ -160,7 +186,28 @@ func (snap *Snapshot) ValueMap() map[string]string {
 		"tos_content":            snap.TOSContent,
 		"privacy_mode":           snap.PrivacyMode,
 		"privacy_content":        snap.PrivacyContent,
+		"cookie_domain":          snap.CookieDomain,
+		"registration_external_url":   snap.RegistrationExternalURL,
+		"external_account_url":        snap.ExternalAccountURL,
+		"custom_links":                snap.customLinksRaw(),
+		"disabled_account_message":    snap.DisabledAccountMessage,
+		"egress_mode":                 snap.EgressMode,
+		"egress_quota_user":           config.FormatByteSize(snap.EgressQuotaUser),
+		"audit_retention_days":        strconv.Itoa(snap.AuditRetentionDays),
+		"log_client_ips":              snap.LogClientIPs,
 	}
+}
+
+// customLinksRaw returns the JSON-encoded list for display/round-tripping.
+func (snap *Snapshot) customLinksRaw() string {
+	if len(snap.CustomLinks) == 0 {
+		return ""
+	}
+	b, err := json.Marshal(snap.CustomLinks)
+	if err != nil {
+		return ""
+	}
+	return string(b)
 }
 
 // buildSnapshot merges DB overrides on top of env defaults.
@@ -171,6 +218,8 @@ func (s *Settings) buildSnapshot(overrides map[string]string) *Snapshot {
 		LogLevel:             s.defaults.LogLevel,
 		RateLimitRate:        s.defaults.RateLimitRate,
 		RateLimitBurst:       s.defaults.RateLimitBurst,
+		UserRateLimitRate:    s.defaults.UserRateLimitRate,
+		UserRateLimitBurst:   s.defaults.UserRateLimitBurst,
 		QuotaMode:            s.defaults.QuotaMode,
 		QuotaTotal:           s.defaults.QuotaTotal,
 		QuotaUser:            s.defaults.QuotaUser,
@@ -184,6 +233,11 @@ func (s *Settings) buildSnapshot(overrides map[string]string) *Snapshot {
 		TOSContent:           s.defaults.TOSContent,
 		PrivacyMode:          s.defaults.PrivacyMode,
 		PrivacyContent:       s.defaults.PrivacyContent,
+		CookieDomain:         s.defaults.CookieDomain,
+		EgressMode:           s.defaults.EgressMode,
+		EgressQuotaUser:      s.defaults.EgressQuotaUser,
+		AuditRetentionDays:   s.defaults.AuditRetentionDays,
+		LogClientIPs:         s.defaults.LogClientIPs,
 	}
 
 	if overrides == nil {
@@ -207,6 +261,16 @@ func (s *Settings) buildSnapshot(overrides map[string]string) *Snapshot {
 	if v, ok := overrides["rate_limit_burst"]; ok {
 		if i, err := strconv.Atoi(v); err == nil {
 			snap.RateLimitBurst = i
+		}
+	}
+	if v, ok := overrides["user_rate_limit_rate"]; ok {
+		if f, err := strconv.ParseFloat(v, 64); err == nil {
+			snap.UserRateLimitRate = f
+		}
+	}
+	if v, ok := overrides["user_rate_limit_burst"]; ok {
+		if i, err := strconv.Atoi(v); err == nil {
+			snap.UserRateLimitBurst = i
 		}
 	}
 	if v, ok := overrides["quota_mode"]; ok {
@@ -257,8 +321,86 @@ func (s *Settings) buildSnapshot(overrides map[string]string) *Snapshot {
 	if v, ok := overrides["privacy_content"]; ok {
 		snap.PrivacyContent = v
 	}
+	if v, ok := overrides["cookie_domain"]; ok {
+		snap.CookieDomain = v
+	}
+	if v, ok := overrides["registration_external_url"]; ok {
+		snap.RegistrationExternalURL = v
+	}
+	if v, ok := overrides["external_account_url"]; ok {
+		snap.ExternalAccountURL = v
+	}
+	if v, ok := overrides["custom_links"]; ok && v != "" {
+		if links, err := parseCustomLinks(v); err == nil {
+			snap.CustomLinks = links
+		}
+	}
+	if v, ok := overrides["disabled_account_message"]; ok {
+		snap.DisabledAccountMessage = v
+	}
+	if v, ok := overrides["egress_mode"]; ok {
+		snap.EgressMode = v
+	}
+	if v, ok := overrides["egress_quota_user"]; ok {
+		if n, err := config.ParseByteSize(v); err == nil {
+			snap.EgressQuotaUser = n
+		}
+	}
+	if v, ok := overrides["audit_retention_days"]; ok {
+		if n, err := strconv.Atoi(v); err == nil && n >= 0 {
+			snap.AuditRetentionDays = n
+		}
+	}
+	if v, ok := overrides["log_client_ips"]; ok {
+		snap.LogClientIPs = v
+	}
 
 	return snap
+}
+
+// parseCustomLinks decodes and validates the custom_links JSON array.
+// Invalid entries are rejected with an error so admin UI can surface them.
+func parseCustomLinks(raw string) ([]CustomLink, error) {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return nil, nil
+	}
+	var links []CustomLink
+	if err := json.Unmarshal([]byte(raw), &links); err != nil {
+		return nil, fmt.Errorf("invalid JSON: %w", err)
+	}
+	if len(links) > maxCustomLinks {
+		return nil, fmt.Errorf("too many links (max %d)", maxCustomLinks)
+	}
+	for i, l := range links {
+		if strings.TrimSpace(l.Label) == "" {
+			return nil, fmt.Errorf("link %d: label is required", i+1)
+		}
+		if err := validateLinkURL(l.URL); err != nil {
+			return nil, fmt.Errorf("link %d (%q): %w", i+1, l.Label, err)
+		}
+	}
+	return links, nil
+}
+
+// validateLinkURL accepts https:// absolute URLs or relative paths starting with /.
+// Other schemes are rejected to avoid javascript:/data: injection or accidental
+// http:// in a TLS deployment.
+func validateLinkURL(raw string) error {
+	if strings.HasPrefix(raw, "/") {
+		return nil
+	}
+	u, err := url.Parse(raw)
+	if err != nil {
+		return fmt.Errorf("invalid URL: %w", err)
+	}
+	if u.Scheme != "https" {
+		return fmt.Errorf("URL must be https:// or a relative path starting with /")
+	}
+	if u.Host == "" {
+		return fmt.Errorf("URL must include a host")
+	}
+	return nil
 }
 
 // validateSetting checks that a key is known, runtime-editable, and its value is valid.
@@ -270,6 +412,17 @@ func validateSetting(key, value string) error {
 	}
 	if !def.RuntimeEditable {
 		return fmt.Errorf("setting %q cannot be changed at runtime", key)
+	}
+
+	// Keys with structured values get special-cased validators so Set() rejects
+	// malformed input before the bad value ever lands in the DB.
+	switch key {
+	case "custom_links":
+		if strings.TrimSpace(value) == "" {
+			return nil
+		}
+		_, err := parseCustomLinks(value)
+		return err
 	}
 
 	switch def.InputType {

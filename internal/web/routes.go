@@ -40,11 +40,26 @@ func FullRoutes(deps *UIDeps) http.Handler {
 	mux.HandleFunc("GET /reset-password", accountH.ShowResetPassword)
 	mux.HandleFunc("POST /reset-password", RequireCSRF(accountH.DoResetPassword))
 
+	// Claim flow: users provisioned via the admin API set their password here.
+	claimH := ClaimHandler(deps)
+	mux.HandleFunc("GET /claim", claimH.ShowClaim)
+	mux.HandleFunc("POST /claim", RequireCSRF(claimH.DoClaim))
+
+	// GDPR-facing self-service pages: delete, export, activity, OAuth apps.
+	rightsH := AccountRightsHandler(deps)
+	mux.HandleFunc("GET /account/delete", rightsH.ShowDelete)
+	mux.HandleFunc("POST /account/delete", RequireCSRF(rightsH.DoDelete))
+	mux.HandleFunc("GET /account/export", rightsH.DoExport)
+	mux.HandleFunc("GET /account/activity", rightsH.ShowActivity)
+	mux.HandleFunc("GET /account/apps", rightsH.ShowOAuthApps)
+	mux.HandleFunc("POST /account/apps/revoke", RequireCSRF(rightsH.RevokeOAuthApp))
+
 	// Legal pages (public, no auth).
 	legalH := LegalHandler(deps)
 	mux.HandleFunc("GET /legal/terms", legalH.ShowTerms)
 	mux.HandleFunc("GET /legal/privacy", legalH.ShowPrivacy)
 	mux.HandleFunc("GET /legal/licenses", legalH.ShowLicenses)
+	mux.HandleFunc("GET /legal/cookies", legalH.ShowCookies)
 
 	// Abuse reporting (public, no auth).
 	abuseH := AbuseHandler(deps)
@@ -76,6 +91,28 @@ func FullRoutes(deps *UIDeps) http.Handler {
 	mux.HandleFunc("POST /admin/settings/{key}/reset", AdminGuard(RequireCSRF(adminHandler.ResetSetting)))
 	mux.HandleFunc("GET /admin/abuse", AdminGuard(abuseH.ShowAbuseReports))
 	mux.HandleFunc("POST /admin/abuse/{id}/review", AdminGuard(RequireCSRF(abuseH.ReviewAbuseReport)))
+
+	// API Keys admin UI.
+	apiKeysH := APIKeysHandler(deps)
+	mux.HandleFunc("GET /admin/api-keys", AdminGuard(apiKeysH.ShowList))
+	mux.HandleFunc("GET /admin/api-keys/new", AdminGuard(apiKeysH.ShowNew))
+	mux.HandleFunc("POST /admin/api-keys", AdminGuard(RequireCSRF(apiKeysH.DoCreate)))
+	mux.HandleFunc("GET /admin/api-keys/{id}", AdminGuard(apiKeysH.ShowEdit))
+	mux.HandleFunc("POST /admin/api-keys/{id}", AdminGuard(RequireCSRF(apiKeysH.DoUpdate)))
+	mux.HandleFunc("POST /admin/api-keys/{id}/delete", AdminGuard(RequireCSRF(apiKeysH.DoDelete)))
+
+	// OpenAPI docs viewer (Redoc).
+	apiDocsH := APIDocsHandler(deps)
+	mux.HandleFunc("GET /admin/api-docs", AdminGuard(apiDocsH.ShowAPIDocs))
+
+	// Webhook subscriptions admin UI.
+	webhooksH := WebhooksHandler(deps)
+	mux.HandleFunc("GET /admin/webhooks", AdminGuard(webhooksH.ShowList))
+	mux.HandleFunc("GET /admin/webhooks/new", AdminGuard(webhooksH.ShowNew))
+	mux.HandleFunc("POST /admin/webhooks", AdminGuard(RequireCSRF(webhooksH.DoCreate)))
+	mux.HandleFunc("GET /admin/webhooks/{id}", AdminGuard(webhooksH.ShowEdit))
+	mux.HandleFunc("POST /admin/webhooks/{id}", AdminGuard(RequireCSRF(webhooksH.DoUpdate)))
+	mux.HandleFunc("POST /admin/webhooks/{id}/delete", AdminGuard(RequireCSRF(webhooksH.DoDelete)))
 
 	// Profile routes are handled via a custom router since Go's ServeMux
 	// doesn't support partial-segment wildcards like /~{username}/.

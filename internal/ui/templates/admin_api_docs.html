@@ -1,0 +1,16 @@
+{{define "admin_api_docs"}}
+{{template "admin_nav" $}}
+
+<h2>Admin API reference</h2>
+<p>
+    Rendered from the live <a href="/api/admin/openapi.json"><code>openapi.json</code></a>
+    spec using <a href="https://github.com/Redocly/redoc">Redoc</a> (Apache 2.0).
+</p>
+
+<div class="redoc-container" style="border:1px solid var(--border-color,#ccc); border-radius:4px; overflow:hidden; min-height:70vh;">
+    <redoc spec-url="/api/admin/openapi.json" hide-download-button="true"></redoc>
+</div>
+
+<script src="/static/redoc.standalone.js" onerror="this.onerror=null;this.src='https://cdn.jsdelivr.net/npm/redoc@2/bundles/redoc.standalone.js';"></script>
+
+{{end}}

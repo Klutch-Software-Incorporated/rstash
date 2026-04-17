@@ -302,6 +302,17 @@ func (r *Repository) SetPasswordResetToken(ctx context.Context, userID int64, to
 	return nil
 }
 
+// SetExternallyManaged marks a user as externally managed (true) or not (false).
+// Externally-managed accounts have their email/delete flows redirected to an
+// external portal (see external_account_url setting).
+func (r *Repository) SetExternallyManaged(ctx context.Context, userID int64, managed bool) error {
+	if err := r.db.WithContext(ctx).Model(&model.User{}).Where("id = ?", userID).
+		Update("externally_managed", managed).Error; err != nil {
+		return fmt.Errorf("set externally managed: %w", err)
+	}
+	return nil
+}
+
 // ClearPasswordResetToken removes the password reset token from a user.
 func (r *Repository) ClearPasswordResetToken(ctx context.Context, userID int64) error {
 	if err := r.db.WithContext(ctx).Model(&model.User{}).Where("id = ?", userID).Updates(map[string]any{
