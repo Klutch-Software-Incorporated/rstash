@@ -34,6 +34,8 @@ func openInner(scheme, path, rawDSN string) (Store, error) {
 		return NewGORMStore(gormDB)
 	case "s3":
 		return NewS3Store(path)
+	case "azureblob":
+		return NewAzureBlobStore(path)
 	default:
 		return nil, fmt.Errorf("unsupported blob scheme %q", scheme)
 	}

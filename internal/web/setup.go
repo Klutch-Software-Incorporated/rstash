@@ -125,7 +125,7 @@ func (h *setupHandler) buildReview() *setupReviewContent {
 				Detail:  "Stores users, sessions, and file metadata. SQLite works well for personal use. For larger deployments, set RSTASH_DB to a PostgreSQL, MySQL, or SQL Server DSN.",
 				Tooltip: "RSTASH_DB"},
 			{Label: "File storage", Status: blobStatus, Level: blobLevel,
-				Detail:  "Stores uploaded file contents. SQLite is simple but can grow large. Set RSTASH_BLOB to use filesystem (fs:) or S3-compatible (s3:) storage instead.",
+				Detail:  "Stores uploaded file contents. SQLite is simple but can grow large. Set RSTASH_BLOB to use filesystem (fs:), S3-compatible (s3:), or Azure Blob Storage (azureblob:) instead.",
 				Tooltip: "RSTASH_BLOB"},
 			{Label: "TLS", Status: tlsStatus, Level: tlsLevel,
 				Detail:  "Encrypts traffic between clients and the server. Set RSTASH_TLS_MODE to auto for Let\u2019s Encrypt, manual for your own certificate, or use a reverse proxy like Caddy or nginx.",
@@ -156,6 +156,8 @@ func friendlyDSNType(dsn string) string {
 		return "Filesystem"
 	case "s3":
 		return "S3-compatible storage"
+	case "azureblob":
+		return "Azure Blob Storage"
 	default:
 		return scheme
 	}

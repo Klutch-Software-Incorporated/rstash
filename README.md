@@ -77,9 +77,12 @@ Additional settings (registration mode, rate limits, quotas, OAuth token lifetim
 | SQLite | `sqlite:path` | `sqlite:rstash-blobs.sqlite` |
 | Filesystem | `fs:/path` | `fs:/var/lib/rstash/blobs` |
 | S3-compatible | `s3:bucket?params` | `s3:my-bucket?region=us-west-2` |
+| Azure Blob Storage | `azureblob:container?params` | `azureblob:rstash?account=mystorage` |
 | Database | Any database DSN | `postgres:host=localhost dbname=blobs` |
 
-The S3 backend works with AWS S3, MinIO, DigitalOcean Spaces, Backblaze B2, and any S3-compatible service. The bucket must exist before starting the server.
+The S3 backend works with AWS S3, MinIO, DigitalOcean Spaces, Backblaze B2, Cloudflare R2, and any S3-compatible service. The bucket must exist before starting the server.
+
+The Azure Blob Storage backend talks natively to Azure. On Azure App Service / VM / Functions with a managed identity granted the `Storage Blob Data Contributor` role, set only `account=NAME` in the DSN — no secrets needed. For other environments, pass an explicit `key=` (shared key) or `sas=` (SAS token). See the `blob_dsn` setting's help text for full details.
 
 ## Development
 
