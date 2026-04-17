@@ -123,7 +123,7 @@ func TestValidate_DatabaseDSN(t *testing.T) {
 }
 
 func TestValidate_BlobDSN(t *testing.T) {
-	for _, dsn := range []string{"sqlite:blobs.db", "fs:/tmp/blobs", "s3:mybucket"} {
+	for _, dsn := range []string{"sqlite:blobs.db", "fs:/tmp/blobs", "s3:mybucket", "azureblob:mycontainer?account=myacct"} {
 		cfg := validConfig()
 		cfg.BlobDSN = dsn
 		if err := cfg.Validate(); err != nil {
