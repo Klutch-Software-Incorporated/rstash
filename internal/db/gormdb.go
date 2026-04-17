@@ -37,7 +37,15 @@ func OpenGORM(dsn string) (*gorm.DB, Dialect, error) {
 
 	case "postgres":
 		dialect = DialectPostgres
-		dialector = postgres.Open(connStr)
+		if cleaned, useEntra := extractEntraAuth(connStr); useEntra {
+			sqlDB, err := openEntraPostgres(cleaned)
+			if err != nil {
+				return nil, "", fmt.Errorf("open postgres (entra): %w", err)
+			}
+			dialector = postgres.New(postgres.Config{Conn: sqlDB})
+		} else {
+			dialector = postgres.Open(connStr)
+		}
 
 	case "mysql":
 		dialect = DialectMySQL
