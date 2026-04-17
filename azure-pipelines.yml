@@ -22,12 +22,6 @@ pool:
 variables:
   GO_VERSION: '1.24.0'
   NODE_VERSION: '20.x'
-  # Azure Container Registry publishing is opt-in. Set these two variables
-  # in the Azure DevOps pipeline UI (Pipelines → Edit → Variables) once
-  # rstash-infra provisions the ACR + service connection. Empty values
-  # short-circuit the Docker push step cleanly.
-  ACR_SERVICE_CONNECTION: ''
-  ACR_IMAGE_REPOSITORY: 'rstash'
 
 stages:
   - stage: BuildTest
@@ -151,20 +145,22 @@ stages:
                     packagePublishDescription: rstash $(PackageVersion) from commit $(Build.SourceVersion)
                   displayName: Push binaries to Azure Artifacts feed
 
-                # Docker image build + push to ACR. Skipped when
-                # ACR_SERVICE_CONNECTION is empty (i.e. before rstash-infra
-                # provisions the registry and the operator wires up the
-                # service connection). Tagged with both the dated version
-                # and `latest` so App Service can pin either.
-                - task: Docker@2
-                  condition: and(succeeded(), ne(variables['ACR_SERVICE_CONNECTION'], ''))
-                  inputs:
-                    command: buildAndPush
-                    containerRegistry: $(ACR_SERVICE_CONNECTION)
-                    repository: $(ACR_IMAGE_REPOSITORY)
-                    Dockerfile: Dockerfile
-                    tags: |
-                      $(PackageVersion)
-                      latest
-                    arguments: --build-arg VERSION=$(PackageVersion)
-                  displayName: Build and push image to ACR
+                # TODO: Docker image push to ACR. Removed for now because
+                # Azure Pipelines validates service connections at compile
+                # time, before the step's `condition:` is evaluated — so
+                # referencing a service connection that doesn't yet exist
+                # fails the pipeline even if the step would never run.
+                # Add back once rstash-infra provisions the ACR and we wire
+                # up the service connection in Azure DevOps:
+                #
+                #   - task: Docker@2
+                #     inputs:
+                #       command: buildAndPush
+                #       containerRegistry: <service-connection-name>
+                #       repository: rstash
+                #       Dockerfile: Dockerfile
+                #       tags: |
+                #         $(PackageVersion)
+                #         latest
+                #       arguments: --build-arg VERSION=$(PackageVersion)
+                #     displayName: Build and push image to ACR
