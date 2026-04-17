@@ -43,6 +43,11 @@
 {{else}}
 <p>{{.Stats.StorageUsed}} used &mdash; {{.Stats.FileCount}} files</p>
 {{end}}
+{{if eq .EgressMode "user"}}
+<h2>Egress (this month)</h2>
+<p>{{.Stats.EgressUsed}} of {{.Stats.EgressQuota}} ({{.Stats.EgressPercent}}%) &mdash; resets at the end of {{.Stats.EgressPeriod}} (UTC)</p>
+<meter min="0" max="{{.Stats.EgressQuotaBytes}}" value="{{.Stats.EgressUsedBytes}}">{{.Stats.EgressPercent}}%</meter>
+{{end}}
 <p>Connected Apps: {{.Stats.OAuthApps}} &nbsp; Active Sessions: {{.SessionCount}} &nbsp; <a href="{{.URLPrefix}}/settings">Manage &rarr;</a></p>
 {{else}}
 {{/* ===== Storage (admin view, no side-by-side) ===== */}}
@@ -52,6 +57,11 @@
 <meter min="0" max="{{.Stats.QuotaBytes}}" value="{{.Stats.StorageBytes}}">{{.Stats.QuotaPercent}}%</meter>
 {{else}}
 <p>{{.Stats.StorageUsed}} used &mdash; {{.Stats.FileCount}} files</p>
+{{end}}
+{{if eq .EgressMode "user"}}
+<h2>Egress (this month)</h2>
+<p>{{.Stats.EgressUsed}} of {{.Stats.EgressQuota}} ({{.Stats.EgressPercent}}%) &mdash; {{.Stats.EgressPeriod}} (UTC)</p>
+<meter min="0" max="{{.Stats.EgressQuotaBytes}}" value="{{.Stats.EgressUsedBytes}}">{{.Stats.EgressPercent}}%</meter>
 {{end}}
 {{end}}
 
