@@ -9,8 +9,11 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
 	"log/slog"
+	"net"
 	"net/http"
 	"strconv"
 	"strings"
@@ -18,6 +21,23 @@ import (
 
 	"rstash/internal/db"
 	"rstash/internal/model"
+)
+
+// Webhook delivery transport tuning. Each phase has its own timeout so a
+// misbehaving subscriber can't tie up a delivery slot at any single stage
+// (DNS, connect, TLS, waiting for response headers). ClientTotal is the
+// outer absolute cap.
+const (
+	dialTimeout           = 5 * time.Second
+	tlsHandshakeTimeout   = 10 * time.Second
+	responseHeaderTimeout = 15 * time.Second
+	clientTotalTimeout    = 30 * time.Second
+
+	// maxResponseBody caps how much of the subscriber's response body we'll
+	// read before discarding. Just enough for a useful error message on
+	// non-2xx responses without exposing us to a subscriber that returns
+	// an unbounded body.
+	maxResponseBody = 16 * 1024
 )
 
 // Emitter publishes state-change events to registered webhook subscribers.
@@ -118,10 +138,41 @@ type Worker struct {
 func NewWorker(repo *db.Repository) *Worker {
 	return &Worker{
 		repo:     repo,
-		client:   &http.Client{Timeout: 30 * time.Second},
+		client:   newDeliveryClient(),
 		interval: 15 * time.Second,
 		batch:    50,
 		done:     make(chan struct{}),
+	}
+}
+
+// newDeliveryClient builds the HTTP client used for outbound webhook
+// deliveries. Each phase (connect, TLS, waiting for response headers) has
+// a separate timeout; the Client.Timeout is the outer absolute cap.
+//
+// Redirects are disabled on purpose: the signed payload should go only to
+// the URL the operator registered. If a subscriber's URL starts responding
+// with 301/302, that's a configuration problem they need to fix on their
+// side, not something we should silently chase.
+func newDeliveryClient() *http.Client {
+	transport := &http.Transport{
+		Proxy: http.ProxyFromEnvironment,
+		DialContext: (&net.Dialer{
+			Timeout:   dialTimeout,
+			KeepAlive: 30 * time.Second,
+		}).DialContext,
+		TLSHandshakeTimeout:   tlsHandshakeTimeout,
+		ResponseHeaderTimeout: responseHeaderTimeout,
+		ExpectContinueTimeout: 1 * time.Second,
+		MaxIdleConns:          20,
+		MaxIdleConnsPerHost:   4,
+		IdleConnTimeout:       60 * time.Second,
+	}
+	return &http.Client{
+		Transport: transport,
+		Timeout:   clientTotalTimeout,
+		CheckRedirect: func(req *http.Request, via []*http.Request) error {
+			return errors.New("webhook deliveries must not follow redirects")
+		},
 	}
 }
 
@@ -185,7 +236,13 @@ func (w *Worker) deliver(ctx context.Context, d *model.WebhookDelivery) {
 		w.scheduleRetry(ctx, d, fmt.Sprintf("http: %v", err))
 		return
 	}
-	defer resp.Body.Close()
+	// Drain up to maxResponseBody so the connection can be reused for the
+	// next delivery (HTTP keepalive requires the body to be drained), but
+	// don't let a misbehaving subscriber make us read an unbounded body.
+	defer func() {
+		_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, maxResponseBody))
+		resp.Body.Close()
+	}()
 
 	if resp.StatusCode >= 200 && resp.StatusCode < 300 {
 		if err := w.repo.MarkWebhookDeliverySuccess(ctx, d.ID, d.SubscriptionID); err != nil {
