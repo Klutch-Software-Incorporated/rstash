@@ -1,0 +1,78 @@
+# PR validation pipeline.
+#
+# This runs vet + tests + a single-target build on every pull request, so we
+# know ahead-of-time whether a branch is likely to build and pass CI once it
+# merges to main. It explicitly does NOT run the full release cross-compile
+# (5 targets, ~5× the wall time) or publish anything to Azure Artifacts —
+# those steps still live in azure-pipelines.yml and only fire on main.
+#
+# Register this file in Azure DevOps under Pipelines → New → Azure Repos Git
+# → pick this repo → "Existing Azure Pipelines YAML file" → select
+# /azure-pipelines-pr.yml. Set the repository's branch policy on main to
+# require this pipeline to pass before merging.
+
+name: pr-$(System.PullRequest.PullRequestId)-$(Build.BuildId)
+
+# No CI trigger — this pipeline is purely for PRs. Push-based main CI lives
+# in azure-pipelines.yml.
+trigger: none
+
+# Fire on every PR targeting any branch. The most common target is main,
+# but we don't restrict here — let the branch policy on main decide which
+# PRs are required to pass.
+pr:
+  branches:
+    include:
+      - "*"
+  drafts: false
+
+pool:
+  vmImage: ubuntu-latest
+
+variables:
+  GO_VERSION: '1.22.2'
+  NODE_VERSION: '20.x'
+
+jobs:
+  - job: Validate
+    displayName: Validate PR
+    timeoutInMinutes: 15
+    steps:
+      - task: GoTool@0
+        inputs:
+          version: $(GO_VERSION)
+        displayName: Install Go $(GO_VERSION)
+
+      - task: NodeTool@0
+        inputs:
+          versionSpec: $(NODE_VERSION)
+        displayName: Install Node $(NODE_VERSION)
+
+      - script: |
+          set -euo pipefail
+          curl -sL https://taskfile.dev/install.sh | sh -s -- -d -b /usr/local/bin
+          task --version
+        displayName: Install Task
+
+      - script: go mod download
+        displayName: Download Go modules
+
+      - script: npm ci
+        workingDirectory: site
+        displayName: Install site dependencies
+
+      # vet catches most quick errors (unused imports, shadowing, bad struct
+      # tags, printf mismatches). Runs before tests so a trivial mistake
+      # doesn't waste a full test run.
+      - script: task vet
+        displayName: task vet
+
+      - script: task test
+        displayName: task test
+
+      # Single-target build just to confirm the code compiles for the host.
+      # We deliberately skip `task build` (5-target cross-compile) — if host
+      # compile works, the cross-compile usually will too, and we save the
+      # wall time.
+      - script: go build ./...
+        displayName: go build ./...
