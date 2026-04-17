@@ -42,7 +42,7 @@ All configuration is via environment variables (see `rstash env` for a documente
 | RSTASH_ADDR | :8080 | Listen address (host:port) |
 | RSTASH_BASE_URL | http://localhost:8080 | Public URL of the server |
 | RSTASH_DB | sqlite:rstash.sqlite | Metadata database DSN (sqlite:, postgres:, mysql:, mssql:) |
-| RSTASH_BLOB | sqlite:rstash-blobs.sqlite | Blob store DSN (sqlite:path, fs:/path, s3:bucket, or database DSN) |
+| RSTASH_BLOB | sqlite:rstash-blobs.sqlite | Blob store DSN (sqlite:path, fs:/path, s3:bucket, azureblob:container, or database DSN) |
 | RSTASH_LOG_LEVEL | info | Log level: debug, info, warn, error |
 | RSTASH_LOG_FILE | | Path to log file (empty = stderr only) |
 | RSTASH_TLS_CERT | | TLS certificate file path |
@@ -63,7 +63,7 @@ are managed at runtime through the admin web UI and stored in the database.
 - `internal/db/` — GORM-based database layer with Repository pattern, AutoMigrate, multi-dialect support (SQLite, PostgreSQL, MySQL, SQL Server)
 - `internal/model/` — domain types (User, OAuthClient, OAuthToken, Node, Session, AuditEntry, AuthorizationCode)
 - `internal/auth/` — authentication service interface and local (password-based) implementation, session/cookie management
-- `internal/blob/` — pluggable blob storage interface, backends (SQLite, filesystem, GORM, S3), and `OpenStore()` factory
+- `internal/blob/` — pluggable blob storage interface, backends (SQLite, filesystem, GORM, S3, Azure Blob Storage), and `OpenStore()` factory
 - `internal/storage/` — storage service (PutDocument, GetDocument, DeleteDocument, GetFolder), ETag generation, quota checking
 - `internal/api/` — remoteStorage protocol handlers (storage API, WebFinger, OAuth token), CORS, scope checking, request logging, rate limiting, security headers
 - `internal/email/` — pluggable email delivery interface, Resend backend, `Open()` factory, email body templates

@@ -62,6 +62,35 @@ Cleanup:
 podman stop minio && podman rm minio
 ```
 
+#### Azure Blob Storage
+
+Azure Blob integration tests run against [Azurite](https://github.com/Azure/Azurite), the official local emulator. The fastest way is Docker/Podman:
+
+```sh
+# Start Azurite (blob service only, on port 10000)
+podman run -d --name azurite -p 10000:10000 \
+  mcr.microsoft.com/azure-storage/azurite \
+  azurite-blob --blobHost 0.0.0.0
+
+# Create the test container. The key below is Azurite's well-known
+# default credential — it's public and safe to paste.
+az storage container create --name rstash-test \
+  --connection-string "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://127.0.0.1:10000/devstoreaccount1;"
+```
+
+Then run the tests:
+
+```sh
+export RSTASH_TEST_AZURE_BLOB_DSN="rstash-test?account=devstoreaccount1&key=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==&endpoint=127.0.0.1:10000&tls=false"
+go test ./internal/blob/ -run TestAzureBlob_Integration -v
+```
+
+Cleanup:
+
+```sh
+podman stop azurite && podman rm azurite
+```
+
 ## Manual Smoke Testing with S3
 
 To test the full server with S3-backed blob storage:
