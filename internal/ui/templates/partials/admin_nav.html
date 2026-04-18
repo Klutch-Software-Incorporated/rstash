@@ -11,7 +11,7 @@
     <a href="/admin/oauth-test" {{if eq $.ActiveAdminNav "oauth-test"}}class="active"{{end}}>OAuth Test</a>
     <a href="/admin/api-keys" {{if eq $.ActiveAdminNav "api-keys"}}class="active"{{end}}>API Keys</a>
     <a href="/admin/webhooks" {{if eq $.ActiveAdminNav "webhooks"}}class="active"{{end}}>Webhooks</a>
-    <a href="/admin/api-docs" {{if eq $.ActiveAdminNav "api-docs"}}class="active"{{end}}>API Docs</a>
+    <a href="/admin/api-docs" target="_blank" rel="noopener">API Docs</a>
 </nav>
 {{if and $.OpenAbuseReports (ne $.ActiveAdminNav "abuse")}}
 <div role="alert" class="alert-warning" style="margin-bottom:1rem">
