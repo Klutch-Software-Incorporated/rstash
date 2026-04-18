@@ -154,6 +154,21 @@ func (r *Renderer) Render(w http.ResponseWriter, contentTemplate string, data Pa
 	}
 }
 
+// RenderStandalone renders a single template as a complete document without
+// wrapping it in the site layout. Useful for pages that need their own
+// <html>/<head>/<body> (e.g. the API docs viewer).
+func (r *Renderer) RenderStandalone(w http.ResponseWriter, templateName string, data any) {
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+
+	if DevMode {
+		r.templates = parseTemplates()
+	}
+
+	if err := r.templates.ExecuteTemplate(w, templateName, data); err != nil {
+		slog.Error("failed to execute standalone template", "error", err, "template", templateName)
+	}
+}
+
 // RenderTo renders to an arbitrary writer (useful for testing).
 func (r *Renderer) RenderTo(w io.Writer, contentTemplate string, data PageData) error {
 	if DevMode {

@@ -6,6 +6,7 @@ import (
 	"io"
 	"io/fs"
 	"log/slog"
+	"mime"
 	"net"
 	"net/http"
 	"net/url"
@@ -245,7 +246,16 @@ func runServe(cmd *cobra.Command, args []string) error {
 	mux.Handle("/api/admin/", api.AdminRoutes(adminDeps))
 	mux.HandleFunc("GET /api/admin/openapi.json", api.ServeOpenAPISpec(api.AdminOpenAPISpec()))
 
-	// Static file server from embedded assets.
+	// Static file server from embedded assets. Register explicit MIME types
+	// first — on Windows, Go's mime package can pick up text/plain for .js/.css
+	// from the registry, which trips X-Content-Type-Options: nosniff.
+	_ = mime.AddExtensionType(".js", "application/javascript")
+	_ = mime.AddExtensionType(".mjs", "application/javascript")
+	_ = mime.AddExtensionType(".css", "text/css; charset=utf-8")
+	_ = mime.AddExtensionType(".svg", "image/svg+xml")
+	_ = mime.AddExtensionType(".json", "application/json")
+	_ = mime.AddExtensionType(".map", "application/json")
+
 	staticFS, err := fs.Sub(ui.Static, "static")
 	if err != nil {
 		return fmt.Errorf("failed to create static sub-filesystem: %w", err)
