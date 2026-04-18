@@ -34,7 +34,7 @@ func testSetup(t *testing.T) (*httptest.Server, *testEnv) {
 	}
 	t.Cleanup(func() { blobs.Close() })
 
-	quotaChecker := storage.NewQuotaChecker(storage.QuotaConfig{Mode: "off"}, repo)
+	quotaChecker := storage.NewQuotaChecker(storage.QuotaConfig{}, repo)
 	storageSvc := storage.NewService(repo, blobs, quotaChecker)
 
 	mux := http.NewServeMux()

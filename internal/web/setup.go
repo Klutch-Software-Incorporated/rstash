@@ -237,6 +237,9 @@ func (h *setupHandler) DoSetup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	snap := h.deps.Settings.Load()
+	_ = h.deps.Repo.ApplyUserLimitDefaults(r.Context(), user.ID, snap.DefaultUserStorageLimit, snap.DefaultUserEgressLimit)
+
 	metrics.UserSignupsTotal.Inc()
 
 	// Auto-accept TOS/Privacy for the initial admin (operator-created).

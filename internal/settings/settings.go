@@ -35,10 +35,9 @@ type Snapshot struct {
 	RateLimitBurst     int
 	UserRateLimitRate  float64 // per-user storage request rate (0 = disabled)
 	UserRateLimitBurst int     // per-user burst capacity
-	QuotaMode        string
-	QuotaTotal       int64
-	QuotaUser        int64
-	MaxUploadSize    int64
+	TotalStorageLimit       int64 // global storage cap (0 = disabled)
+	DefaultUserStorageLimit int64 // stamped onto new users (0 = unlimited)
+	MaxUploadSize           int64
 	TokenLifetime        string // duration string: "30d", "24h", "0" (no expiry)
 	RefreshTokens        string // "enabled" or "disabled"
 	RefreshTokenLifetime string // duration string: "90d", "0" (no expiry)
@@ -54,8 +53,8 @@ type Snapshot struct {
 	ExternalAccountURL      string // where externally-managed users manage email/delete
 	CustomLinks             []CustomLink // admin-configured links for user menu/profile
 	DisabledAccountMessage  string       // HTML shown on login-error for disabled users
-	EgressMode              string       // "off" or "user" — monthly egress enforcement
-	EgressQuotaUser         int64        // default per-user monthly egress in bytes
+	TotalEgressLimit       int64 // global monthly egress cap (0 = disabled)
+	DefaultUserEgressLimit int64 // stamped onto new users (0 = unlimited)
 	AuditRetentionDays      int          // 0 = forever; > 0 = prune entries older than N days
 	LogClientIPs            string       // "enabled", "hashed", or "disabled"
 }
@@ -172,10 +171,11 @@ func (snap *Snapshot) ValueMap() map[string]string {
 		"rate_limit_burst":       fmt.Sprintf("%d", snap.RateLimitBurst),
 		"user_rate_limit_rate":   fmt.Sprintf("%g", snap.UserRateLimitRate),
 		"user_rate_limit_burst":  fmt.Sprintf("%d", snap.UserRateLimitBurst),
-		"quota_mode":        snap.QuotaMode,
-		"quota_total":       config.FormatByteSize(snap.QuotaTotal),
-		"quota_user":        config.FormatByteSize(snap.QuotaUser),
-		"max_upload_size":   config.FormatByteSize(snap.MaxUploadSize),
+		"total_storage_limit":        config.FormatByteSize(snap.TotalStorageLimit),
+		"default_user_storage_limit": config.FormatByteSize(snap.DefaultUserStorageLimit),
+		"total_egress_limit":         config.FormatByteSize(snap.TotalEgressLimit),
+		"default_user_egress_limit":  config.FormatByteSize(snap.DefaultUserEgressLimit),
+		"max_upload_size":            config.FormatByteSize(snap.MaxUploadSize),
 		"token_lifetime":         snap.TokenLifetime,
 		"refresh_tokens":         snap.RefreshTokens,
 		"refresh_token_lifetime": snap.RefreshTokenLifetime,
@@ -191,8 +191,6 @@ func (snap *Snapshot) ValueMap() map[string]string {
 		"external_account_url":        snap.ExternalAccountURL,
 		"custom_links":                snap.customLinksRaw(),
 		"disabled_account_message":    snap.DisabledAccountMessage,
-		"egress_mode":                 snap.EgressMode,
-		"egress_quota_user":           config.FormatByteSize(snap.EgressQuotaUser),
 		"audit_retention_days":        strconv.Itoa(snap.AuditRetentionDays),
 		"log_client_ips":              snap.LogClientIPs,
 	}
@@ -220,10 +218,9 @@ func (s *Settings) buildSnapshot(overrides map[string]string) *Snapshot {
 		RateLimitBurst:       s.defaults.RateLimitBurst,
 		UserRateLimitRate:    s.defaults.UserRateLimitRate,
 		UserRateLimitBurst:   s.defaults.UserRateLimitBurst,
-		QuotaMode:            s.defaults.QuotaMode,
-		QuotaTotal:           s.defaults.QuotaTotal,
-		QuotaUser:            s.defaults.QuotaUser,
-		MaxUploadSize:        s.defaults.MaxUploadSize,
+		TotalStorageLimit:       s.defaults.TotalStorageLimit,
+		DefaultUserStorageLimit: s.defaults.DefaultUserStorageLimit,
+		MaxUploadSize:           s.defaults.MaxUploadSize,
 		SiteName:             s.defaults.SiteName,
 		HomeSubtitle:         s.defaults.HomeSubtitle,
 		TokenLifetime:        s.defaults.TokenLifetime,
@@ -234,8 +231,8 @@ func (s *Settings) buildSnapshot(overrides map[string]string) *Snapshot {
 		PrivacyMode:          s.defaults.PrivacyMode,
 		PrivacyContent:       s.defaults.PrivacyContent,
 		CookieDomain:         s.defaults.CookieDomain,
-		EgressMode:           s.defaults.EgressMode,
-		EgressQuotaUser:      s.defaults.EgressQuotaUser,
+		TotalEgressLimit:       s.defaults.TotalEgressLimit,
+		DefaultUserEgressLimit: s.defaults.DefaultUserEgressLimit,
 		AuditRetentionDays:   s.defaults.AuditRetentionDays,
 		LogClientIPs:         s.defaults.LogClientIPs,
 	}
@@ -273,17 +270,24 @@ func (s *Settings) buildSnapshot(overrides map[string]string) *Snapshot {
 			snap.UserRateLimitBurst = i
 		}
 	}
-	if v, ok := overrides["quota_mode"]; ok {
-		snap.QuotaMode = v
-	}
-	if v, ok := overrides["quota_total"]; ok {
+	if v, ok := overrides["total_storage_limit"]; ok {
 		if n, err := config.ParseByteSize(v); err == nil {
-			snap.QuotaTotal = n
+			snap.TotalStorageLimit = n
 		}
 	}
-	if v, ok := overrides["quota_user"]; ok {
+	if v, ok := overrides["default_user_storage_limit"]; ok {
 		if n, err := config.ParseByteSize(v); err == nil {
-			snap.QuotaUser = n
+			snap.DefaultUserStorageLimit = n
+		}
+	}
+	if v, ok := overrides["total_egress_limit"]; ok {
+		if n, err := config.ParseByteSize(v); err == nil {
+			snap.TotalEgressLimit = n
+		}
+	}
+	if v, ok := overrides["default_user_egress_limit"]; ok {
+		if n, err := config.ParseByteSize(v); err == nil {
+			snap.DefaultUserEgressLimit = n
 		}
 	}
 	if v, ok := overrides["max_upload_size"]; ok {
@@ -337,14 +341,6 @@ func (s *Settings) buildSnapshot(overrides map[string]string) *Snapshot {
 	}
 	if v, ok := overrides["disabled_account_message"]; ok {
 		snap.DisabledAccountMessage = v
-	}
-	if v, ok := overrides["egress_mode"]; ok {
-		snap.EgressMode = v
-	}
-	if v, ok := overrides["egress_quota_user"]; ok {
-		if n, err := config.ParseByteSize(v); err == nil {
-			snap.EgressQuotaUser = n
-		}
 	}
 	if v, ok := overrides["audit_retention_days"]; ok {
 		if n, err := strconv.Atoi(v); err == nil && n >= 0 {
@@ -453,7 +449,11 @@ func validateSetting(key, value string) error {
 		if err != nil {
 			return fmt.Errorf("%s: %w", key, err)
 		}
-		if n <= 0 {
+		if n < 0 {
+			return fmt.Errorf("%s must be >= 0", key)
+		}
+		// max_upload_size of 0 would break all uploads; reject explicitly.
+		if key == "max_upload_size" && n == 0 {
 			return fmt.Errorf("%s must be > 0", key)
 		}
 		return nil

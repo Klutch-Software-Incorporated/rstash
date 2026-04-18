@@ -49,15 +49,23 @@ Control how new users can sign up. Change this in the admin panel under Settings
 - **`open`** — Anyone can register and immediately log in.
 - **`approval`** — Anyone can register, but they can't log in until an admin approves their account from the admin panel.
 
-## Storage Quotas
+## Storage & Download Limits
 
-rstash can limit how much data users store. Configure this under Settings in the admin panel:
+rstash has two independent knobs for storage and two for monthly downloads (egress), all configured under Settings in the admin panel. Each defaults to `0` (unlimited/disabled) for a friction-free self-hoster experience.
 
-- **`off`** — No limits, anyone can store as much as they want.
-- **`total`** — All users share one global storage pool (default: 50 GB).
-- **`user`** — Each user gets their own quota (e.g., 500 MB per user). Admins can override individual quotas from the user list.
+**Storage**
 
-The storage meter appears on each user's dashboard so they can track their usage.
+- **Server storage limit** — a global cap across all users. Useful when the host has a fixed disk or a pay-per-GB backend.
+- **Default user storage limit** — stamped onto each new user account at creation time. Existing users are never retroactively changed by editing this; admins edit per-user values from the user list.
+
+**Egress (monthly downloads)**
+
+- **Server egress limit** — global monthly download cap. Useful on bandwidth-metered hosts.
+- **Default user egress limit** — stamped onto each new user account; resets on the calendar-month boundary (UTC).
+
+A `0` on any of these means "no limit." A user whose row has `StorageQuota = 0` is unlimited — changing the server default later will not affect them. This is deliberate: it means billing integrations and admin edits are the single source of truth for existing accounts.
+
+The storage meter and monthly-download meter appear on each user's dashboard whenever they have a limit set.
 
 ## Rate Limiting
 

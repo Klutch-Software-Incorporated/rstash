@@ -17,7 +17,6 @@ import (
 	"rstash/internal/config"
 	"rstash/internal/db"
 	"rstash/internal/model"
-	"rstash/internal/settings"
 	"rstash/internal/storage"
 	"rstash/internal/ui"
 )
@@ -84,8 +83,6 @@ type profileDashboardContent struct {
 	RecentFiles  []*recentFileRow
 	LargestFiles []*recentFileRow
 	SessionCount int64
-	QuotaMode    string
-	EgressMode   string // "off" or "user"
 	Tokens       []*tokenRow
 	BaseURL      string
 	URLPrefix    string
@@ -183,23 +180,16 @@ func (h *profileHandler) ShowDashboard(w http.ResponseWriter, r *http.Request) {
 		StorageBytes: stats.TotalBytes,
 		OAuthApps:    tokenCount,
 	}
-	snap := h.deps.Settings.Load()
-	if snap.QuotaMode == "user" {
-		limit := snap.QuotaUser
-		if target.StorageQuota > 0 {
-			limit = target.StorageQuota
+	if target.StorageQuota > 0 {
+		hs.StorageQuota = formatBytes(target.StorageQuota)
+		hs.QuotaBytes = target.StorageQuota
+		pct := int(stats.TotalBytes * 100 / target.StorageQuota)
+		if pct > 100 {
+			pct = 100
 		}
-		hs.StorageQuota = formatBytes(limit)
-		hs.QuotaBytes = limit
-		if limit > 0 {
-			pct := int(stats.TotalBytes * 100 / limit)
-			if pct > 100 {
-				pct = 100
-			}
-			hs.QuotaPercent = pct
-		}
+		hs.QuotaPercent = pct
 	}
-	populateEgressStats(ctx, h.deps, hs, target, snap)
+	populateEgressStats(ctx, h.deps, hs, target)
 
 	host := h.deps.Config.BaseURL
 	if parsed, err := url.Parse(h.deps.Config.BaseURL); err == nil {
@@ -212,8 +202,6 @@ func (h *profileHandler) ShowDashboard(w http.ResponseWriter, r *http.Request) {
 		RecentFiles:  fileRows,
 		LargestFiles: largestRows,
 		SessionCount: sessCount,
-		QuotaMode:    snap.QuotaMode,
-		EgressMode:   snap.EgressMode,
 		Tokens:       tokenRows,
 		BaseURL:      h.deps.Config.BaseURL,
 		URLPrefix:    prefix,
@@ -280,8 +268,6 @@ type profileSettingsContent struct {
 	CreatedAt     string
 	Tokens        []*tokenRow
 	Sessions      []*sessionRow
-	QuotaMode     string
-	EgressMode    string // "off" or "user"
 	Stats         *homeStats
 	URLPrefix     string
 	IsSelf        bool
@@ -318,22 +304,16 @@ func (h *profileHandler) ShowSettings(w http.ResponseWriter, r *http.Request) {
 		StorageBytes: stats.TotalBytes,
 	}
 	snap := h.deps.Settings.Load()
-	if snap.QuotaMode == "user" {
-		limit := snap.QuotaUser
-		if target.StorageQuota > 0 {
-			limit = target.StorageQuota
+	if target.StorageQuota > 0 {
+		hs.StorageQuota = formatBytes(target.StorageQuota)
+		hs.QuotaBytes = target.StorageQuota
+		pct := int(stats.TotalBytes * 100 / target.StorageQuota)
+		if pct > 100 {
+			pct = 100
 		}
-		hs.StorageQuota = formatBytes(limit)
-		hs.QuotaBytes = limit
-		if limit > 0 {
-			pct := int(stats.TotalBytes * 100 / limit)
-			if pct > 100 {
-				pct = 100
-			}
-			hs.QuotaPercent = pct
-		}
+		hs.QuotaPercent = pct
 	}
-	populateEgressStats(ctx, h.deps, hs, target, snap)
+	populateEgressStats(ctx, h.deps, hs, target)
 
 	tokenCount, err := h.deps.Repo.CountUserOAuthTokens(ctx, target.ID)
 	if err != nil {
@@ -394,8 +374,6 @@ func (h *profileHandler) ShowSettings(w http.ResponseWriter, r *http.Request) {
 		CreatedAt:          target.CreatedAt.Format("2006-01-02 15:04:05"),
 		Tokens:             tokenRows,
 		Sessions:           sessRows,
-		QuotaMode:          snap.QuotaMode,
-		EgressMode:         snap.EgressMode,
 		Stats:              hs,
 		URLPrefix:          prefix,
 		IsSelf:             isSelf,
@@ -1044,25 +1022,19 @@ func profileBreadcrumbs(storagePath, prefix string) []breadcrumb {
 	return crumbs
 }
 
-// populateEgressStats fills the egress fields on hs when egress_mode=user.
-// Uses the user's per-user override when set, otherwise the server default.
-// Called by ShowDashboard and ShowSettings to keep both views consistent.
-// Leaves hs unchanged (zero values) when egress_mode=off so the template
-// can skip rendering the section.
-func populateEgressStats(ctx context.Context, deps *UIDeps, hs *homeStats, target *model.User, snap *settings.Snapshot) {
-	if snap.EgressMode != "user" {
+// populateEgressStats fills the egress fields on hs from the target user's
+// monthly usage. The section renders only when the user has a limit set
+// (EgressQuota > 0); otherwise hs.EgressQuotaBytes stays at 0 and the template
+// skips the section. Called by ShowDashboard and ShowSettings.
+func populateEgressStats(ctx context.Context, deps *UIDeps, hs *homeStats, target *model.User) {
+	if target.EgressQuota <= 0 {
 		return
 	}
 
 	period := db.CurrentPeriod()
 	hs.EgressPeriod = period
-
-	limit := snap.EgressQuotaUser
-	if target.EgressQuota > 0 {
-		limit = target.EgressQuota
-	}
-	hs.EgressQuota = formatBytes(limit)
-	hs.EgressQuotaBytes = limit
+	hs.EgressQuota = formatBytes(target.EgressQuota)
+	hs.EgressQuotaBytes = target.EgressQuota
 
 	usage, err := deps.Repo.GetEgressUsage(ctx, target.ID, period)
 	if err != nil {
@@ -1076,12 +1048,10 @@ func populateEgressStats(ctx context.Context, deps *UIDeps, hs *homeStats, targe
 	hs.EgressUsedBytes = used
 	hs.EgressUsed = formatBytes(used)
 
-	if limit > 0 {
-		pct := int(used * 100 / limit)
-		if pct > 100 {
-			pct = 100
-		}
-		hs.EgressPercent = pct
+	pct := int(used * 100 / target.EgressQuota)
+	if pct > 100 {
+		pct = 100
 	}
+	hs.EgressPercent = pct
 }
 

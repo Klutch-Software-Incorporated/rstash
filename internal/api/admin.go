@@ -9,14 +9,16 @@ import (
 	"time"
 
 	"rstash/internal/db"
+	"rstash/internal/settings"
 	"rstash/internal/storage"
 	"rstash/internal/webhooks"
 )
 
 // AdminDeps holds dependencies for the admin API handlers.
 type AdminDeps struct {
-	Repo    *db.Repository
-	Storage *storage.Service
+	Repo     *db.Repository
+	Storage  *storage.Service
+	Settings *settings.Settings
 	// BaseURL is used to construct claim URLs when provisioning users.
 	BaseURL string
 	// RateLimiter enforces per-APIKey RateLimitRPM. Nil disables rate limiting
@@ -219,19 +221,25 @@ func (d *AdminDeps) createUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if req.QuotaBytes > 0 {
-		if err := d.Repo.UpdateUserQuota(r.Context(), user.ID, req.QuotaBytes); err != nil {
-			slog.Error("admin API: set quota on create", "error", err)
+	// Explicit limits in the request win over server defaults. 0 in the
+	// request means "use the server default." Settings may be nil in tests
+	// that don't wire a live snapshot; in that case defaults fall to 0.
+	storageLimit := req.QuotaBytes
+	egressLimit := req.EgressQuotaBytes
+	if d.Settings != nil {
+		snap := d.Settings.Load()
+		if storageLimit == 0 {
+			storageLimit = snap.DefaultUserStorageLimit
 		}
-		user.StorageQuota = req.QuotaBytes
-	}
-
-	if req.EgressQuotaBytes > 0 {
-		if err := d.Repo.UpdateUserEgressQuota(r.Context(), user.ID, req.EgressQuotaBytes); err != nil {
-			slog.Error("admin API: set egress quota on create", "error", err)
+		if egressLimit == 0 {
+			egressLimit = snap.DefaultUserEgressLimit
 		}
-		user.EgressQuota = req.EgressQuotaBytes
 	}
+	if err := d.Repo.ApplyUserLimitDefaults(r.Context(), user.ID, storageLimit, egressLimit); err != nil {
+		slog.Error("admin API: apply limits on create", "error", err)
+	}
+	user.StorageQuota = storageLimit
+	user.EgressQuota = egressLimit
 
 	if req.EmailVerified && user.Email != nil {
 		if err := d.Repo.VerifyUserEmail(r.Context(), user.ID); err != nil {

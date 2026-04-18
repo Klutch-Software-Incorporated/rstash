@@ -58,6 +58,20 @@ func (r *Repository) AddEgressUsage(ctx context.Context, userID int64, period st
 	return nil
 }
 
+// GetTotalEgressUsage returns the sum of bytes_out across all users for the
+// given period. Used to enforce the global monthly egress cap.
+func (r *Repository) GetTotalEgressUsage(ctx context.Context, period string) (int64, error) {
+	var total int64
+	err := r.db.WithContext(ctx).Model(&model.EgressUsage{}).
+		Where("period = ?", period).
+		Select("COALESCE(SUM(bytes_out), 0)").
+		Scan(&total).Error
+	if err != nil {
+		return 0, fmt.Errorf("get total egress usage: %w", err)
+	}
+	return total, nil
+}
+
 // ResetEgressUsage zeros the current-period counter for userID. Used by the
 // admin API to align with external billing periods or resolve disputes.
 func (r *Repository) ResetEgressUsage(ctx context.Context, userID int64, period string) error {

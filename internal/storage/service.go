@@ -207,14 +207,15 @@ func (s *Service) GetDocument(ctx context.Context, userID int64, path string, co
 		return nil, ErrNotModified
 	}
 
-	// Egress enforcement: hot-path returns early when disabled.
+	// Egress enforcement: consults User.EgressQuota (0 = unlimited) and the
+	// global cap from settings (0 = disabled).
 	if s.egress != nil {
 		user, _ := s.repo.GetUserByID(ctx, userID)
-		var override int64
+		var userLimit int64
 		if user != nil {
-			override = user.EgressQuota
+			userLimit = user.EgressQuota
 		}
-		if err := s.egress.CheckServe(ctx, userID, node.ContentLength, override); err != nil {
+		if err := s.egress.CheckServe(ctx, userID, node.ContentLength, userLimit); err != nil {
 			return nil, err
 		}
 	}

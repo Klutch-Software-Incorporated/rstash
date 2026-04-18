@@ -192,16 +192,14 @@
         <button type="submit" class="btn-danger">Delete User</button>
     </form>
 </div>
-{{if eq .QuotaMode "user"}}
 <form method="POST" action="{{.URLPrefix}}/admin/quota" class="inline-form" style="max-width:20rem">
     <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
-    <label>Storage Quota</label>
+    <label>Storage Limit</label>
     <div style="display:flex;gap:.5rem">
-        <input type="text" name="quota" placeholder="e.g. 1GB" style="margin-bottom:0">
-        <button type="submit" class="btn-primary" style="width:auto">Set Quota</button>
+        <input type="text" name="quota" placeholder="e.g. 1GB, or 0 for unlimited" style="margin-bottom:0">
+        <button type="submit" class="btn-primary" style="width:auto">Set Limit</button>
     </div>
 </form>
-{{end}}
 {{end}}
 {{end}}
 

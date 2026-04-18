@@ -27,10 +27,13 @@ The billing provider (whichever is chosen) writes quotas directly — no interme
 system in the app.
 
 ### Flow
-1. User signs up (free tier = server default `quota_user`)
+1. User signs up — `user.StorageQuota` stamped from `default_user_storage_limit` (0 = unlimited)
 2. User clicks "Upgrade" → hosted checkout (Paddle/Polar/Dodo overlay)
 3. Webhook fires → read product metadata `storage_quota` → set `user.StorageQuota`
-4. User cancels → webhook → reset `StorageQuota` to 0 (back to server default)
+4. User cancels → webhook → reset `user.StorageQuota` to the free-tier value the plan
+   specifies (NOT 0, unless free = unlimited). Under the new "stamp, don't fallback"
+   model there is no runtime server-side default; billing is the authority on per-user
+   limits for managed users.
 
 ### User Model Changes
 ```go

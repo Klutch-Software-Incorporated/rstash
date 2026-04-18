@@ -33,8 +33,8 @@ type adminDashboardContent struct {
 	BaseURL            string
 	BlobDSN            string
 	TotalStorageUsed   string
-	QuotaMode          string
-	QuotaLimit         string
+	TotalStorageLimit  string // formatted; empty when unlimited
+	TotalEgressLimit   string // formatted; empty when unlimited
 	ActiveUsers24h     int64
 	ActiveUsers7d      int64
 	TopUsers           []*topUserRow
@@ -43,7 +43,6 @@ type adminDashboardContent struct {
 }
 
 type adminUsersContent struct {
-	QuotaMode        string
 	PendingCount     int64
 	RegistrationMode string
 	Users            []*userRow
@@ -144,12 +143,12 @@ func (h *adminHandler) ShowDashboard(w http.ResponseWriter, r *http.Request) {
 		BaseURL:          h.deps.Config.BaseURL,
 		BlobDSN:          h.deps.Config.BlobDSN,
 		TotalStorageUsed: formatBytes(totalUsed),
-		QuotaMode:        snap.QuotaMode,
 	}
-	if snap.QuotaMode == "total" {
-		content.QuotaLimit = formatBytes(snap.QuotaTotal)
-	} else if snap.QuotaMode == "user" {
-		content.QuotaLimit = formatBytes(snap.QuotaUser) + " per user"
+	if snap.TotalStorageLimit > 0 {
+		content.TotalStorageLimit = formatBytes(snap.TotalStorageLimit)
+	}
+	if snap.TotalEgressLimit > 0 {
+		content.TotalEgressLimit = formatBytes(snap.TotalEgressLimit)
 	}
 
 	now := time.Now().UTC()
@@ -245,19 +244,16 @@ func (h *adminHandler) ShowUsers(w http.ResponseWriter, r *http.Request) {
 		} else {
 			row.StorageUsed = formatBytes(stats.TotalBytes)
 		}
-		if snap.QuotaMode == "user" {
-			if u.StorageQuota > 0 {
-				row.StorageQuota = formatBytes(u.StorageQuota)
-			} else {
-				row.StorageQuota = formatBytes(snap.QuotaUser) + " (default)"
-			}
+		if u.StorageQuota > 0 {
+			row.StorageQuota = formatBytes(u.StorageQuota)
+		} else {
+			row.StorageQuota = "unlimited"
 		}
 		rows[i] = row
 	}
 
 	pendingCount, _ := h.deps.Repo.CountPendingUsers(ctx)
 	content := &adminUsersContent{
-		QuotaMode:        snap.QuotaMode,
 		PendingCount:     pendingCount,
 		RegistrationMode: snap.RegistrationMode,
 		Users:            rows,
@@ -282,9 +278,23 @@ func (h *adminHandler) ShowSettings(w http.ResponseWriter, r *http.Request) {
 	runtimeValues := snap.ValueMap()
 	envValues := h.deps.Config.ValueMap()
 
+	// Canonical display order for setting groups in the admin panel.
+	// Groups not listed here fall to the end in first-seen order, so adding
+	// a new group without updating this list will surface it (harmlessly).
+	canonicalGroupOrder := []string{
+		"Branding",
+		"Legal",
+		"Access",
+		"Rate Limiting",
+		"Storage",
+		"Egress",
+		"OAuth",
+		"Monitoring",
+	}
+
 	// Build grouped runtime settings + flat env-only list.
 	groupMap := make(map[string]*adminSettingGroup)
-	var groupOrder []string
+	var seenOrder []string
 	var envOnly []*adminSettingRow
 
 	for _, def := range config.SettingDefs() {
@@ -315,14 +325,25 @@ func (h *adminHandler) ShowSettings(w http.ResponseWriter, r *http.Request) {
 		if !ok {
 			g = &adminSettingGroup{Title: def.Group}
 			groupMap[def.Group] = g
-			groupOrder = append(groupOrder, def.Group)
+			seenOrder = append(seenOrder, def.Group)
 		}
 		g.Settings = append(g.Settings, row)
 	}
 
+	// Emit groups in canonical order, then any leftover groups (e.g. a
+	// newly added one not yet in canonicalGroupOrder) in first-seen order.
+	emitted := make(map[string]bool)
 	var groups []adminSettingGroup
-	for _, name := range groupOrder {
-		groups = append(groups, *groupMap[name])
+	for _, name := range canonicalGroupOrder {
+		if g, ok := groupMap[name]; ok {
+			groups = append(groups, *g)
+			emitted[name] = true
+		}
+	}
+	for _, name := range seenOrder {
+		if !emitted[name] {
+			groups = append(groups, *groupMap[name])
+		}
 	}
 
 	content := &adminSettingsContent{Groups: groups, EnvOnly: envOnly}
@@ -485,6 +506,9 @@ func (h *adminHandler) CreateUser(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/admin/users", http.StatusSeeOther)
 		return
 	}
+
+	snap := h.deps.Settings.Load()
+	_ = h.deps.Repo.ApplyUserLimitDefaults(r.Context(), newUser.ID, snap.DefaultUserStorageLimit, snap.DefaultUserEgressLimit)
 
 	// Auto-accept TOS/Privacy for admin-created users.
 	_ = h.deps.Repo.AcceptTOS(r.Context(), newUser.ID)
