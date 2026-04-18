@@ -121,28 +121,22 @@ func runServe(cmd *cobra.Command, args []string) error {
 	// Initialize quota checker (always create so it can be enabled at runtime).
 	snap := runtimeSettings.Load()
 	quotaChecker := storage.NewQuotaChecker(storage.QuotaConfig{
-		Mode:       snap.QuotaMode,
-		TotalLimit: snap.QuotaTotal,
-		UserLimit:  snap.QuotaUser,
+		TotalLimit: snap.TotalStorageLimit,
 	}, repo)
 
 	runtimeSettings.OnChange(func(s *settings.Snapshot) {
 		quotaChecker.UpdateConfig(storage.QuotaConfig{
-			Mode:       s.QuotaMode,
-			TotalLimit: s.QuotaTotal,
-			UserLimit:  s.QuotaUser,
+			TotalLimit: s.TotalStorageLimit,
 		})
 	})
 
 	// Initialize egress tracker (outbound-transfer counting + enforcement).
 	egressTracker := storage.NewEgressTracker(storage.EgressConfig{
-		Mode:      snap.EgressMode,
-		UserLimit: snap.EgressQuotaUser,
+		TotalLimit: snap.TotalEgressLimit,
 	}, repo)
 	runtimeSettings.OnChange(func(s *settings.Snapshot) {
 		egressTracker.UpdateConfig(storage.EgressConfig{
-			Mode:      s.EgressMode,
-			UserLimit: s.EgressQuotaUser,
+			TotalLimit: s.TotalEgressLimit,
 		})
 	})
 
@@ -242,7 +236,7 @@ func runServe(cmd *cobra.Command, args []string) error {
 
 	// Admin JSON API (keys managed via admin UI).
 	apiKeyLimiter := api.NewAPIKeyRateLimiter()
-	adminDeps := &api.AdminDeps{Repo: repo, Storage: storageSvc, BaseURL: cfg.BaseURL, RateLimiter: apiKeyLimiter, Webhooks: webhookEmitter}
+	adminDeps := &api.AdminDeps{Repo: repo, Storage: storageSvc, Settings: runtimeSettings, BaseURL: cfg.BaseURL, RateLimiter: apiKeyLimiter, Webhooks: webhookEmitter}
 	mux.Handle("/api/admin/", api.AdminRoutes(adminDeps))
 	mux.HandleFunc("GET /api/admin/openapi.json", api.ServeOpenAPISpec(api.AdminOpenAPISpec()))
 

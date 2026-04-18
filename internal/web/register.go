@@ -151,6 +151,8 @@ func (h *registerHandler) DoRegister(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	_ = h.deps.Repo.ApplyUserLimitDefaults(r.Context(), user.ID, snap.DefaultUserStorageLimit, snap.DefaultUserEgressLimit)
+
 	metrics.UserSignupsTotal.Inc()
 
 	// Record TOS and Privacy Policy acceptance.

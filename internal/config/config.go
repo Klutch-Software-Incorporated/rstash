@@ -23,10 +23,9 @@ type Config struct {
 	RateLimitBurst     int     // RSTASH_RATE_BURST — max burst size
 	UserRateLimitRate  float64 // requests/sec per user on storage routes (0 = disabled)
 	UserRateLimitBurst int     // per-user burst size
-	QuotaMode        string  // RSTASH_QUOTA_MODE — "off", "total", "user"
-	QuotaTotal       int64   // RSTASH_QUOTA_TOTAL — bytes (parsed from human-readable)
-	QuotaUser        int64   // RSTASH_QUOTA_USER — bytes (parsed from human-readable)
-	MaxUploadSize    int64   // RSTASH_MAX_UPLOAD — max request body size (parsed from human-readable)
+	TotalStorageLimit       int64 // global storage cap in bytes across all users (0 = disabled)
+	DefaultUserStorageLimit int64 // stamped onto User.StorageQuota at account creation (0 = unlimited)
+	MaxUploadSize           int64 // RSTASH_MAX_UPLOAD — max request body size (parsed from human-readable)
 	TokenLifetime        string  // RSTASH_TOKEN_LIFETIME — OAuth token lifetime: "30d", "24h", "0" (no expiry)
 	RefreshTokens        string  // "enabled" or "disabled"
 	RefreshTokenLifetime string  // refresh token lifetime: "90d", "0" (no expiry)
@@ -44,8 +43,8 @@ type Config struct {
 	TLSCacheDir          string  // RSTASH_TLS_CACHE — autocert cache directory
 	EmailDSN             string  // RSTASH_EMAIL — email provider DSN
 	CookieDomain         string  // cookie domain (empty = host-only)
-	EgressMode           string  // "off" or "user"
-	EgressQuotaUser      int64   // default per-user monthly egress (bytes)
+	TotalEgressLimit       int64 // global monthly egress cap in bytes (0 = disabled)
+	DefaultUserEgressLimit int64 // stamped onto User.EgressQuota at account creation (0 = unlimited)
 	AuditRetentionDays   int     // 0 = forever
 	LogClientIPs         string  // "enabled", "hashed", "disabled"
 }
@@ -65,9 +64,7 @@ func ParseDSN(dsn string) (scheme, path string, err error) {
 // have no env var). Runtime-editable settings are managed via the CLI
 // or admin UI and stored in the database.
 func Load() *Config {
-	quotaTotal, _ := ParseByteSize("50GB")
 	maxUpload, _ := ParseByteSize("50MB")
-	egressUser, _ := ParseByteSize("500GB")
 
 	return &Config{
 		// Boot-critical: read from env vars.
@@ -87,24 +84,23 @@ func Load() *Config {
 		SiteName:         "rstash",
 		HomeSubtitle:     "A personal remoteStorage server.",
 		MetricsMode:      "public",
-		TOSMode:          "text",
+		TOSMode:          "off",
 		TOSContent:       defaultTOSContent,
-		PrivacyMode:      "text",
+		PrivacyMode:      "off",
 		PrivacyContent:   defaultPrivacyContent,
 		RegistrationMode: "closed",
 		RateLimitRate:      10,
 		RateLimitBurst:     20,
 		UserRateLimitRate:  0, // disabled by default; opt in for commercial tier
 		UserRateLimitBurst: 20,
-		QuotaMode:        "total",
-		QuotaTotal:       quotaTotal,
-		QuotaUser:        0,
-		MaxUploadSize:    maxUpload,
+		TotalStorageLimit:       0, // disabled by default; self-hosters opt in
+		DefaultUserStorageLimit: 0, // new users are unlimited unless admin sets a default
+		MaxUploadSize:           maxUpload,
 		TokenLifetime:        "30d",
 		RefreshTokens:        "enabled",
 		RefreshTokenLifetime: "90d",
-		EgressMode:           "user",
-		EgressQuotaUser:      egressUser,
+		TotalEgressLimit:       0,
+		DefaultUserEgressLimit: 0,
 		AuditRetentionDays:   0,
 		LogClientIPs:         "enabled",
 	}
@@ -160,10 +156,11 @@ func (c *Config) ValueMap() map[string]string {
 		"log_level":         c.LogLevel,
 		"rate_limit_rate":   fmt.Sprintf("%g", c.RateLimitRate),
 		"rate_limit_burst":  fmt.Sprintf("%d", c.RateLimitBurst),
-		"quota_mode":        c.QuotaMode,
-		"quota_total":       FormatByteSize(c.QuotaTotal),
-		"quota_user":        FormatByteSize(c.QuotaUser),
-		"max_upload_size":   FormatByteSize(c.MaxUploadSize),
+		"total_storage_limit":        FormatByteSize(c.TotalStorageLimit),
+		"default_user_storage_limit": FormatByteSize(c.DefaultUserStorageLimit),
+		"total_egress_limit":         FormatByteSize(c.TotalEgressLimit),
+		"default_user_egress_limit":  FormatByteSize(c.DefaultUserEgressLimit),
+		"max_upload_size":            FormatByteSize(c.MaxUploadSize),
 		"token_lifetime":         c.TokenLifetime,
 		"refresh_tokens":         c.RefreshTokens,
 		"refresh_token_lifetime": c.RefreshTokenLifetime,

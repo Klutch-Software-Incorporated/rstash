@@ -27,7 +27,7 @@ type homeStats struct {
 	StorageBytes int64 // raw bytes for meter
 	QuotaBytes   int64 // raw bytes for meter max
 
-	// Egress (populated only when egress_mode=user)
+	// Egress (populated only when the user has a per-user egress limit set)
 	EgressUsed       string // human-readable used bytes for current period
 	EgressQuota      string // human-readable limit
 	EgressPercent    int    // 0–100

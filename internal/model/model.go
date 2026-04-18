@@ -7,7 +7,7 @@ type User struct {
 	Username     string     `gorm:"size:255;uniqueIndex;not null"`
 	PasswordHash string     `gorm:"size:255;not null"`
 	IsAdmin      bool       `gorm:"not null;default:false"`
-	StorageQuota int64      `gorm:"not null;default:0"` // 0 = use server default
+	StorageQuota int64      `gorm:"not null;default:0"` // 0 = unlimited; stamped at creation from default_user_storage_limit
 	Disabled     bool       `gorm:"not null;default:false"`
 	Approved     bool       `gorm:"not null;default:true"`
 	CreatedAt    time.Time  `gorm:"not null;autoCreateTime"`
@@ -31,8 +31,9 @@ type User struct {
 	ExternallyManaged bool `gorm:"not null;default:false"`
 
 	// EgressQuota is the per-user egress limit in bytes per calendar month.
-	// 0 = use the server default (egress_quota_user setting). Enforced only
-	// when egress_mode=user. Uploads are bounded separately by storage
+	// 0 = unlimited (no per-user cap). Stamped at user creation from the
+	// default_user_egress_limit setting; afterwards editable per-user via
+	// admin UI or admin API. Uploads are bounded separately by storage
 	// quota and max_upload_size, not by this value.
 	EgressQuota int64 `gorm:"not null;default:0"`
 }

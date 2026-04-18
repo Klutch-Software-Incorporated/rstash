@@ -232,8 +232,9 @@ func schemaRef(typ, format string) *openapi3.SchemaRef {
 }
 
 // quotaFieldRef returns the schema for a quota field (storage or egress).
-// Values must be non-negative; zero has the special meaning "use the server
-// default" (quota_user or egress_quota_user settings).
+// Values must be non-negative. On user creation, 0 means "apply the server
+// default" (default_user_storage_limit / default_user_egress_limit). On
+// updates to existing users, 0 means "unlimited."
 func quotaFieldRef(description string) *openapi3.SchemaRef {
 	zero := float64(0)
 	return &openapi3.SchemaRef{Value: &openapi3.Schema{

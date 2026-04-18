@@ -16,7 +16,6 @@ func validConfig() *Config {
 		LogLevel:         "info",
 		RateLimitRate:    10,
 		RateLimitBurst:   20,
-		QuotaMode:        "off",
 		MaxUploadSize:    50 << 20, // 50MB
 	}
 }

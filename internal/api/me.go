@@ -81,7 +81,7 @@ func (d *AdminDeps) getMe(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Egress fields are omitted from the JSON when both are zero (see the
-	// omitempty tags above), which effectively hides them when egress_mode=off.
+	// omitempty tags above), hiding them for users with no egress limit set.
 	if eg, _ := d.Repo.GetEgressUsage(ctx, user.ID, db.CurrentPeriod()); eg != nil {
 		resp.EgressUsedBytes = eg.BytesOut
 	}

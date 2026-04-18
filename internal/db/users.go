@@ -150,10 +150,32 @@ func (r *Repository) UserCount(ctx context.Context) (int64, error) {
 	return count, nil
 }
 
-// UpdateUserQuota sets the per-user storage quota override.
+// UpdateUserQuota sets the per-user storage limit. 0 = unlimited.
 func (r *Repository) UpdateUserQuota(ctx context.Context, userID int64, quotaBytes int64) error {
 	if err := r.db.WithContext(ctx).Model(&model.User{}).Where("id = ?", userID).Update("storage_quota", quotaBytes).Error; err != nil {
 		return fmt.Errorf("update user quota: %w", err)
+	}
+	return nil
+}
+
+// ApplyUserLimitDefaults stamps non-zero defaults onto a newly-created user's
+// StorageQuota and EgressQuota. Zero values are skipped, leaving the user
+// unlimited on that dimension. Call immediately after CreateUser so new users
+// inherit the current server defaults; changing the defaults later does not
+// affect existing users.
+func (r *Repository) ApplyUserLimitDefaults(ctx context.Context, userID int64, storageLimit, egressLimit int64) error {
+	updates := map[string]any{}
+	if storageLimit > 0 {
+		updates["storage_quota"] = storageLimit
+	}
+	if egressLimit > 0 {
+		updates["egress_quota"] = egressLimit
+	}
+	if len(updates) == 0 {
+		return nil
+	}
+	if err := r.db.WithContext(ctx).Model(&model.User{}).Where("id = ?", userID).Updates(updates).Error; err != nil {
+		return fmt.Errorf("apply user limit defaults: %w", err)
 	}
 	return nil
 }

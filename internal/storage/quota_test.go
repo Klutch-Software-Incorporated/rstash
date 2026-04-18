@@ -41,49 +41,49 @@ func addTestNode(t *testing.T, repo *db.Repository, userID int64, path string, s
 	}
 }
 
-func TestQuota_ModeOff_AlwaysAllows(t *testing.T) {
+func TestQuota_NoLimits_AlwaysAllows(t *testing.T) {
 	repo := testRepo(t)
 	userID := createTestUser(t, repo, "alice", 0)
 
-	qc := NewQuotaChecker(QuotaConfig{Mode: "off"}, repo)
+	qc := NewQuotaChecker(QuotaConfig{}, repo)
 	err := qc.Check(context.Background(), repo, userID, 999999999)
 	if err != nil {
-		t.Fatalf("mode off should always allow, got: %v", err)
+		t.Fatalf("no limits should always allow, got: %v", err)
 	}
 }
 
-func TestQuota_ModeTotal_AllowsWithinLimit(t *testing.T) {
+func TestQuota_GlobalCap_AllowsWithinLimit(t *testing.T) {
 	repo := testRepo(t)
 	userID := createTestUser(t, repo, "alice", 0)
 	addTestNode(t, repo, userID, "/file1.txt", 500)
 
-	qc := NewQuotaChecker(QuotaConfig{Mode: "total", TotalLimit: 1000}, repo)
+	qc := NewQuotaChecker(QuotaConfig{TotalLimit: 1000}, repo)
 	err := qc.Check(context.Background(), repo, userID, 400)
 	if err != nil {
 		t.Fatalf("should allow within limit, got: %v", err)
 	}
 }
 
-func TestQuota_ModeTotal_BlocksWhenExceeded(t *testing.T) {
+func TestQuota_GlobalCap_BlocksWhenExceeded(t *testing.T) {
 	repo := testRepo(t)
 	userID := createTestUser(t, repo, "alice", 0)
 	addTestNode(t, repo, userID, "/file1.txt", 800)
 
-	qc := NewQuotaChecker(QuotaConfig{Mode: "total", TotalLimit: 1000}, repo)
+	qc := NewQuotaChecker(QuotaConfig{TotalLimit: 1000}, repo)
 	err := qc.Check(context.Background(), repo, userID, 300)
 	if err != ErrQuotaExceeded {
 		t.Fatalf("expected ErrQuotaExceeded, got: %v", err)
 	}
 }
 
-func TestQuota_ModeTotal_AccountsForAllUsers(t *testing.T) {
+func TestQuota_GlobalCap_AccountsForAllUsers(t *testing.T) {
 	repo := testRepo(t)
 	alice := createTestUser(t, repo, "alice", 0)
 	bob := createTestUser(t, repo, "bob", 0)
 	addTestNode(t, repo, alice, "/file1.txt", 600)
 	addTestNode(t, repo, bob, "/file1.txt", 300)
 
-	qc := NewQuotaChecker(QuotaConfig{Mode: "total", TotalLimit: 1000}, repo)
+	qc := NewQuotaChecker(QuotaConfig{TotalLimit: 1000}, repo)
 	// Total is 900, adding 200 would be 1100 > 1000.
 	err := qc.Check(context.Background(), repo, alice, 200)
 	if err != ErrQuotaExceeded {
@@ -91,76 +91,69 @@ func TestQuota_ModeTotal_AccountsForAllUsers(t *testing.T) {
 	}
 }
 
-func TestQuota_ModeUser_AllowsWithinLimit(t *testing.T) {
+func TestQuota_PerUser_AllowsWithinLimit(t *testing.T) {
 	repo := testRepo(t)
-	userID := createTestUser(t, repo, "alice", 0)
+	// User has an explicit 1000-byte limit on their row.
+	userID := createTestUser(t, repo, "alice", 1000)
 	addTestNode(t, repo, userID, "/file1.txt", 300)
 
-	qc := NewQuotaChecker(QuotaConfig{Mode: "user", UserLimit: 1000}, repo)
+	qc := NewQuotaChecker(QuotaConfig{}, repo)
 	err := qc.Check(context.Background(), repo, userID, 500)
 	if err != nil {
 		t.Fatalf("should allow within limit, got: %v", err)
 	}
 }
 
-func TestQuota_ModeUser_BlocksWhenExceeded(t *testing.T) {
+func TestQuota_PerUser_BlocksWhenExceeded(t *testing.T) {
 	repo := testRepo(t)
-	userID := createTestUser(t, repo, "alice", 0)
+	userID := createTestUser(t, repo, "alice", 1000)
 	addTestNode(t, repo, userID, "/file1.txt", 800)
 
-	qc := NewQuotaChecker(QuotaConfig{Mode: "user", UserLimit: 1000}, repo)
+	qc := NewQuotaChecker(QuotaConfig{}, repo)
 	err := qc.Check(context.Background(), repo, userID, 300)
 	if err != ErrQuotaExceeded {
 		t.Fatalf("expected ErrQuotaExceeded, got: %v", err)
 	}
 }
 
-func TestQuota_ModeUser_RespectsPerUserOverride(t *testing.T) {
+func TestQuota_PerUser_ZeroMeansUnlimited(t *testing.T) {
 	repo := testRepo(t)
-	// User has a custom quota of 2000, server default is 1000.
-	userID := createTestUser(t, repo, "alice", 2000)
-	addTestNode(t, repo, userID, "/file1.txt", 800)
-
-	qc := NewQuotaChecker(QuotaConfig{Mode: "user", UserLimit: 1000}, repo)
-
-	// 800 + 500 = 1300, exceeds default 1000 but within custom 2000.
-	err := qc.Check(context.Background(), repo, userID, 500)
-	if err != nil {
-		t.Fatalf("should respect per-user override, got: %v", err)
-	}
-
-	// 800 + 1300 = 2100, exceeds custom 2000.
-	err = qc.Check(context.Background(), repo, userID, 1300)
-	if err != ErrQuotaExceeded {
-		t.Fatalf("expected ErrQuotaExceeded with per-user override, got: %v", err)
-	}
-}
-
-func TestQuota_ModeUser_UnlimitedUser(t *testing.T) {
-	repo := testRepo(t)
-	// storage_quota=0 in user mode means use server default.
-	// But we test the GetUserQuota returning 0 for truly unlimited.
-	// To get an unlimited user in mode=user, the admin would set storage_quota=-1
-	// or some convention. Actually per the plan, quota=0 means "use server default"
-	// and the server default (UserLimit) is always > 0 in mode=user.
-	// The "unlimited" case is when a custom user quota is set to a very large number.
-	// Let's just verify that the default flow works.
+	// StorageQuota=0 on the user row means unlimited. Prior semantics
+	// (0 = "use server default") no longer apply.
 	userID := createTestUser(t, repo, "alice", 0)
 	addTestNode(t, repo, userID, "/file1.txt", 500)
 
-	qc := NewQuotaChecker(QuotaConfig{Mode: "user", UserLimit: 1000}, repo)
-	err := qc.Check(context.Background(), repo, userID, 400)
+	qc := NewQuotaChecker(QuotaConfig{}, repo)
+	err := qc.Check(context.Background(), repo, userID, 999999999)
 	if err != nil {
-		t.Fatalf("should allow within server default, got: %v", err)
+		t.Fatalf("StorageQuota=0 should be unlimited, got: %v", err)
+	}
+}
+
+func TestQuota_PerUserAndGlobal_BothEnforced(t *testing.T) {
+	repo := testRepo(t)
+	alice := createTestUser(t, repo, "alice", 500) // per-user: 500
+	addTestNode(t, repo, alice, "/file1.txt", 200)
+
+	qc := NewQuotaChecker(QuotaConfig{TotalLimit: 1000}, repo)
+
+	// 200 + 200 = 400, within per-user 500 and global 1000.
+	if err := qc.Check(context.Background(), repo, alice, 200); err != nil {
+		t.Fatalf("should allow within both limits, got: %v", err)
+	}
+
+	// 200 + 400 = 600 > per-user 500.
+	if err := qc.Check(context.Background(), repo, alice, 400); err != ErrQuotaExceeded {
+		t.Fatalf("expected ErrQuotaExceeded from per-user cap, got: %v", err)
 	}
 }
 
 func TestQuota_OverwriteAccountsForDelta(t *testing.T) {
 	repo := testRepo(t)
-	userID := createTestUser(t, repo, "alice", 0)
+	userID := createTestUser(t, repo, "alice", 1000)
 	addTestNode(t, repo, userID, "/file1.txt", 800)
 
-	qc := NewQuotaChecker(QuotaConfig{Mode: "user", UserLimit: 1000}, repo)
+	qc := NewQuotaChecker(QuotaConfig{}, repo)
 
 	// Overwriting: new file is 500 bytes, old was 800.
 	// Net delta = 500 - 800 = -300. Usage would be 800 + (-300) = 500, within limit.
@@ -181,32 +174,28 @@ func TestQuota_GetUserQuota(t *testing.T) {
 	repo := testRepo(t)
 	ctx := context.Background()
 
-	// User with no override.
-	alice := createTestUser(t, repo, "alice", 0)
-	// User with custom quota.
-	bob := createTestUser(t, repo, "bob", 5000)
+	alice := createTestUser(t, repo, "alice", 0)    // unlimited
+	bob := createTestUser(t, repo, "bob", 5000)     // explicit 5000
 
-	qc := NewQuotaChecker(QuotaConfig{Mode: "user", UserLimit: 1000}, repo)
+	qc := NewQuotaChecker(QuotaConfig{}, repo)
 
-	if got := qc.GetUserQuota(ctx, alice); got != 1000 {
-		t.Errorf("alice quota: got %d, want 1000 (server default)", got)
+	if got := qc.GetUserQuota(ctx, alice); got != 0 {
+		t.Errorf("alice quota: got %d, want 0 (unlimited)", got)
 	}
 	if got := qc.GetUserQuota(ctx, bob); got != 5000 {
-		t.Errorf("bob quota: got %d, want 5000 (custom override)", got)
+		t.Errorf("bob quota: got %d, want 5000", got)
 	}
-
-	// Non-existent user falls back to server default.
-	if got := qc.GetUserQuota(ctx, 9999); got != 1000 {
-		t.Errorf("non-existent user quota: got %d, want 1000", got)
+	if got := qc.GetUserQuota(ctx, 9999); got != 0 {
+		t.Errorf("non-existent user quota: got %d, want 0", got)
 	}
 }
 
-func TestQuota_ModeTotal_Transaction(t *testing.T) {
+func TestQuota_GlobalCap_Transaction(t *testing.T) {
 	repo := testRepo(t)
 	userID := createTestUser(t, repo, "alice", 0)
 	addTestNode(t, repo, userID, "/file1.txt", 500)
 
-	qc := NewQuotaChecker(QuotaConfig{Mode: "total", TotalLimit: 1000}, repo)
+	qc := NewQuotaChecker(QuotaConfig{TotalLimit: 1000}, repo)
 
 	// Use a transaction-scoped repo for quota checks.
 	repo.Transaction(func(txRepo *db.Repository) error {
@@ -221,18 +210,4 @@ func TestQuota_ModeTotal_Transaction(t *testing.T) {
 		}
 		return nil
 	})
-}
-
-func TestQuota_GetUserQuota_UsesRepo(t *testing.T) {
-	repo := testRepo(t)
-
-	// Verify GetUserQuota uses the repo connection from the checker.
-	qc := NewQuotaChecker(QuotaConfig{Mode: "user", UserLimit: 2000}, repo)
-
-	userID := createTestUser(t, repo, "alice", 0)
-
-	// Verify default is returned via GetUserQuota.
-	if got := qc.GetUserQuota(context.Background(), userID); got != 2000 {
-		t.Fatalf("expected 2000, got %d", got)
-	}
 }
