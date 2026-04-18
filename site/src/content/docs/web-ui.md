@@ -67,12 +67,12 @@ View and manage all users. From here you can:
 - Grant or revoke admin privileges
 - Disable or re-enable accounts (immediately terminates their sessions)
 - Approve or reject pending registrations
-- Set per-user storage quotas
+- Set per-user storage and download limits
 - Delete users
 
 ### Settings
 
-A grouped editor for all runtime settings — access control, rate limiting, storage quotas, OAuth, legal pages, and more. Changes take effect immediately without restarting the server. Each setting shows whether it's using the default value or a database override, and you can reset any override with one click.
+A grouped editor for all runtime settings — branding, legal pages, access control, rate limiting, storage and egress limits, OAuth, and monitoring. Changes take effect immediately without restarting the server. Each setting shows whether it's using the default value or a database override, and you can reset any override with one click.
 
 Environment-only settings (database DSN, listen address, TLS) are shown as read-only so you can see their current values.
 

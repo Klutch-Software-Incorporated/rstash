@@ -12,7 +12,7 @@ A self-hosted [remoteStorage](https://remotestorage.io/) server written in Go, i
 - **Pluggable blob storage** — SQLite (default), filesystem, S3-compatible, or any supported database
 - **TLS support** — Manual certificate, automatic via Let's Encrypt (autocert), or off
 - **Per-IP rate limiting** — Token bucket with configurable rate and burst
-- **Storage quotas** — Global or per-user quota enforcement
+- **Storage & egress limits** — Global caps plus per-user limits stamped at account creation
 - **Email integration** — Email verification, password reset, admin announcements (via Resend)
 - **Single binary** — All templates and static assets embedded via `go:embed`
 

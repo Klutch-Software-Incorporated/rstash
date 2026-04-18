@@ -15,7 +15,11 @@
     <dt>Blob Store</dt>
     <dd><code>{{.BlobDSN}}</code></dd>
     <dt>Total Storage</dt>
-    <dd>{{.TotalStorageUsed}}</dd>
+    <dd>{{.TotalStorageUsed}}{{if .TotalStorageLimit}} / {{.TotalStorageLimit}}{{end}}</dd>
+    {{if .TotalEgressLimit}}
+    <dt>Server Download Limit</dt>
+    <dd>{{.TotalEgressLimit}} / month</dd>
+    {{end}}
     <dt>Active Users (24h)</dt>
     <dd>{{.ActiveUsers24h}}</dd>
     <dt>Active Users (7d)</dt>

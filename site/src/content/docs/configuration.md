@@ -136,7 +136,8 @@ The following settings have sensible defaults and can be changed at any time thr
 
 - **Registration mode** — `closed` (default), `open`, or `approval`
 - **Rate limiting** — per-IP requests per second (default: 10 req/sec, burst 20)
-- **Storage quotas** — off, global total (default: 50 GB), or per-user
+- **Storage limits** — server-wide cap and default per-user limit (both default to unlimited; stamped on new users, never retroactively changed)
+- **Egress limits** — server-wide and default per-user monthly download cap (both default to unlimited)
 - **Max upload size** — per-request limit (default: 50 MB)
 - **OAuth token lifetime** — how long tokens last (default: 30 days)
 - **Refresh tokens** — enabled/disabled and lifetime (default: 90 days)

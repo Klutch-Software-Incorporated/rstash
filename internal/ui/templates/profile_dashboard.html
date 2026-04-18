@@ -37,14 +37,14 @@
 
 {{if .IsSelf}}
 <h2>Storage</h2>
-{{if eq .QuotaMode "user"}}
+{{if gt .Stats.QuotaBytes 0}}
 <p>{{.Stats.StorageUsed}} used of {{.Stats.StorageQuota}} ({{.Stats.QuotaPercent}}%) &mdash; {{.Stats.FileCount}} files</p>
 <meter min="0" max="{{.Stats.QuotaBytes}}" value="{{.Stats.StorageBytes}}">{{.Stats.QuotaPercent}}%</meter>
 {{else}}
 <p>{{.Stats.StorageUsed}} used &mdash; {{.Stats.FileCount}} files</p>
 {{end}}
-{{if eq .EgressMode "user"}}
-<h2>Egress (this month)</h2>
+{{if gt .Stats.EgressQuotaBytes 0}}
+<h2>Downloads (this month)</h2>
 <p>{{.Stats.EgressUsed}} of {{.Stats.EgressQuota}} ({{.Stats.EgressPercent}}%) &mdash; resets at the end of {{.Stats.EgressPeriod}} (UTC)</p>
 <meter min="0" max="{{.Stats.EgressQuotaBytes}}" value="{{.Stats.EgressUsedBytes}}">{{.Stats.EgressPercent}}%</meter>
 {{end}}
@@ -52,14 +52,14 @@
 {{else}}
 {{/* ===== Storage (admin view, no side-by-side) ===== */}}
 <h2>Storage</h2>
-{{if eq .QuotaMode "user"}}
+{{if gt .Stats.QuotaBytes 0}}
 <p>{{.Stats.StorageUsed}} used of {{.Stats.StorageQuota}} ({{.Stats.QuotaPercent}}%) &mdash; {{.Stats.FileCount}} files</p>
 <meter min="0" max="{{.Stats.QuotaBytes}}" value="{{.Stats.StorageBytes}}">{{.Stats.QuotaPercent}}%</meter>
 {{else}}
 <p>{{.Stats.StorageUsed}} used &mdash; {{.Stats.FileCount}} files</p>
 {{end}}
-{{if eq .EgressMode "user"}}
-<h2>Egress (this month)</h2>
+{{if gt .Stats.EgressQuotaBytes 0}}
+<h2>Downloads (this month)</h2>
 <p>{{.Stats.EgressUsed}} of {{.Stats.EgressQuota}} ({{.Stats.EgressPercent}}%) &mdash; {{.Stats.EgressPeriod}} (UTC)</p>
 <meter min="0" max="{{.Stats.EgressQuotaBytes}}" value="{{.Stats.EgressUsedBytes}}">{{.Stats.EgressPercent}}%</meter>
 {{end}}
