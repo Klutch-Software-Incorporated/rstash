@@ -145,14 +145,21 @@ stages:
                     packagePublishDescription: rstash $(PackageVersion) from commit $(Build.SourceVersion)
                   displayName: Push binaries to Azure Artifacts feed
 
-                # Docker image build + push to ACR. rstash-infra now
-                # provisions the registry (rstprdacreus2001) and the
-                # Azure DevOps service connection (rstash-acr-eus2) wires
-                # this pipeline to it. Tags the image with both the dated
-                # version and `latest` so App Service can pin either.
+                # Docker image build + push to ACR. rstash-infra provisions
+                # the registry (rstprdacreus2001) and the Azure DevOps service
+                # connection (rstash-acr-eus2) wires this pipeline to it.
+                # Tags the image with both the dated version and `latest` so
+                # App Service can pin either.
+                #
+                # Split into separate build + push tasks because Docker@2's
+                # `arguments` input is silently ignored by `buildAndPush` — it
+                # only takes effect on `build`, `push`, `login`, `logout`, and
+                # `run`. Using buildAndPush here meant `--build-arg VERSION=...`
+                # never reached `docker build`, leaving every image stamped
+                # with the Dockerfile's default (`dev`).
                 - task: Docker@2
                   inputs:
-                    command: buildAndPush
+                    command: build
                     containerRegistry: rstash-acr-eus2
                     repository: rstash
                     Dockerfile: Dockerfile
@@ -160,4 +167,14 @@ stages:
                       $(PackageVersion)
                       latest
                     arguments: --build-arg VERSION=$(PackageVersion)
-                  displayName: Build and push image to ACR
+                  displayName: Build image
+
+                - task: Docker@2
+                  inputs:
+                    command: push
+                    containerRegistry: rstash-acr-eus2
+                    repository: rstash
+                    tags: |
+                      $(PackageVersion)
+                      latest
+                  displayName: Push image to ACR
