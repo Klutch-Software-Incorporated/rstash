@@ -20,14 +20,14 @@ A self-hosted [remoteStorage](https://remotestorage.io/) server written in Go, i
 
 ```sh
 # Download the latest binary (Linux amd64)
-curl -LO https://fossil.klutch.software/rstash/uv/rstash-linux-amd64
+curl -LO https://github.com/Klutch-Software-Incorporated/rstash/releases/latest/download/rstash-linux-amd64
 chmod +x rstash-linux-amd64
 
 # Start the server
 ./rstash-linux-amd64
 ```
 
-[Pre-built binaries](https://fossil.klutch.software/rstash/uvlist) are available for Linux (amd64, arm64), macOS (amd64, arm64), and Windows (amd64).
+[Pre-built binaries](https://github.com/Klutch-Software-Incorporated/rstash/releases) are available for Linux (amd64, arm64), macOS (amd64, arm64), and Windows (amd64).
 
 On first run, rstash redirects to a setup wizard where you review settings and create the admin account. All further management happens through the web UI.
 
@@ -105,7 +105,7 @@ go run -tags dev .
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for details.
 
-Source control is managed via [Fossil](https://fossil-scm.org/), not git. Repository: [fossil.klutch.software/rstash](https://fossil.klutch.software/rstash)
+Source is hosted on GitHub: [Klutch-Software-Incorporated/rstash](https://github.com/Klutch-Software-Incorporated/rstash). Contributions are welcome — fork, branch, and open a pull request.
 
 ## Architecture
 

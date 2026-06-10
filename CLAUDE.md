@@ -12,7 +12,10 @@ The target audience is technical self-hosters running personal or small family/f
 servers. The design prioritizes a "just run it and go" experience — run `rstash` to
 start the server and complete setup through the web UI.
 
-Source control is managed via Git (Azure DevOps remote).
+Source control is managed via Git, hosted on GitHub (Klutch-Software-Incorporated/rstash).
+The hosted rstash.cloud deploy pipeline lives in the separate `rstash-infra` repo on
+Azure DevOps, which pulls from GitHub to build and push the container image — GitHub
+itself holds no deploy credentials. See `docs/github-migration.md` for the full split.
 
 ## Build & Run Commands
 

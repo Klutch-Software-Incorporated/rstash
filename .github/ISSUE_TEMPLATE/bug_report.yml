@@ -1,0 +1,50 @@
+name: Bug report
+description: Report a problem with rstash
+labels: [bug]
+body:
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: A clear description of the bug, including what you expected instead.
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Start rstash with ...
+        2. Send request ...
+        3. See error ...
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: rstash version
+      description: Output of `rstash --version`, or the release/commit you're running.
+    validations:
+      required: true
+  - type: dropdown
+    id: database
+    attributes:
+      label: Database backend
+      options: [SQLite, PostgreSQL, MySQL, SQL Server]
+    validations:
+      required: false
+  - type: dropdown
+    id: blob
+    attributes:
+      label: Blob store backend
+      options: [SQLite, Filesystem, S3-compatible, Azure Blob, Database]
+    validations:
+      required: false
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant logs
+      description: Paste any relevant log output. Redact secrets first.
+      render: shell
+    validations:
+      required: false

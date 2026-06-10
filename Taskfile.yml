@@ -82,25 +82,7 @@ tasks:
       - CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 go build -ldflags "-s -w -X rstash/internal/config.Version={{.VERSION}}" -o dist/rstash-darwin-arm64 .
       - CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -ldflags "-s -w -X rstash/internal/config.Version={{.VERSION}}" -o dist/rstash-windows-amd64.exe .
 
-  unversioned:
-    dir: dist/
-    desc: Upsert release binaries to the remote Fossil repo
-    aliases:
-      - uv
-    deps: [build]
-    sources:
-      - dist/rstash-linux-amd64
-      - dist/rstash-linux-arm64
-      - dist/rstash-darwin-amd64
-      - dist/rstash-darwin-arm64
-      - dist/rstash-windows-amd64.exe
-    method: checksum
-    cmds:
-      - fossil uv add *
-      - fossil uv sync https://curti@fossil.klutch.software/rstash
-
-  release:
-    desc: Build, upload binaries, and deploy site if changed
-    cmds:
-      - task: unversioned
-      - task: site:deploy
+  # Releases are tag-driven: push a CalVer tag (e.g. v2026.0610.1) and the
+  # GitHub Actions Release workflow cross-compiles the binaries and attaches
+  # them to the GitHub Release. See docs/github-migration.md. The docs site is
+  # deployed separately via `task site:deploy`.

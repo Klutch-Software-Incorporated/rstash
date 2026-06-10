@@ -1,0 +1,11 @@
+# Known false positives, ignored by fingerprint (commit:file:rule:line).
+# Verified non-secrets — see notes below.
+
+# Azurite's well-known PUBLIC development credential, used in the Azure Blob
+# integration-test instructions. It's published in Microsoft's docs and ships
+# with the emulator; it must be this exact value for copy-paste to work.
+04e1289a17d40590e895352c4c029126a673bab8:CONTRIBUTING.md:generic-api-key:78
+
+# Placeholder example value in the OpenAPI spec ("a1b2c3d4e5f6..."), not a
+# real token.
+0990c8c59fd45a40f6a677cd23088d5ada8b038b:api/openapi.yaml:generic-api-key:213

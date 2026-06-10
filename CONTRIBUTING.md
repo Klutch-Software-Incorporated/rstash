@@ -4,7 +4,18 @@
 
 - Go 1.24+
 - [Task](https://taskfile.dev/) (task runner)
-- [Fossil](https://fossil-scm.org/) (source control)
+- Git
+
+## Contribution workflow
+
+rstash is developed on [GitHub](https://github.com/Klutch-Software-Incorporated/rstash). To contribute:
+
+1. Fork the repository and clone your fork.
+2. Create a branch off `main` for your change.
+3. Make your change; run `task fmt`, `task vet`, and `task test` before pushing.
+4. Open a pull request against `main`. CI (build, vet, test, secret scan) runs automatically on every PR.
+
+A maintainer will review; once CI is green and the change is approved, it'll be merged.
 
 ## Getting Started
 
