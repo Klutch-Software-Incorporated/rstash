@@ -52,13 +52,6 @@ site/dist/
 site/.astro/
 internal/ui/site/
 
-# Infrastructure
-infra/pulumi/node_modules/
-infra/pulumi/.env
-infra/.env.generated
-infra/.caddy-image.tar
-infra/.fossil-image.tar
-
 # Fossil artifacts (kept locally as backup during migration)
 _FOSSIL_
 .fslckout
