@@ -1,6 +1,0 @@
-name: rstash-cloud
-runtime:
-  name: nodejs
-  options:
-    packagemanager: npm
-description: DigitalOcean infrastructure for rstash.cloud

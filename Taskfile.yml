@@ -4,9 +4,6 @@ env:
   TASK_CORE_UTILS: "1"
 
 includes:
-  infra:
-    taskfile: ./infra/Taskfile.yml
-    dir: ./infra
   site:
     taskfile: ./site/Taskfile.yml
     dir: ./site
