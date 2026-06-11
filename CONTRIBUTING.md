@@ -17,6 +17,46 @@ rstash is developed on [GitHub](https://github.com/Klutch-Software-Incorporated/
 
 A maintainer will review; once CI is green and the change is approved, it'll be merged.
 
+## Versioning & Releases
+
+rstash uses [Semantic Versioning](https://semver.org/). It's pre-1.0, so the
+`0.` prefix is itself the signal that the config, database schema, and protocol
+surfaces are still stabilizing.
+
+Categorize a change by the worst thing it does to an **existing deployment on
+upgrade**:
+
+| Bump (pre-1.0)  | When | Examples |
+|---|---|---|
+| **breaking** → `0.(y+1).0` | Not backward-compatible | non-reversible `AutoMigrate` change (column drop/rename); removing/renaming an `RSTASH_*` var or changing a default's behavior; breaking the remoteStorage protocol or admin API; dropping a DSN/config format |
+| **feature** → `0.y.(z+1)` | Backward-compatible addition | new blob backend, new endpoint, new *optional* setting, new CLI subcommand |
+| **fix** → `0.y.(z+1)` | Backward-compatible fix | bugfix, security patch, dependency bump, docs, perf, internal refactor |
+
+Label each PR `breaking` / `feature` / `fix` so the highest label across the
+merged-since-last-release set dictates the next bump, and the release notes
+group cleanly.
+
+**Who cuts a release:** maintainers, not contributors. Merging a PR does not cut
+a release — a release tag is a deliberate "this slice of `main` is blessed for
+download" act. Contributors land labeled changes; a maintainer decides when to
+tag and what the bump is, then pushes a `vX.Y.Z` tag. That tag (and only that)
+triggers the GitHub Release workflow, which cross-compiles the binaries and
+attaches them. Tagging is **decoupled from deploys**: rstash.cloud continuously
+deploys every approved merge to `main` regardless of tags — a release tag only
+governs the downloadable binaries.
+
+**Version string:** every binary bakes its version in via `git describe` —
+`v0.4.1` on a release tag, `v0.4.1-7-gabc1234` on an untagged commit — so any
+build traces back to a commit (`rstash --version`, or the admin status page). A
+plain `go build`/`go run` during development falls back to the commit SHA Go
+embeds, so it's never an opaque `dev`.
+
+**`go install` is not supported.** The module path is the bare name `rstash`
+(not a URL), so `go install` can't resolve it, and the binary embeds a docs site
+generated at build time that a plain `go install` would skip. Use the binaries
+on the [Releases page](https://github.com/Klutch-Software-Incorporated/rstash/releases)
+or `task build`.
+
 ## Getting Started
 
 ```sh

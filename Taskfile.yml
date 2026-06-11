@@ -8,9 +8,6 @@ includes:
     taskfile: ./site/Taskfile.yml
     dir: ./site
 
-vars:
-  VERSION: '{{now | date "2006.01.02"}}'
-
 tasks:
   collect-licenses:
     desc: Collect third-party license information
@@ -56,6 +53,13 @@ tasks:
 
   build:
     desc: Cross-compile release binaries for all platforms
+    vars:
+      # git describe gives "v0.4.1" on a release tag and "v0.4.1-7-gabc1234"
+      # on an untagged commit; --always falls back to a bare SHA if there are
+      # no tags yet, --dirty flags an uncommitted tree. This single string is
+      # baked into every binary so any build traces back to a commit.
+      VERSION:
+        sh: git describe --tags --always --dirty
     deps: [collect-licenses, site:embed]
     sources:
       - "**/*.go"
