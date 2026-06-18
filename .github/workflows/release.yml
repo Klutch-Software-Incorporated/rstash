@@ -1,9 +1,9 @@
 name: Release
 
 # Cross-compiles the release binaries and attaches them to a GitHub Release.
-# Triggered by pushing a CalVer tag, e.g. v2026.0610.1. The version (tag
-# without the leading "v") is baked into the binary via the build's ldflags.
-# Replaces the old Azure Artifacts Universal Package feed.
+# Triggered by pushing a SemVer tag, e.g. v0.4.1 (see CONTRIBUTING.md for the
+# bump rules). The tag — with its leading "v" — is baked into the binary via
+# the build's ldflags. Replaces the old Azure Artifacts Universal Package feed.
 
 on:
   push:
@@ -42,7 +42,9 @@ jobs:
         working-directory: site
 
       - name: Cross-compile release binaries
-        run: task build VERSION="${GITHUB_REF_NAME#v}"
+        # Pass the tag verbatim (with the leading "v") so the baked version
+        # matches the git tag and `git describe` exactly: v0.4.1, not 0.4.1.
+        run: task build VERSION="${GITHUB_REF_NAME}"
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2

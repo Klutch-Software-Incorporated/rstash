@@ -33,9 +33,12 @@ RUN cd site && npm ci
 # Full source.
 COPY . .
 
-# Version baked into the binary via -ldflags. Default "dev" is overridden
-# in CI via --build-arg VERSION=<pipeline-version>.
-ARG VERSION=dev
+# Version baked into the binary via -ldflags. The ADO image pipeline passes
+# --build-arg VERSION=<git describe> (.git is excluded from the build context,
+# so the binary's VCS fallback can't fire here — the build-arg is the source of
+# truth). Left empty by default: an un-injected manual `docker build` then
+# falls through to config.Version's "unknown", never a misleading "dev".
+ARG VERSION=
 
 # Generate embedded licenses.json.
 RUN go run ./cmd/collect-licenses
