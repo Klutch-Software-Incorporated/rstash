@@ -1,0 +1,12 @@
+<Project>
+
+  <!-- Inherit the repo-root defaults, then add test-only relaxations. -->
+  <Import Project="$([MSBuild]::GetPathOfFileAbove('Directory.Build.props', '$(MSBuildThisFileDirectory)../'))" />
+
+  <PropertyGroup>
+    <!-- Test methods use the idiomatic Method_State_Expected naming. -->
+    <NoWarn>$(NoWarn);CA1707</NoWarn>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+</Project>
