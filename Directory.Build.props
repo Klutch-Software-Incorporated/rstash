@@ -1,0 +1,13 @@
+<Project>
+
+  <!-- Cross-cutting defaults for every Rstash project. Per-project csproj keeps
+       TargetFramework/Nullable/ImplicitUsings (template defaults, net10.0). -->
+  <PropertyGroup>
+    <LangVersion>latest</LangVersion>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <EnableNETAnalyzers>true</EnableNETAnalyzers>
+    <AnalysisLevel>latest-recommended</AnalysisLevel>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+  </PropertyGroup>
+
+</Project>

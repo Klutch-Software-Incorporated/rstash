@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <ItemGroup>
+    <ProjectReference Include="..\Rstash.Model\Rstash.Model.csproj" />
+    <ProjectReference Include="..\Rstash.Services\Rstash.Services.csproj" />
+    <ProjectReference Include="..\Rstash.Storage\Rstash.Storage.csproj" />
+    <ProjectReference Include="..\Rstash.Database\Rstash.Database.csproj" />
+    <ProjectReference Include="..\Rstash.Notifications\Rstash.Notifications.csproj" />
+    <ProjectReference Include="..\Rstash.Web\Rstash.Web.csproj" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+</Project>
