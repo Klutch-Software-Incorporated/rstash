@@ -4,6 +4,7 @@
     <ProjectReference Include="..\Rstash.Model\Rstash.Model.csproj" />
     <ProjectReference Include="..\Rstash.Storage\Rstash.Storage.csproj" />
     <ProjectReference Include="..\Rstash.Notifications\Rstash.Notifications.csproj" />
+    <ProjectReference Include="..\Rstash.Database\Rstash.Database.csproj" />
   </ItemGroup>
 
   <PropertyGroup>

@@ -13,6 +13,8 @@ public class RstashDbContext(DbContextOptions<RstashDbContext> options) : DbCont
 
     public DbSet<AuditEntry> AuditLog => Set<AuditEntry>();
 
+    public DbSet<Setting> Settings => Set<Setting>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
