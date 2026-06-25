@@ -4,6 +4,14 @@
     <ProjectReference Include="..\Rstash.Model\Rstash.Model.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="10.0.9" />
+    <!-- Direct ref overrides the vulnerable transitive SQLitePCLRaw.lib.e_sqlite3 2.1.11
+         (GHSA-2m69-gcr7-jv3q) pulled in by EF Core's Sqlite provider. Verify runtime DB
+         open in P1 (3.x is a major bump over the 2.1.x EF Core 10 ships against). -->
+    <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" Version="3.0.3" />
+  </ItemGroup>
+
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
