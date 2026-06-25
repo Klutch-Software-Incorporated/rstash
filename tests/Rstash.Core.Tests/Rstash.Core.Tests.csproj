@@ -22,6 +22,7 @@
     <ProjectReference Include="..\..\src\Rstash.Model\Rstash.Model.csproj" />
     <ProjectReference Include="..\..\src\Rstash.Services\Rstash.Services.csproj" />
     <ProjectReference Include="..\..\src\Rstash.Storage\Rstash.Storage.csproj" />
+    <ProjectReference Include="..\..\src\Rstash.Database\Rstash.Database.csproj" />
   </ItemGroup>
 
 </Project>
