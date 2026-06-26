@@ -143,6 +143,7 @@ app.Use(async (context, next) =>
             || path.StartsWithSegments("/storage")
             || path.StartsWithSegments("/.well-known")
             || path.StartsWithSegments("/oauth")
+            || path.StartsWithSegments("/ui")
             || path.StartsWithSegments("/_")
             || (path.Value?.Contains('.') ?? false);
 
@@ -180,6 +181,7 @@ app.MapWebFinger(baseUrl);
 app.MapOAuthEndpoints();
 app.MapFileBrowserEndpoints();
 app.MapAdminUserEndpoints();
+app.MapUiEndpoints();
 
 app.Run();
 

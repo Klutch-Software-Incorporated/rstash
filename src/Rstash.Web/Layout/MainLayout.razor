@@ -1,33 +1,88 @@
 @inherits LayoutComponentBase
+@inject Rstash.Services.SettingsService Settings
+@inject UserManager<ApplicationUser> Users
+@inject NavigationManager Navigation
 
-<MudThemeProvider />
+<MudThemeProvider Theme="RstashTheme.Theme" IsDarkMode="_isDarkMode" />
 <MudPopoverProvider />
 <MudDialogProvider />
 <MudSnackbarProvider />
 
 <MudLayout>
     <MudAppBar Elevation="1">
-        <MudLink Href="/" Color="Color.Inherit" Typo="Typo.h6" Underline="Underline.None">rstash</MudLink>
+        <MudIcon Icon="@Icons.Material.Filled.Cloud" Class="mr-2" />
+        <MudLink Href="/" Color="Color.Inherit" Typo="Typo.h6" Underline="Underline.None">@_siteName</MudLink>
         <MudSpacer />
+        <MudIconButton Href="@ThemeToggleUrl"
+                       Icon="@(_isDarkMode ? Icons.Material.Filled.LightMode : Icons.Material.Filled.DarkMode)"
+                       Color="Color.Inherit"
+                       title="Toggle light/dark theme" />
         <AuthorizeView>
             <Authorized>
-                <MudButton Href="/files" Color="Color.Inherit" Variant="Variant.Text">Files</MudButton>
-                <MudButton Href="/admin/settings" Color="Color.Inherit" Variant="Variant.Text">Settings</MudButton>
-                <MudLink Href="/account" Color="Color.Inherit" Class="mx-4">@context.User.Identity?.Name</MudLink>
-                <form action="/auth/logout" method="post">
-                    <MudButton ButtonType="ButtonType.Submit" Color="Color.Inherit" Variant="Variant.Text">
-                        Sign out
-                    </MudButton>
+                <MudButton Href="/files" Color="Color.Inherit" Variant="Variant.Text"
+                           StartIcon="@Icons.Material.Filled.Folder">Files</MudButton>
+                @if (_isAdmin)
+                {
+                    <MudButton Href="/admin/settings" Color="Color.Inherit" Variant="Variant.Text"
+                               StartIcon="@Icons.Material.Filled.AdminPanelSettings">Admin</MudButton>
+                }
+                <MudButton Href="/account" Color="Color.Inherit" Variant="Variant.Text"
+                           StartIcon="@Icons.Material.Filled.AccountCircle">@context.User.Identity?.Name</MudButton>
+                <form action="/auth/logout" method="post" class="d-flex">
+                    <MudButton ButtonType="ButtonType.Submit" Color="Color.Inherit" Variant="Variant.Text"
+                               StartIcon="@Icons.Material.Filled.Logout">Sign out</MudButton>
                 </form>
             </Authorized>
             <NotAuthorized>
-                <MudButton Href="/login" Color="Color.Inherit" Variant="Variant.Text">Sign in</MudButton>
+                <MudButton Href="/login" Color="Color.Inherit" Variant="Variant.Outlined">Sign in</MudButton>
             </NotAuthorized>
         </AuthorizeView>
     </MudAppBar>
     <MudMainContent>
-        <MudContainer MaxWidth="MaxWidth.Large" Class="mt-6">
+        <MudContainer MaxWidth="MaxWidth.Large" Class="mt-6 mb-4">
             @Body
+        </MudContainer>
+        <MudContainer MaxWidth="MaxWidth.Large" Class="mb-4">
+            <MudDivider Class="mb-3" />
+            <MudText Typo="Typo.caption" Color="Color.Secondary">@_siteName · powered by rstash</MudText>
         </MudContainer>
     </MudMainContent>
 </MudLayout>
+
+@code {
+    [CascadingParameter] private HttpContext? HttpContext { get; set; }
+
+    private bool _isDarkMode;
+    private bool _isAdmin;
+    private string _siteName = "rstash";
+
+    protected override async Task OnInitializedAsync()
+    {
+        _siteName = Settings.Current.SiteName;
+
+        if (HttpContext is null)
+        {
+            return;
+        }
+
+        _isDarkMode = HttpContext.Request.Cookies.TryGetValue(RstashTheme.ThemeCookie, out var pref)
+            && string.Equals(pref, "dark", StringComparison.OrdinalIgnoreCase);
+
+        if (HttpContext.User.Identity?.IsAuthenticated == true)
+        {
+            var user = await Users.GetUserAsync(HttpContext.User);
+            _isAdmin = user?.IsAdmin ?? false;
+        }
+    }
+
+    // Flip-to-the-opposite-mode link; returns to the current page after setting the cookie.
+    private string ThemeToggleUrl
+    {
+        get
+        {
+            var returnTo = new Uri(Navigation.Uri).PathAndQuery;
+            var nextMode = _isDarkMode ? "light" : "dark";
+            return $"/ui/theme?mode={nextMode}&return={Uri.EscapeDataString(returnTo)}";
+        }
+    }
+}
