@@ -1,0 +1,112 @@
+@page "/account"
+@attribute [Authorize]
+@inject UserManager<ApplicationUser> Users
+@inject SignInManager<ApplicationUser> SignInManager
+
+<PageTitle>Account</PageTitle>
+
+<MudText Typo="Typo.h4" GutterBottom="true">Account</MudText>
+<MudText>Username: <strong>@_username</strong></MudText>
+<MudText Class="mb-4">Email: <strong>@(_email ?? "(none)")</strong></MudText>
+
+<MudText Typo="Typo.h6">Change password</MudText>
+@if (_passwordMessage is not null) { <MudAlert Severity="Severity.Success" Class="my-2">@_passwordMessage</MudAlert> }
+@if (_passwordError is not null) { <MudAlert Severity="Severity.Error" Class="my-2">@_passwordError</MudAlert> }
+<EditForm Model="PasswordModel" method="post" OnValidSubmit="ChangePasswordAsync" FormName="password">
+    <DataAnnotationsValidator />
+    <div class="mb-2"><label>Current password<br /><InputText type="password" @bind-Value="PasswordModel.Current" /></label></div>
+    <div class="mb-2"><label>New password<br /><InputText type="password" @bind-Value="PasswordModel.New" /></label></div>
+    <MudButton ButtonType="ButtonType.Submit" Variant="Variant.Filled" Color="Color.Primary">Update password</MudButton>
+</EditForm>
+
+<MudText Typo="Typo.h6" Class="mt-6">Change email</MudText>
+@if (_emailMessage is not null) { <MudAlert Severity="Severity.Success" Class="my-2">@_emailMessage</MudAlert> }
+@if (_emailError is not null) { <MudAlert Severity="Severity.Error" Class="my-2">@_emailError</MudAlert> }
+<EditForm Model="EmailModel" method="post" OnValidSubmit="ChangeEmailAsync" FormName="email">
+    <DataAnnotationsValidator />
+    <div class="mb-2"><label>Email<br /><InputText @bind-Value="EmailModel.Email" /></label></div>
+    <MudButton ButtonType="ButtonType.Submit" Variant="Variant.Filled" Color="Color.Primary">Update email</MudButton>
+</EditForm>
+
+@code {
+    [SupplyParameterFromForm(FormName = "password")] private PasswordInput PasswordModel { get; set; } = new();
+    [SupplyParameterFromForm(FormName = "email")] private EmailInput EmailModel { get; set; } = new();
+    [CascadingParameter] private HttpContext? HttpContext { get; set; }
+
+    private string _username = "";
+    private string? _email;
+    private string? _passwordMessage;
+    private string? _passwordError;
+    private string? _emailMessage;
+    private string? _emailError;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var user = await CurrentUserAsync();
+        if (user is null)
+        {
+            return;
+        }
+
+        _username = user.UserName ?? "";
+        _email = user.Email;
+    }
+
+    private async Task ChangePasswordAsync()
+    {
+        var user = await CurrentUserAsync();
+        if (user is null)
+        {
+            return;
+        }
+
+        var result = await Users.ChangePasswordAsync(user, PasswordModel.Current, PasswordModel.New);
+        if (result.Succeeded)
+        {
+            await SignInManager.RefreshSignInAsync(user);
+            _passwordMessage = "Password updated.";
+            _passwordError = null;
+        }
+        else
+        {
+            _passwordError = string.Join(" ", result.Errors.Select(e => e.Description));
+            _passwordMessage = null;
+        }
+    }
+
+    private async Task ChangeEmailAsync()
+    {
+        var user = await CurrentUserAsync();
+        if (user is null)
+        {
+            return;
+        }
+
+        var result = await Users.SetEmailAsync(user, EmailModel.Email);
+        if (result.Succeeded)
+        {
+            _email = EmailModel.Email;
+            _emailMessage = "Email updated.";
+            _emailError = null;
+        }
+        else
+        {
+            _emailError = string.Join(" ", result.Errors.Select(e => e.Description));
+            _emailMessage = null;
+        }
+    }
+
+    private Task<ApplicationUser?> CurrentUserAsync() =>
+        HttpContext is null ? Task.FromResult<ApplicationUser?>(null) : Users.GetUserAsync(HttpContext.User);
+
+    public sealed class PasswordInput
+    {
+        [Required] public string Current { get; set; } = "";
+        [Required] public string New { get; set; } = "";
+    }
+
+    public sealed class EmailInput
+    {
+        [Required, EmailAddress] public string Email { get; set; } = "";
+    }
+}
