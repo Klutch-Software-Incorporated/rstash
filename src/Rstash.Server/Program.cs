@@ -13,6 +13,7 @@ var builder = WebApplication.CreateBuilder(args);
 // Boot-critical configuration (env vars; see the settings registry for the rest).
 var databaseDsn = builder.Configuration["RSTASH_DB"] ?? "sqlite:rstash.sqlite";
 var blobDsn = builder.Configuration["RSTASH_BLOB"] ?? "sqlite:rstash-blobs.sqlite";
+var baseUrl = (builder.Configuration["RSTASH_BASE_URL"] ?? "http://localhost:8080").TrimEnd('/');
 
 // Core services.
 builder.Services.AddHealthChecks();
@@ -116,7 +117,8 @@ app.MapPost("/auth/logout", async (SignInManager<ApplicationUser> signInManager)
 
 // remoteStorage storage API (bearer-token auth + scopes).
 app.MapStorageEndpoints();
-// WebFinger discovery + OAuth authorize/token/revoke land next in P4.
+app.MapWebFinger(baseUrl);
+// OAuth authorize/token/revoke land next in P4.
 
 app.Run();
 
