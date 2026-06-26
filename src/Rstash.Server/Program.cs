@@ -29,6 +29,10 @@ var databaseDsn = builder.Configuration["RSTASH_DB"] ?? "sqlite:rstash.sqlite";
 var blobDsn = builder.Configuration["RSTASH_BLOB"] ?? "sqlite:rstash-blobs.sqlite";
 var baseUrl = (builder.Configuration["RSTASH_BASE_URL"] ?? "http://localhost:8080").TrimEnd('/');
 
+// Listen on RSTASH_ADDR (host:port; empty host = all interfaces), default :8080.
+var listenAddr = builder.Configuration["RSTASH_ADDR"] ?? ":8080";
+builder.WebHost.UseUrls(listenAddr.StartsWith(':') ? $"http://0.0.0.0{listenAddr}" : $"http://{listenAddr}");
+
 // Core services.
 builder.Services.AddHealthChecks();
 builder.Services.AddOpenApi();
