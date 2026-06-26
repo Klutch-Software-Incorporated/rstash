@@ -21,6 +21,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Rstash.Model\Rstash.Model.csproj" />
+    <ProjectReference Include="..\Rstash.Notifications\Rstash.Notifications.csproj" />
     <ProjectReference Include="..\Rstash.Services\Rstash.Services.csproj" />
   </ItemGroup>
 

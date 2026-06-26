@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using MudBlazor.Services;
 using Rstash.Database;
+using Rstash.Notifications;
 using Rstash.Server.Components;
 using Rstash.Server.Endpoints;
 using Rstash.Services;
@@ -23,6 +24,7 @@ builder.Services.AddSingleton<SettingsService>();
 builder.Services.AddSingleton<RemoteStorageService>();
 builder.Services.AddSingleton<SetupState>();
 builder.Services.AddSingleton<TokenStore>();
+builder.Services.AddSingleton(EmailSenderFactory.Create(builder.Configuration["RSTASH_EMAIL"]));
 
 // CORS for the storage API (remoteStorage clients run in browsers).
 builder.Services.AddCors(options => options.AddPolicy("rstash-storage", policy => policy
