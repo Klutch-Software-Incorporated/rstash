@@ -9,9 +9,8 @@
 <MudSnackbarProvider />
 
 <MudLayout>
-    <MudAppBar Elevation="1">
-        <MudIcon Icon="@Icons.Material.Filled.Cloud" Class="mr-2" />
-        <MudLink Href="/" Color="Color.Inherit" Typo="Typo.h6" Underline="Underline.None">@_siteName</MudLink>
+    <MudAppBar Elevation="0" Class="rs-appbar">
+        <a href="/" class="rs-brand"><span class="rs-brand-mark"></span>@_siteName</a>
         <MudSpacer />
         <MudIconButton Href="@ThemeToggleUrl"
                        Icon="@(_isDarkMode ? Icons.Material.Filled.LightMode : Icons.Material.Filled.DarkMode)"
@@ -20,29 +19,31 @@
         <AuthorizeView>
             <Authorized>
                 <MudButton Href="/files" Color="Color.Inherit" Variant="Variant.Text"
-                           StartIcon="@Icons.Material.Filled.Folder">Files</MudButton>
+                           StartIcon="@Icons.Material.Filled.Folder" Class="mx-1">Files</MudButton>
                 @if (_isAdmin)
                 {
                     <MudButton Href="/admin/settings" Color="Color.Inherit" Variant="Variant.Text"
-                               StartIcon="@Icons.Material.Filled.AdminPanelSettings">Admin</MudButton>
+                               StartIcon="@Icons.Material.Filled.AdminPanelSettings" Class="mx-1">Admin</MudButton>
                 }
-                <MudButton Href="/account" Color="Color.Inherit" Variant="Variant.Text"
-                           StartIcon="@Icons.Material.Filled.AccountCircle">@context.User.Identity?.Name</MudButton>
+                <a href="/account" class="rs-account mx-2">
+                    <span>@_accountLabel</span>
+                    <span class="rs-avatar">@_initial</span>
+                </a>
                 <form action="/auth/logout" method="post" class="d-flex">
-                    <MudButton ButtonType="ButtonType.Submit" Color="Color.Inherit" Variant="Variant.Text"
-                               StartIcon="@Icons.Material.Filled.Logout">Sign out</MudButton>
+                    <MudIconButton ButtonType="ButtonType.Submit" Icon="@Icons.Material.Filled.Logout"
+                                   Color="Color.Inherit" title="Sign out" />
                 </form>
             </Authorized>
             <NotAuthorized>
-                <MudButton Href="/login" Color="Color.Inherit" Variant="Variant.Outlined">Sign in</MudButton>
+                <MudButton Href="/login" Variant="Variant.Filled" Color="Color.Primary" Class="ml-2">Sign in</MudButton>
             </NotAuthorized>
         </AuthorizeView>
     </MudAppBar>
     <MudMainContent>
-        <MudContainer MaxWidth="MaxWidth.Large" Class="mt-6 mb-4">
+        <MudContainer MaxWidth="MaxWidth.False" Class="rs-main mt-6 mb-4">
             @Body
         </MudContainer>
-        <MudContainer MaxWidth="MaxWidth.Large" Class="mb-4">
+        <MudContainer MaxWidth="MaxWidth.False" Class="rs-main mb-6">
             <MudDivider Class="mb-3" />
             <MudText Typo="Typo.caption" Color="Color.Secondary">@_siteName · powered by rstash</MudText>
         </MudContainer>
@@ -55,6 +56,8 @@
     private bool _isDarkMode;
     private bool _isAdmin;
     private string _siteName = "rstash";
+    private string _accountLabel = "";
+    private string _initial = "?";
 
     protected override async Task OnInitializedAsync()
     {
@@ -72,6 +75,12 @@
         {
             var user = await Users.GetUserAsync(HttpContext.User);
             _isAdmin = user?.IsAdmin ?? false;
+
+            // Show the remoteStorage handle (user@host) — the brand's identity anchor.
+            var name = user?.UserName ?? HttpContext.User.Identity.Name ?? "";
+            var host = new Uri(Navigation.BaseUri).Host;
+            _accountLabel = string.IsNullOrEmpty(name) ? host : $"{name}@{host}";
+            _initial = string.IsNullOrEmpty(name) ? "?" : name[..1];
         }
     }
 

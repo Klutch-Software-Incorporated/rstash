@@ -5,6 +5,7 @@ namespace Rstash.Web;
 /// <summary>
 /// The rstash brand theme. A single shared <see cref="MudTheme"/> consumed by the layout's
 /// <c>MudThemeProvider</c>; light/dark are selected at render time from a cookie preference.
+/// Brand: warm gold (<c>#d4a840</c>) and deep gold (<c>#8a6d00</c>) on an off-white canvas.
 /// </summary>
 public static class RstashTheme
 {
@@ -15,35 +16,58 @@ public static class RstashTheme
     {
         PaletteLight = new PaletteLight
         {
-            Primary = "#5B61E8",
-            Secondary = "#16B8A6",
-            AppbarBackground = "#5B61E8",
-            AppbarText = "#FFFFFF",
-            Background = "#F6F7FB",
-            BackgroundGray = "#EEF0F6",
+            Primary = "#D4A840",
+            PrimaryContrastText = "#2A2007",
+            Secondary = "#8A6D00",
+            SecondaryContrastText = "#FFFFFF",
+            AppbarBackground = "#FAFAF8",
+            AppbarText = "#2A2620",
+            Background = "#FAFAF8",
+            BackgroundGray = "#F2F1EC",
             Surface = "#FFFFFF",
             DrawerBackground = "#FFFFFF",
+            TextPrimary = "#2A2620",
+            TextSecondary = "#7A7468",
+            ActionDefault = "#7A7468",
+            LinesDefault = "#E9E5DB",
+            LinesInputs = "#E9E5DB",
+            TableLines = "#E9E5DB",
+            Divider = "#E9E5DB",
             Success = "#2E9E6B",
             Warning = "#C9810B",
-            Error = "#D64550",
-            TextPrimary = "#1D2433",
-            TextSecondary = "#5A6478",
+            Error = "#C0392B",
         },
         PaletteDark = new PaletteDark
         {
-            Primary = "#8B90F5",
-            Secondary = "#2BD4C3",
-            AppbarBackground = "#1A1C23",
-            AppbarText = "#ECEDF4",
-            Background = "#121319",
-            BackgroundGray = "#0D0E13",
-            Surface = "#1A1C23",
-            DrawerBackground = "#1A1C23",
+            Primary = "#D4A840",
+            PrimaryContrastText = "#2A2007",
+            Secondary = "#D8B85F",
+            SecondaryContrastText = "#2A2007",
+            AppbarBackground = "#211F1A",
+            AppbarText = "#ECE7DA",
+            Background = "#1A1814",
+            BackgroundGray = "#13110E",
+            Surface = "#211F1A",
+            DrawerBackground = "#211F1A",
+            TextPrimary = "#ECE7DA",
+            TextSecondary = "#A89F8D",
+            ActionDefault = "#A89F8D",
+            LinesDefault = "#3A352C",
+            LinesInputs = "#3A352C",
+            TableLines = "#3A352C",
+            Divider = "#3A352C",
             Success = "#3FBE82",
             Warning = "#E0A93B",
             Error = "#E5707A",
-            TextPrimary = "#ECEDF4",
-            TextSecondary = "#A4ABBD",
+        },
+        Typography = new Typography
+        {
+            Default = new DefaultTypography
+            {
+                FontFamily = ["Roboto", "system-ui", "sans-serif"],
+                FontSize = "0.9375rem",
+                LineHeight = "1.5",
+            },
         },
         LayoutProperties = new LayoutProperties
         {

@@ -1,0 +1,94 @@
+/* rstash brand layer — small custom pieces that sit on top of MudBlazor.
+   Colors reference MudBlazor's own palette CSS variables (--mud-palette-*) so
+   everything adapts automatically when the theme switches to dark mode. */
+
+:root {
+    --rs-gold: #d4a840;
+    --rs-gold-deep: #8a6d00;
+    --rs-gold-tint: #f7efd8;
+    --rs-gold-tint-line: #ecddae;
+    --rs-shadow: 0 1px 2px rgba(42, 38, 32, .04), 0 1px 12px rgba(42, 38, 32, .03);
+}
+
+.rs-mono,
+.mono {
+    font-family: 'Roboto Mono', ui-monospace, monospace;
+}
+
+/* App bar: blends with the page, separated by a hairline instead of a shadow. */
+.rs-appbar {
+    border-bottom: 1px solid var(--mud-palette-lines-default);
+}
+
+/* Brand: tilde mark + wordmark. */
+.rs-brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-weight: 900;
+    font-size: 19px;
+    letter-spacing: -.5px;
+    color: var(--mud-palette-text-primary);
+    text-decoration: none;
+}
+
+.rs-brand-mark {
+    width: 26px;
+    height: 26px;
+    border-radius: 7px;
+    background: var(--mud-palette-primary);
+    color: var(--mud-palette-primary-text);
+    display: grid;
+    place-items: center;
+    font-family: 'Roboto Mono', monospace;
+    font-weight: 700;
+    font-size: 15px;
+}
+
+.rs-brand-mark::before {
+    content: "~";
+    transform: translateY(-1px);
+}
+
+/* Account pill: storage handle + avatar, links to the account page. */
+.rs-account {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    padding: 5px 6px 5px 12px;
+    border: 1px solid var(--mud-palette-lines-default);
+    border-radius: 999px;
+    background: var(--mud-palette-surface);
+    font-size: 13.5px;
+    color: var(--mud-palette-text-secondary);
+    text-decoration: none;
+    white-space: nowrap;
+}
+
+.rs-account:hover {
+    border-color: var(--rs-gold-tint-line);
+}
+
+.rs-avatar {
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    background: var(--mud-palette-secondary);
+    color: var(--mud-palette-secondary-text);
+    display: grid;
+    place-items: center;
+    font-weight: 700;
+    font-size: 12px;
+    text-transform: uppercase;
+}
+
+/* Page content width — matches the brand reference (1040px). */
+.rs-main {
+    max-width: 1040px;
+    margin: 0 auto;
+}
+
+/* Soften MudBlazor's elevation-1 to the brand's subtle two-layer shadow. */
+.mud-elevation-1 {
+    box-shadow: var(--rs-shadow) !important;
+}
