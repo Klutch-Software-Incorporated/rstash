@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using MudBlazor.Services;
 using Rstash.Database;
@@ -19,6 +20,26 @@ builder.Services.AddSingleton<IStorage>(_ => StorageFactory.Open(blobDsn));
 builder.Services.AddSingleton<SettingsService>();
 builder.Services.AddSingleton<RemoteStorageService>();
 
+// Scoped context bridge: Identity's EF stores need a per-request RstashDbContext,
+// while the singleton services above use the factory directly.
+builder.Services.AddScoped<RstashDbContext>(sp =>
+    sp.GetRequiredService<IDbContextFactory<RstashDbContext>>().CreateDbContext());
+
+// ASP.NET Core Identity (core APIs only — the setup/login UI is custom Blazor).
+builder.Services.AddAuthentication(IdentityConstants.ApplicationScheme).AddIdentityCookies();
+builder.Services
+    .AddIdentityCore<ApplicationUser>(options =>
+    {
+        options.SignIn.RequireConfirmedAccount = false;
+        options.User.RequireUniqueEmail = false;
+    })
+    .AddRoles<IdentityRole<long>>()
+    .AddEntityFrameworkStores<RstashDbContext>()
+    .AddSignInManager()
+    .AddDefaultTokenProviders();
+builder.Services.AddAuthorization();
+builder.Services.AddCascadingAuthenticationState();
+
 // Blazor Web App (interactive server) + MudBlazor.
 builder.Services.AddRazorComponents().AddInteractiveServerComponents();
 builder.Services.AddMudServices();
@@ -36,6 +57,8 @@ await using (var scope = app.Services.CreateAsyncScope())
 }
 
 app.MapStaticAssets();
+app.UseAuthentication();
+app.UseAuthorization();
 app.UseAntiforgery();
 
 app.MapHealthChecks("/healthz");

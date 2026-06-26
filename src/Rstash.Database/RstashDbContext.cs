@@ -1,13 +1,16 @@
+using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using Rstash.Model;
 
 namespace Rstash.Database;
 
 /// <summary>
-/// The rstash EF Core context. Identity and OpenIddict stores are layered onto
-/// this base in P3/P4; for now it owns the protocol domain tables.
+/// The rstash EF Core context, built on Identity (AspNet* tables). OpenIddict
+/// stores are layered on in P4; it also owns the protocol domain tables.
 /// </summary>
-public class RstashDbContext(DbContextOptions<RstashDbContext> options) : DbContext(options)
+public class RstashDbContext(DbContextOptions<RstashDbContext> options)
+    : IdentityDbContext<ApplicationUser, IdentityRole<long>, long>(options)
 {
     public DbSet<Node> Nodes => Set<Node>();
 
