@@ -19,6 +19,7 @@ builder.Services.AddDbContextFactory<RstashDbContext>(options => options.UseRsta
 builder.Services.AddSingleton<IStorage>(_ => StorageFactory.Open(blobDsn));
 builder.Services.AddSingleton<SettingsService>();
 builder.Services.AddSingleton<RemoteStorageService>();
+builder.Services.AddSingleton<SetupState>();
 
 // Scoped context bridge: Identity's EF stores need a per-request RstashDbContext,
 // while the singleton services above use the factory directly.
@@ -61,10 +62,44 @@ app.UseAuthentication();
 app.UseAuthorization();
 app.UseAntiforgery();
 
+// First-run setup guard: until an account exists, route everything to /setup.
+app.Use(async (context, next) =>
+{
+    var setup = context.RequestServices.GetRequiredService<SetupState>();
+    if (!setup.IsComplete)
+    {
+        var path = context.Request.Path;
+        var exempt = path.StartsWithSegments("/setup")
+            || path.StartsWithSegments("/healthz")
+            || path.StartsWithSegments("/_")
+            || (path.Value?.Contains('.') ?? false);
+
+        var contextFactory = context.RequestServices.GetRequiredService<IDbContextFactory<RstashDbContext>>();
+        await using var db = await contextFactory.CreateDbContextAsync();
+        if (await db.Users.AnyAsync())
+        {
+            setup.MarkComplete();
+        }
+        else if (!exempt)
+        {
+            context.Response.Redirect("/setup");
+            return;
+        }
+    }
+
+    await next();
+});
+
 app.MapHealthChecks("/healthz");
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode()
     .AddAdditionalAssemblies(typeof(Rstash.Web.Layout.MainLayout).Assembly);
+
+app.MapPost("/auth/logout", async (SignInManager<ApplicationUser> signInManager) =>
+{
+    await signInManager.SignOutAsync();
+    return Results.Redirect("/");
+}).DisableAntiforgery();
 
 // Storage protocol endpoints (GET/PUT/DELETE/HEAD /storage/...), WebFinger, and
 // OAuth land in P4 — they need bearer-token auth. Identity + setup/login UI are

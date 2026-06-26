@@ -4,6 +4,8 @@
     <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
+    <!-- Form models intentionally keep initializers for the initial SSR render. -->
+    <NoWarn>$(NoWarn);BL0008</NoWarn>
   </PropertyGroup>
 
 
@@ -12,7 +14,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.AspNetCore.Components.Web" Version="10.0.2" />
+    <!-- The UI components use ASP.NET Core types (Identity managers, etc.). -->
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
     <PackageReference Include="MudBlazor" Version="9.5.0" />
   </ItemGroup>
 

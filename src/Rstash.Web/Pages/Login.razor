@@ -1,0 +1,55 @@
+@page "/login"
+@inject SignInManager<ApplicationUser> SignInManager
+@inject NavigationManager Navigation
+
+<PageTitle>Sign in</PageTitle>
+
+<MudText Typo="Typo.h4" GutterBottom="true">Sign in</MudText>
+
+@if (_error is not null)
+{
+    <MudAlert Severity="Severity.Error" Class="mb-4">@_error</MudAlert>
+}
+
+<EditForm Model="Input" method="post" OnValidSubmit="SignInAsync" FormName="login">
+    <DataAnnotationsValidator />
+    <div class="mb-3">
+        <label>Username<br /><InputText @bind-Value="Input.Username" autocomplete="username" /></label>
+    </div>
+    <div class="mb-3">
+        <label>Password<br /><InputText type="password" @bind-Value="Input.Password" autocomplete="current-password" /></label>
+    </div>
+    <MudButton ButtonType="ButtonType.Submit" Variant="Variant.Filled" Color="Color.Primary">
+        Sign in
+    </MudButton>
+</EditForm>
+
+@code {
+    [SupplyParameterFromForm]
+    private LoginInput Input { get; set; } = new();
+
+    private string? _error;
+
+    private async Task SignInAsync()
+    {
+        var result = await SignInManager.PasswordSignInAsync(
+            Input.Username, Input.Password, isPersistent: true, lockoutOnFailure: false);
+
+        if (!result.Succeeded)
+        {
+            _error = "Invalid username or password.";
+            return;
+        }
+
+        Navigation.NavigateTo("/", forceLoad: true);
+    }
+
+    public sealed class LoginInput
+    {
+        [Required]
+        public string Username { get; set; } = "";
+
+        [Required]
+        public string Password { get; set; } = "";
+    }
+}
