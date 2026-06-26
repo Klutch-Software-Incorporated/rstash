@@ -50,6 +50,12 @@ builder.Services
     .AddDefaultTokenProviders();
 builder.Services.AddAuthorization();
 builder.Services.AddCascadingAuthenticationState();
+builder.Services.ConfigureApplicationCookie(options =>
+{
+    options.LoginPath = "/login";
+    options.AccessDeniedPath = "/login";
+    options.ReturnUrlParameter = "redirect";
+});
 
 // Blazor Web App (interactive server) + MudBlazor.
 builder.Services.AddRazorComponents().AddInteractiveServerComponents();

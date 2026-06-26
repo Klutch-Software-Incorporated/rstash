@@ -1,0 +1,98 @@
+@page "/admin/settings"
+@attribute [Authorize]
+@inject SettingsService Settings
+@inject UserManager<ApplicationUser> Users
+@inject NavigationManager Navigation
+
+<PageTitle>Settings — admin</PageTitle>
+
+<MudText Typo="Typo.h4" GutterBottom="true">Server settings</MudText>
+
+@if (_message is not null)
+{
+    <MudAlert Severity="Severity.Success" Class="mb-3">@_message</MudAlert>
+}
+@if (_error is not null)
+{
+    <MudAlert Severity="Severity.Error" Class="mb-3">@_error</MudAlert>
+}
+
+<EditForm Model="Input" method="post" OnValidSubmit="SaveAsync" FormName="setting">
+    <DataAnnotationsValidator />
+    <div class="mb-3">
+        <label>Setting<br />
+            <InputSelect @bind-Value="Input.Key">
+                <option value="">— choose a setting —</option>
+                @foreach (var def in SettingDefinitions.RuntimeEditable)
+                {
+                    <option value="@def.Key">@def.Label (@def.Key)</option>
+                }
+            </InputSelect>
+        </label>
+    </div>
+    <div class="mb-3">
+        <label>Value<br /><InputText @bind-Value="Input.Value" /></label>
+    </div>
+    <MudButton ButtonType="ButtonType.Submit" Variant="Variant.Filled" Color="Color.Primary">Save</MudButton>
+</EditForm>
+
+<MudText Typo="Typo.h6" Class="mt-6 mb-2">Current overrides</MudText>
+@if (_overrides.Count == 0)
+{
+    <MudText>None — every setting is using its default.</MudText>
+}
+else
+{
+    <ul>
+        @foreach (var entry in _overrides)
+        {
+            <li><strong>@entry.Key</strong>: @entry.Value</li>
+        }
+    </ul>
+}
+
+@code {
+    [SupplyParameterFromForm] private SettingInput Input { get; set; } = new();
+    [CascadingParameter] private HttpContext? HttpContext { get; set; }
+
+    private IReadOnlyDictionary<string, string> _overrides = new Dictionary<string, string>();
+    private string? _message;
+    private string? _error;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var user = HttpContext is null ? null : await Users.GetUserAsync(HttpContext.User);
+        if (user is null || !user.IsAdmin)
+        {
+            Navigation.NavigateTo("/", forceLoad: true);
+            return;
+        }
+
+        _overrides = await Settings.GetOverridesAsync();
+    }
+
+    private async Task SaveAsync()
+    {
+        try
+        {
+            await Settings.SetAsync(Input.Key, Input.Value);
+            _message = $"Updated {Input.Key}.";
+            _error = null;
+        }
+        catch (SettingValidationException ex)
+        {
+            _error = ex.Message;
+            _message = null;
+        }
+
+        _overrides = await Settings.GetOverridesAsync();
+    }
+
+    public sealed class SettingInput
+    {
+        [Required]
+        public string Key { get; set; } = "";
+
+        public string Value { get; set; } = "";
+    }
+}
