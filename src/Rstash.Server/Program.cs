@@ -24,6 +24,7 @@ builder.Services.AddSingleton<SettingsService>();
 builder.Services.AddSingleton<RemoteStorageService>();
 builder.Services.AddSingleton<SetupState>();
 builder.Services.AddSingleton<TokenStore>();
+builder.Services.AddSingleton<AuditService>();
 builder.Services.AddSingleton(EmailSenderFactory.Create(builder.Configuration["RSTASH_EMAIL"]));
 
 // CORS for the storage API (remoteStorage clients run in browsers).

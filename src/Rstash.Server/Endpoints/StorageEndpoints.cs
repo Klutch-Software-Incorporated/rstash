@@ -29,7 +29,8 @@ internal static class StorageEndpoints
         RemoteStorageService storage,
         TokenStore tokens,
         UserManager<ApplicationUser> users,
-        SettingsService settings)
+        SettingsService settings,
+        AuditService audit)
     {
         var storagePath = "/" + (path ?? string.Empty);
 
@@ -117,10 +118,15 @@ internal static class StorageEndpoints
                     await TextAsync(ctx, StatusCodes.Status400BadRequest, "cannot PUT a folder");
                     break;
                 case "PUT":
-                    await PutDocumentAsync(ctx, storage, owner.Id, storagePath, conditions, settings.Current.MaxUploadSize);
+                    if (await PutDocumentAsync(ctx, storage, owner.Id, storagePath, conditions, settings.Current.MaxUploadSize))
+                    {
+                        await audit.RecordAsync(owner.Id, "storage.put", "storage", storagePath);
+                    }
+
                     break;
                 case "DELETE":
                     await DeleteDocumentAsync(ctx, storage, owner.Id, storagePath, conditions);
+                    await audit.RecordAsync(owner.Id, "storage.delete", "storage", storagePath);
                     break;
                 default:
                     await TextAsync(ctx, StatusCodes.Status405MethodNotAllowed, "method not allowed");
@@ -179,7 +185,7 @@ internal static class StorageEndpoints
         }
     }
 
-    private static async Task PutDocumentAsync(
+    private static async Task<bool> PutDocumentAsync(
         HttpContext ctx, RemoteStorageService storage, long userId, string path,
         StorageConditions cond, long maxUploadSize)
     {
@@ -192,14 +198,14 @@ internal static class StorageEndpoints
         if (ctx.Request.ContentLength is { } declared && declared > maxUploadSize)
         {
             await TextAsync(ctx, StatusCodes.Status413PayloadTooLarge, "payload too large");
-            return;
+            return false;
         }
 
         var data = await ReadCappedAsync(ctx.Request.Body, maxUploadSize, ctx.RequestAborted);
         if (data is null)
         {
             await TextAsync(ctx, StatusCodes.Status413PayloadTooLarge, "payload too large");
-            return;
+            return false;
         }
 
         using var buffered = new MemoryStream(data, writable: false);
@@ -207,6 +213,7 @@ internal static class StorageEndpoints
 
         ctx.Response.Headers.ETag = ETag.Quote(result.ETag);
         ctx.Response.StatusCode = result.IsNew ? StatusCodes.Status201Created : StatusCodes.Status200OK;
+        return true;
     }
 
     private static async Task DeleteDocumentAsync(

@@ -104,6 +104,21 @@ public sealed class StorageApiTests(RstashAppFactory factory) : IClassFixture<Rs
     }
 
     [Fact]
+    public async Task Put_RecordsAuditEntry()
+    {
+        var (user, token) = await SeedUserWithTokenAsync("audituser", "*:rw");
+
+        await factory.CreateClient().SendAsync(
+            Authed(HttpMethod.Put, $"/storage/{user}/x.txt", token, new StringContent("hi")));
+
+        using var scope = factory.Services.CreateScope();
+        var audit = scope.ServiceProvider.GetRequiredService<AuditService>();
+        var recent = await audit.RecentAsync(50);
+
+        Assert.Contains(recent, e => e.Action == "storage.put" && e.TargetId == "/x.txt");
+    }
+
+    [Fact]
     public async Task UnknownUser_Returns404()
     {
         var (_, token) = await SeedUserWithTokenAsync("erin", "*:rw");

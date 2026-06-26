@@ -1,0 +1,49 @@
+@page "/admin/audit"
+@attribute [Authorize]
+@inject AuditService Audit
+@inject UserManager<ApplicationUser> Users
+@inject NavigationManager Navigation
+
+<PageTitle>Audit log — admin</PageTitle>
+
+<MudText Typo="Typo.h4" GutterBottom="true">Audit log</MudText>
+<MudLink Href="/admin/settings" Class="mb-3">Server settings →</MudLink>
+
+<MudSimpleTable Dense="true" Bordered="true" Class="mt-3">
+    <thead>
+        <tr><th>Time (UTC)</th><th>Actor</th><th>Action</th><th>Target</th></tr>
+    </thead>
+    <tbody>
+        @foreach (var entry in _entries)
+        {
+            <tr>
+                <td>@entry.CreatedAt.UtcDateTime.ToString("u")</td>
+                <td>@entry.ActorId</td>
+                <td>@entry.Action</td>
+                <td>@entry.TargetType:@entry.TargetId</td>
+            </tr>
+        }
+        @if (_entries.Count == 0)
+        {
+            <tr><td colspan="4"><em>No audit entries yet.</em></td></tr>
+        }
+    </tbody>
+</MudSimpleTable>
+
+@code {
+    [CascadingParameter] private HttpContext? HttpContext { get; set; }
+
+    private IReadOnlyList<AuditEntry> _entries = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        var actor = HttpContext is null ? null : await Users.GetUserAsync(HttpContext.User);
+        if (actor is null || !actor.IsAdmin)
+        {
+            Navigation.NavigateTo("/", forceLoad: true);
+            return;
+        }
+
+        _entries = await Audit.RecentAsync(200);
+    }
+}
