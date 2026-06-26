@@ -4,106 +4,113 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-rstash is a remoteStorage server (draft-dejong-remotestorage-26) written in Go.
-It implements the remoteStorage protocol including WebFinger discovery, OAuth 2.0
+rstash is a remoteStorage server (draft-dejong-remotestorage-26) written in **C# / .NET 10**.
+It implements the remoteStorage protocol including WebFinger discovery, OAuth 2.0 + PKCE
 authorization, and the storage API (GET/PUT/DELETE/HEAD for documents and folders).
 
 The target audience is technical self-hosters running personal or small family/friends
 servers. The design prioritizes a "just run it and go" experience — run `rstash` to
 start the server and complete setup through the web UI.
 
-Source control is managed via Git, hosted on GitHub (Klutch-Software-Incorporated/rstash).
-The hosted rstash.cloud deploy pipeline lives in the separate `rstash-infra` repo on
-Azure DevOps, which pulls from GitHub to build and push the container image — GitHub
-itself holds no deploy credentials. See `docs/github-migration.md` for the full split.
+> **History:** this codebase was rewritten from Go to idiomatic C#/.NET. The original Go
+> implementation is preserved under `legacy/` as a behavioral reference and parity oracle.
+> It is not built or shipped. The Go tests were ported to xUnit as the correctness baseline.
+
+Source control is Git, hosted on GitHub (Klutch-Software-Incorporated/rstash). The hosted
+rstash.cloud deploy pipeline lives in the separate `rstash-infra` repo on Azure DevOps.
 
 ## Build & Run Commands
 
-- **Build:** `task build` (cross-compiles release binaries to `dist/`)
-- **Run:** `task run` (or `go run .`)
-- **Run tests:** `task test` (or `go test ./...`)
-- **Run a single test:** `go test -run TestName ./internal/package`
-- **Format code:** `task fmt` (or `gofmt -w .`)
-- **Vet code:** `task vet` (or `go vet ./...`)
+- **Build:** `dotnet build Rstash.slnx`
+- **Run:** `dotnet run --project src/Rstash.Server` (or `dotnet run --project src/Rstash.Server -- env|check`)
+- **Run all tests:** `dotnet test Rstash.slnx`
+- **Run one test project:** `dotnet test tests/Rstash.Core.Tests`
+- **Run a single test:** `dotnet test --filter "FullyQualifiedName~TestName"`
+- **EF migrations:** `dotnet dotnet-ef migrations add <Name> -p src/Rstash.Database -s src/Rstash.Database -o Migrations` (local `dotnet-ef` tool, pinned in `.config/dotnet-tools.json`)
+- **Single-file publish:** `dotnet publish src/Rstash.Server -c Release -r <rid> --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true`
 
 ## CLI
 
-The CLI is intentionally minimal. Running `rstash` starts the server (default command).
+Running `rstash` starts the server (default). Subcommands short-circuit before the web host:
 
-- `rstash` — start the HTTP server (same as `rstash serve`)
-- `rstash env` — print a documented .env configuration template to stdout
-- `rstash check` — validate configuration and test database/blob store connectivity
+- `rstash` / `rstash serve` — start the HTTP server
+- `rstash env` — print a documented env-var template (generated from the setting registry)
+- `rstash check` — validate configuration and test database/blob connectivity (non-zero exit on failure)
 
 All server management (users, settings, etc.) is done through the web UI.
 
 ## Configuration
 
-All configuration is via environment variables (see `rstash env` for a documented template):
+Boot-critical config is via environment variables (`rstash env` prints a template). Everything
+else is a runtime setting managed in the admin UI and stored in the DB.
 
 | Variable | Default | Description |
 |----------|---------|-------------|
 | RSTASH_ADDR | :8080 | Listen address (host:port) |
 | RSTASH_BASE_URL | http://localhost:8080 | Public URL of the server |
 | RSTASH_DB | sqlite:rstash.sqlite | Metadata database DSN (sqlite:, postgres:, mysql:, mssql:) |
-| RSTASH_BLOB | sqlite:rstash-blobs.sqlite | Blob store DSN (sqlite:path, fs:/path, s3:bucket, azureblob:container, or database DSN) |
-| RSTASH_LOG_LEVEL | info | Log level: debug, info, warn, error |
-| RSTASH_LOG_FILE | | Path to log file (empty = stderr only) |
-| RSTASH_TLS_CERT | | TLS certificate file path |
-| RSTASH_TLS_KEY | | TLS private key file path |
-| RSTASH_TLS_MODE | *(empty)* | TLS mode: off, manual, auto (empty=auto-detect) |
-| RSTASH_TLS_CACHE | ./certs | Autocert certificate cache directory |
+| RSTASH_BLOB | sqlite:rstash-blobs.sqlite | Blob store DSN (sqlite:path, fs:/path, database DSN; s3:/azureblob: planned) |
 | RSTASH_EMAIL | | Email provider DSN (e.g. resend:API_KEY?from=noreply@example.com) |
 
-Additional settings (registration mode, rate limits, quotas, OAuth token lifetime, etc.)
-are managed at runtime through the admin web UI and stored in the database.
+(The setting registry also defines TLS, log level/file, etc.; only SQLite + the database blob
+backend are wired today — Postgres/MySQL/SQL Server providers and S3/Azure blob backends are
+stubbed behind their factories pending their NuGet packages.)
 
-## Architecture
+## Solution Layout
 
-- `main.go` — entry point, delegates to CLI
-- `internal/cli/` — cobra-based CLI: serve (default), env, check commands
-- `internal/config/` — env var configuration loading, validation, DSN parsing, byte-size/token-lifetime parsing, setting definitions registry
-- `internal/settings/` — runtime settings (DB overrides merged with env defaults, atomic snapshot)
-- `internal/db/` — GORM-based database layer with Repository pattern, AutoMigrate, multi-dialect support (SQLite, PostgreSQL, MySQL, SQL Server)
-- `internal/model/` — domain types (User, OAuthClient, OAuthToken, Node, Session, AuditEntry, AuthorizationCode)
-- `internal/auth/` — authentication service interface and local (password-based) implementation, session/cookie management
-- `internal/blob/` — pluggable blob storage interface, backends (SQLite, filesystem, GORM, S3, Azure Blob Storage), and `OpenStore()` factory
-- `internal/storage/` — storage service (PutDocument, GetDocument, DeleteDocument, GetFolder), ETag generation, quota checking
-- `internal/api/` — remoteStorage protocol handlers (storage API, WebFinger, OAuth token), CORS, scope checking, request logging, rate limiting, security headers
-- `internal/email/` — pluggable email delivery interface, Resend backend, `Open()` factory, email body templates
-- `internal/web/` — web UI handlers (setup wizard, login, registration, admin panel, file browser, profile/settings, OAuth authorize, abuse reports, account/email management, password reset), session middleware, CSRF, AdminGuard, AccountGuard
-- `internal/ui/` — embedded templates and static assets (go:embed), template renderer, flash messages
+`Rstash.slnx` — `src/` (7 projects) + `tests/` (2 projects). Dependency arrows point inward;
+ports live with their implementations, not in a central project.
+
+- **Rstash.Model** — protocol domain + pure rules, no IO: `Node`, `AuditEntry`, `ETag`,
+  `FolderDescription`/`FolderItem` (JSON-LD), `Scope`, `StoragePath`.
+- **Rstash.Services** — use-case orchestration: `RemoteStorageService` (Put/Get/Head/Delete/
+  GetFolder + quota + conditionals + tx), `SettingsService` + the setting registry/validator,
+  `TokenStore` (OAuth tokens + auth codes), `AuditService`, `SetupState`.
+- **Rstash.Storage** — swappable blob backends + the `IStorage` contract: `FileSystemStorage`,
+  `DatabaseStorage` (+ `BlobDbContext`), `StorageFactory`.
+- **Rstash.Database** — EF Core: `RstashDbContext : IdentityDbContext<ApplicationUser, …, long>`,
+  `ApplicationUser`, `NodeStore` (implicit-folder queries), entity configs, migrations, the
+  multi-provider `UseRstashDatabase` opener + case-sensitive-LIKE interceptor.
+- **Rstash.Notifications** — outbound email + the `IEmailSender` contract: `ResendEmailSender`,
+  `NoOpEmailSender`, `EmailSenderFactory`.
+- **Rstash.Web** — Blazor (Razor Class Library) + MudBlazor: layout, setup/login/register,
+  account, file browser, admin (settings/users/audit), OAuth consent.
+- **Rstash.Server** — the executable host: minimal-API endpoints (storage, WebFinger, OAuth,
+  file browser, admin user ops) in `Endpoints/`, Blazor root components in `Components/`,
+  DI/middleware/auth wiring, the CLI.
+
+Tests: **Rstash.Core.Tests** (xUnit unit tests over Model/Services/Storage/Database) and
+**Rstash.IntegrationTests** (`WebApplicationFactory` end-to-end over the host).
 
 ## Key Conventions
 
-- Standard library net/http for routing (Go 1.22 enhanced patterns)
-- cobra for CLI (minimal — just serve, env, check)
-- GORM ORM with multi-dialect support (gorm.io/gorm)
-- glebarez/sqlite for pure-Go SQLite (no CGO), gorm.io/driver/postgres, gorm.io/driver/mysql, gorm.io/driver/sqlserver
-- log/slog for structured logging
-- Interfaces for pluggable backends (blob.Store, auth.Service)
-- Server-rendered Go HTML templates for web UI (custom CSS, no build tooling)
-- All assets embedded via go:embed for single-binary deployment
-- Audit logging for all state-changing operations (admin, storage, auth, OAuth)
-- Runtime settings: DB overrides take precedence over env defaults, atomic snapshot swap
-- All database access goes through `*db.Repository` (wraps `*gorm.DB`); package-level DB functions no longer exist
-- Transactions use `repo.Transaction(func(txRepo *db.Repository) error { ... })` pattern
-- SQLite LIKE is case-insensitive by default; we set `PRAGMA case_sensitive_like = ON` at DB init so path prefix queries are case-sensitive. For other databases, LIKE queries on paths use case-sensitive collation (e.g. COLLATE BINARY or equivalent).
-- Schema managed by GORM AutoMigrate — no raw DDL strings
+- ASP.NET Core minimal APIs for the protocol surface; Blazor Web App (SSR-by-default, interactive
+  islands opt-in) + MudBlazor for the human UI. Auth forms are static-SSR `EditForm` + `<InputText>`.
+- **EF Core** (multi-provider; SQLite wired) with code-first **migrations compiled into the
+  assembly**, applied at startup via `Database.Migrate()`. Access via `RstashDbContext` (and
+  `NodeStore`/stores) — no repository pattern.
+- **ASP.NET Core Identity** (`ApplicationUser : IdentityUser<long>`) + cookie auth; `LoginPath=/login`.
+- remoteStorage **app-authorization** (storage bearer tokens, `/oauth/*`) is a custom lightweight
+  OAuth AS, kept distinct from user-identity auth. PKCE S256 on the code flow.
+- Interfaces live with their implementations (`IStorage` in Storage, `IEmailSender` in
+  Notifications). Idiomatic C# throughout — async/await, LINQ, records, nullable refs.
+- SQLite path-prefix queries are case-sensitive via a connection interceptor setting
+  `PRAGMA case_sensitive_like = ON`. Note: SQLite can't `ORDER BY` a `DateTimeOffset` — order by Id.
+- Runtime settings: DB overrides merged over registry defaults, atomic snapshot swap, validated on write.
+- Audit logging on state-changing storage operations (extendable to auth/OAuth).
+- Single-binary deployment via self-contained single-file publish; container via `Dockerfile`.
 
 ## Setup Flow
 
-On first run (no users in database), all routes redirect to `/setup`:
-1. **Review page** (`GET /setup`) — shows current server settings (base URL, database type, storage type, TLS) with warnings if SQLite defaults are in use
-2. **Account creation** (`GET /setup?step=account`) — create the first admin account
-3. After setup, the admin is logged in and redirected to the admin panel
+On first run (no users), a guard redirects all non-exempt routes to `/setup`. The setup page
+creates the first admin account (real Identity user), signs them in via cookie, and redirects home.
 
 ## remoteStorage Protocol
 
 - Spec: draft-dejong-remotestorage-26
 - WebFinger: `GET /.well-known/webfinger?resource=acct:user@host`
-- OAuth: `GET /oauth/authorize`, `POST /oauth/token`
-- Storage: `GET/PUT/DELETE/HEAD /storage/{user}/{path...}`
-- Public paths (`/public/`) readable without auth
-- Folders end with `/`, documents don't
-- ETags required on all storage responses
-- Folder listings use JSON-LD with `@context: "http://remotestorage.io/spec/folder-description"`
+- OAuth: `GET/POST /oauth/authorize` (consent), `POST /oauth/token` (authorization_code + PKCE), `POST /oauth/revoke`
+- Storage: `GET/PUT/DELETE/HEAD /storage/{user}/{path...}` (bearer token + scopes)
+- Public paths (`/public/`) — documents readable without auth
+- Folders end with `/`, documents don't; ETags on all storage responses
+- Folder listings: JSON-LD with `@context: "http://remotestorage.io/spec/folder-description"`
