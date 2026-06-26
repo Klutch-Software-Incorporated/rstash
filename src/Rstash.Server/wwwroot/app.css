@@ -327,3 +327,36 @@
 }
 
 .rs-browse:hover { background: var(--rs-gold-tint); }
+
+/* ---------- file browser ---------- */
+.rs-files-table th {
+    font-size: .72rem;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    font-weight: 600;
+    color: var(--mud-palette-text-secondary);
+}
+
+.rs-files-table td,
+.rs-files-table th {
+    vertical-align: middle;
+}
+
+.rs-files-size,
+.rs-files-actions {
+    text-align: right;
+    white-space: nowrap;
+}
+
+.rs-files-name {
+    display: inline-flex;
+    align-items: center;
+    gap: .5rem;
+    color: var(--rs-gold-deep);
+    text-decoration: none;
+    word-break: break-all;
+}
+
+.rs-files-name:hover { text-decoration: underline; }
+
+.rs-files-table form { display: inline; margin: 0; }
