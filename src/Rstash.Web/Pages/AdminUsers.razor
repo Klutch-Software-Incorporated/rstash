@@ -1,0 +1,67 @@
+@page "/admin/users"
+@attribute [Authorize]
+@using Microsoft.EntityFrameworkCore
+@inject UserManager<ApplicationUser> Users
+@inject NavigationManager Navigation
+
+<PageTitle>Users — admin</PageTitle>
+
+<MudText Typo="Typo.h4" GutterBottom="true">Users</MudText>
+<MudLink Href="/admin/settings" Class="mb-3">Server settings →</MudLink>
+
+<MudSimpleTable Dense="true" Bordered="true" Class="mt-3">
+    <thead>
+        <tr>
+            <th>User</th><th>Email</th><th>Admin</th><th>Approved</th>
+            <th>Disabled</th><th>Quota</th><th>Actions</th>
+        </tr>
+    </thead>
+    <tbody>
+        @foreach (var user in _users)
+        {
+            <tr>
+                <td>@user.UserName</td>
+                <td>@user.Email</td>
+                <td>@(user.IsAdmin ? "yes" : "")</td>
+                <td>@(user.Approved ? "yes" : "no")</td>
+                <td>@(user.Disabled ? "yes" : "")</td>
+                <td>@FormatQuota(user.StorageQuota)</td>
+                <td>
+                    @if (!user.Approved)
+                    {
+                        <PostButton Action="/admin/users/approve" Id="@user.Id" Label="approve" />
+                    }
+                    <PostButton Action="/admin/users/toggle-disabled" Id="@user.Id"
+                                Label="@(user.Disabled ? "enable" : "disable")" />
+                    <PostButton Action="/admin/users/delete" Id="@user.Id" Label="delete" />
+                    <form action="/admin/users/quota" method="post" style="display:inline">
+                        <AntiforgeryToken />
+                        <input type="hidden" name="id" value="@user.Id" />
+                        <input type="text" name="storageQuota" placeholder="e.g. 1GB" size="8" />
+                        <button type="submit">set quota</button>
+                    </form>
+                </td>
+            </tr>
+        }
+    </tbody>
+</MudSimpleTable>
+
+@code {
+    [CascadingParameter] private HttpContext? HttpContext { get; set; }
+
+    private List<ApplicationUser> _users = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        var actor = HttpContext is null ? null : await Users.GetUserAsync(HttpContext.User);
+        if (actor is null || !actor.IsAdmin)
+        {
+            Navigation.NavigateTo("/", forceLoad: true);
+            return;
+        }
+
+        _users = await Users.Users.OrderBy(u => u.UserName).ToListAsync();
+    }
+
+    private static string FormatQuota(long bytes) => bytes == 0 ? "unlimited" : ByteSize.Format(bytes);
+}

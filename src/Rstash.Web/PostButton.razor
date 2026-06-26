@@ -1,0 +1,12 @@
+@* A minimal antiforgery-protected POST button carrying a single id field. *@
+<form action="@Action" method="post" style="display:inline; margin-right:.25rem">
+    <AntiforgeryToken />
+    <input type="hidden" name="id" value="@Id" />
+    <button type="submit">@Label</button>
+</form>
+
+@code {
+    [Parameter] public string Action { get; set; } = "";
+    [Parameter] public long Id { get; set; }
+    [Parameter] public string Label { get; set; } = "";
+}
