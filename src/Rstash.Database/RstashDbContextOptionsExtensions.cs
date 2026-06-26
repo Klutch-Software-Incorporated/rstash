@@ -26,7 +26,9 @@ public static class RstashDbContextOptionsExtensions
 
         return parsed.Dialect switch
         {
-            Dialect.Sqlite => builder.UseSqlite(ToSqliteConnectionString(parsed.ConnectionString)),
+            Dialect.Sqlite => builder
+                .UseSqlite(ToSqliteConnectionString(parsed.ConnectionString))
+                .AddInterceptors(SqliteCaseSensitiveLikeInterceptor.Instance),
             _ => throw new NotSupportedException(
                 $"Database dialect '{parsed.Dialect}' is not yet wired in the .NET rewrite; " +
                 "only sqlite is implemented so far."),
