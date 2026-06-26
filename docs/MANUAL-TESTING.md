@@ -89,12 +89,16 @@ Throughout, the server runs at **http://localhost:8080** unless you set `ASPNETC
 - [ ] **Do:** `/admin/audit`.
       **Expect:** a table of recent entries (you'll see `storage.put` / `storage.delete` after §7).
 
-## 6. File browser (cookie-authed UI)
+## 6. File browser (cookie-authed UI, read-only + delete)
 
-- [ ] **Do:** **Files** (→ `/files`). Upload a small file.
-      **Expect:** it appears in the listing; folders (if any) sort first.
-- [ ] **Do:** upload `notes/todo.txt` style content by creating files; navigate into a folder via its link, use **Up**.
-      **Expect:** navigation works; the breadcrumb path (`/notes/`) updates.
+> The browser lists, navigates, downloads, and deletes. It does **not** upload —
+> content arrives via the remoteStorage API (§7) or the `rstash seed` command (§1).
+> Populate some data first, then come back here.
+
+- [ ] **Do:** **Files** (→ `/files`).
+      **Expect:** top-level modules/folders are listed; folders sort first.
+- [ ] **Do:** navigate into a folder via its link, then use **Up**.
+      **Expect:** navigation works; the path (`/notes/`) updates.
 - [ ] **Do:** click a file's name.
       **Expect:** it downloads / opens with the right content.
 - [ ] **Do:** click **delete** on a file.

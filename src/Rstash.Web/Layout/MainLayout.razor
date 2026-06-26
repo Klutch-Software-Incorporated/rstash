@@ -10,12 +10,8 @@
 
 <MudLayout>
     <MudAppBar Elevation="0" Class="rs-appbar">
-        <a href="/" class="rs-brand"><span class="rs-brand-mark"></span>@_siteName</a>
+        <a href="/" class="rs-brand"><img src="/favicon.svg" class="rs-brand-logo" alt="" />@_siteName</a>
         <MudSpacer />
-        <MudIconButton Href="@ThemeToggleUrl"
-                       Icon="@(_isDarkMode ? Icons.Material.Filled.LightMode : Icons.Material.Filled.DarkMode)"
-                       Color="Color.Inherit"
-                       title="Toggle light/dark theme" />
         <AuthorizeView>
             <Authorized>
                 <MudButton Href="/files" Color="Color.Inherit" Variant="Variant.Text"
@@ -35,7 +31,7 @@
                 </form>
             </Authorized>
             <NotAuthorized>
-                <MudButton Href="/login" Variant="Variant.Filled" Color="Color.Primary" Class="ml-2">Sign in</MudButton>
+                <MudButton Href="/login" Variant="Variant.Filled" Color="Color.Primary">Sign in</MudButton>
             </NotAuthorized>
         </AuthorizeView>
     </MudAppBar>
@@ -43,9 +39,13 @@
         <MudContainer MaxWidth="MaxWidth.False" Class="rs-main mt-6 mb-4">
             @Body
         </MudContainer>
-        <MudContainer MaxWidth="MaxWidth.False" Class="rs-main mb-6">
-            <MudDivider Class="mb-3" />
-            <MudText Typo="Typo.caption" Color="Color.Secondary">@_siteName · powered by rstash</MudText>
+        <MudContainer MaxWidth="MaxWidth.False" Class="rs-main">
+            <footer class="rs-footer">
+                <span class="rs-mono">@_siteName</span>
+                <span>Open source · self-hosted</span>
+                <a href="/files">Files</a>
+                <a href="/account">Account</a>
+            </footer>
         </MudContainer>
     </MudMainContent>
 </MudLayout>
@@ -68,6 +68,8 @@
             return;
         }
 
+        // Dark mode is not user-toggleable yet (planned as an account setting); we still
+        // honor the cookie so that future setting can drive it without a layout change.
         _isDarkMode = HttpContext.Request.Cookies.TryGetValue(RstashTheme.ThemeCookie, out var pref)
             && string.Equals(pref, "dark", StringComparison.OrdinalIgnoreCase);
 
@@ -81,17 +83,6 @@
             var host = new Uri(Navigation.BaseUri).Host;
             _accountLabel = string.IsNullOrEmpty(name) ? host : $"{name}@{host}";
             _initial = string.IsNullOrEmpty(name) ? "?" : name[..1];
-        }
-    }
-
-    // Flip-to-the-opposite-mode link; returns to the current page after setting the cookie.
-    private string ThemeToggleUrl
-    {
-        get
-        {
-            var returnTo = new Uri(Navigation.Uri).PathAndQuery;
-            var nextMode = _isDarkMode ? "light" : "dark";
-            return $"/ui/theme?mode={nextMode}&return={Uri.EscapeDataString(returnTo)}";
         }
     }
 }

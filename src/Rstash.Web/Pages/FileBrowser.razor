@@ -40,14 +40,6 @@
     }
 </ul>
 
-<MudText Typo="Typo.h6" Class="mt-4 mb-1">Upload to this folder</MudText>
-<form action="/files/upload" method="post" enctype="multipart/form-data">
-    <AntiforgeryToken />
-    <input type="hidden" name="folder" value="@_folderPath" />
-    <input type="file" name="file" />
-    <button type="submit">Upload</button>
-</form>
-
 @code {
     [Parameter] public string? Path { get; set; }
     [CascadingParameter] private HttpContext? HttpContext { get; set; }

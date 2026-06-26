@@ -32,22 +32,11 @@
     text-decoration: none;
 }
 
-.rs-brand-mark {
+.rs-brand-logo {
     width: 26px;
     height: 26px;
-    border-radius: 7px;
-    background: var(--mud-palette-primary);
-    color: var(--mud-palette-primary-text);
-    display: grid;
-    place-items: center;
-    font-family: 'Roboto Mono', monospace;
-    font-weight: 700;
-    font-size: 15px;
-}
-
-.rs-brand-mark::before {
-    content: "~";
-    transform: translateY(-1px);
+    display: block;
+    flex-shrink: 0;
 }
 
 /* Account pill: storage handle + avatar, links to the account page. */
@@ -91,4 +80,26 @@
 /* Soften MudBlazor's elevation-1 to the brand's subtle two-layer shadow. */
 .mud-elevation-1 {
     box-shadow: var(--rs-shadow) !important;
+}
+
+/* Footer: a quiet hairline-separated strip at the bottom of the page. */
+.rs-footer {
+    display: flex;
+    gap: 18px;
+    flex-wrap: wrap;
+    align-items: center;
+    padding: 20px 0 48px;
+    margin-top: 8px;
+    border-top: 1px solid var(--mud-palette-lines-default);
+    color: var(--mud-palette-text-secondary);
+    font-size: 12.5px;
+}
+
+.rs-footer a {
+    color: var(--mud-palette-text-secondary);
+    text-decoration: none;
+}
+
+.rs-footer a:hover {
+    text-decoration: underline;
 }

@@ -8,6 +8,8 @@ namespace Rstash.Server.Endpoints;
 /// <summary>
 /// Cookie-authenticated file operations for the in-app browser (distinct from
 /// the bearer-token storage API). Acts on the signed-in user's own storage.
+/// The browser is read-only apart from deletes — content arrives via the
+/// remoteStorage API, not by uploading through the UI.
 /// </summary>
 internal static class FileBrowserEndpoints
 {
@@ -15,7 +17,6 @@ internal static class FileBrowserEndpoints
     {
         var group = endpoints.MapGroup("/files").RequireAuthorization();
         group.MapGet("/download/{**path}", DownloadAsync);
-        group.MapPost("/upload", UploadAsync);
         group.MapPost("/delete", DeleteAsync);
     }
 
@@ -39,42 +40,6 @@ internal static class FileBrowserEndpoints
         {
             return Results.NotFound();
         }
-    }
-
-    private static async Task<IResult> UploadAsync(
-        HttpContext ctx, IAntiforgery antiforgery, RemoteStorageService storage, UserManager<ApplicationUser> users)
-    {
-        if (!await ValidAntiforgery(ctx, antiforgery))
-        {
-            return Results.BadRequest();
-        }
-
-        var user = await users.GetUserAsync(ctx.User);
-        if (user is null)
-        {
-            return Results.Unauthorized();
-        }
-
-        var form = await ctx.Request.ReadFormAsync();
-        var folder = form["folder"].ToString();
-        var file = form.Files["file"];
-
-        if (file is { Length: > 0 })
-        {
-            var path = folder.TrimEnd('/') + "/" + file.FileName;
-            var contentType = string.IsNullOrEmpty(file.ContentType) ? "application/octet-stream" : file.ContentType;
-            await using var stream = file.OpenReadStream();
-            try
-            {
-                await storage.PutDocumentAsync(user.Id, path, stream, contentType, new StorageConditions(), ctx.RequestAborted);
-            }
-            catch (StorageException)
-            {
-                // Quota/conflict errors surface on the next browse; keep the UX simple.
-            }
-        }
-
-        return Results.Redirect("/files" + folder);
     }
 
     private static async Task<IResult> DeleteAsync(
