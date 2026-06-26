@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using MudBlazor.Services;
 using Rstash.Database;
 using Rstash.Server.Components;
+using Rstash.Server.Endpoints;
 using Rstash.Services;
 using Rstash.Services.Storage;
 using Rstash.Storage;
@@ -20,6 +21,14 @@ builder.Services.AddSingleton<IStorage>(_ => StorageFactory.Open(blobDsn));
 builder.Services.AddSingleton<SettingsService>();
 builder.Services.AddSingleton<RemoteStorageService>();
 builder.Services.AddSingleton<SetupState>();
+builder.Services.AddSingleton<TokenStore>();
+
+// CORS for the storage API (remoteStorage clients run in browsers).
+builder.Services.AddCors(options => options.AddPolicy("rstash-storage", policy => policy
+    .AllowAnyOrigin()
+    .WithMethods("GET", "HEAD", "PUT", "DELETE", "OPTIONS")
+    .AllowAnyHeader()
+    .WithExposedHeaders("ETag", "Content-Length", "Content-Type")));
 
 // Scoped context bridge: Identity's EF stores need a per-request RstashDbContext,
 // while the singleton services above use the factory directly.
@@ -58,6 +67,7 @@ await using (var scope = app.Services.CreateAsyncScope())
 }
 
 app.MapStaticAssets();
+app.UseCors();
 app.UseAuthentication();
 app.UseAuthorization();
 app.UseAntiforgery();
@@ -71,6 +81,9 @@ app.Use(async (context, next) =>
         var path = context.Request.Path;
         var exempt = path.StartsWithSegments("/setup")
             || path.StartsWithSegments("/healthz")
+            || path.StartsWithSegments("/storage")
+            || path.StartsWithSegments("/.well-known")
+            || path.StartsWithSegments("/oauth")
             || path.StartsWithSegments("/_")
             || (path.Value?.Contains('.') ?? false);
 
@@ -101,9 +114,9 @@ app.MapPost("/auth/logout", async (SignInManager<ApplicationUser> signInManager)
     return Results.Redirect("/");
 }).DisableAntiforgery();
 
-// Storage protocol endpoints (GET/PUT/DELETE/HEAD /storage/...), WebFinger, and
-// OAuth land in P4 — they need bearer-token auth. Identity + setup/login UI are
-// built across the rest of P3.
+// remoteStorage storage API (bearer-token auth + scopes).
+app.MapStorageEndpoints();
+// WebFinger discovery + OAuth authorize/token/revoke land next in P4.
 
 app.Run();
 

@@ -18,6 +18,8 @@ public class RstashDbContext(DbContextOptions<RstashDbContext> options)
 
     public DbSet<Setting> Settings => Set<Setting>();
 
+    public DbSet<OAuthToken> OAuthTokens => Set<OAuthToken>();
+
     protected override void OnModelCreating(ModelBuilder builder)
     {
         base.OnModelCreating(builder);
