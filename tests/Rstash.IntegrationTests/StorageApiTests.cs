@@ -80,6 +80,30 @@ public sealed class StorageApiTests(RstashAppFactory factory) : IClassFixture<Rs
     }
 
     [Fact]
+    public async Task ExceedingUserQuota_Returns507()
+    {
+        var (user, token) = await SeedUserWithTokenAsync("quotauser", "*:rw");
+
+        using (var scope = factory.Services.CreateScope())
+        {
+            var users = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
+            var account = await users.FindByNameAsync(user);
+            account!.StorageQuota = 10;
+            await users.UpdateAsync(account);
+        }
+
+        var client = factory.CreateClient();
+
+        var within = await client.SendAsync(
+            Authed(HttpMethod.Put, $"/storage/{user}/a.txt", token, new StringContent("12345")));
+        Assert.Equal(HttpStatusCode.Created, within.StatusCode);
+
+        var exceeding = await client.SendAsync(
+            Authed(HttpMethod.Put, $"/storage/{user}/b.txt", token, new StringContent("123456789012345678901")));
+        Assert.Equal(HttpStatusCode.InsufficientStorage, exceeding.StatusCode);
+    }
+
+    [Fact]
     public async Task UnknownUser_Returns404()
     {
         var (_, token) = await SeedUserWithTokenAsync("erin", "*:rw");

@@ -12,7 +12,7 @@ namespace Rstash.Services.Storage;
 /// Quota and egress enforcement are layered on later (currently no-op).
 /// </summary>
 public sealed class RemoteStorageService(
-    IDbContextFactory<RstashDbContext> contextFactory, IStorage storage)
+    IDbContextFactory<RstashDbContext> contextFactory, IStorage storage, SettingsService settings)
 {
     public async Task<PutResult> PutDocumentAsync(
         long userId, string path, Stream content, string contentType,
@@ -52,6 +52,9 @@ public sealed class RemoteStorageService(
             {
                 throw new StorageException(StorageError.PreconditionFailed);
             }
+
+            await EnsureWithinQuotaAsync(
+                db, userId, data.LongLength - (existing?.ContentLength ?? 0), cancellationToken);
 
             var isNew = existing is null;
             await nodes.UpsertNodeAsync(userId, path, contentType, data.LongLength, etag, cancellationToken);
@@ -207,6 +210,41 @@ public sealed class RemoteStorageService(
 
         var description = new FolderDescription { Items = items };
         return (description, etag);
+    }
+
+    /// <summary>
+    /// Enforces the per-user storage quota (ApplicationUser.StorageQuota; 0 =
+    /// unlimited) and the global cap (settings; 0 = disabled). <paramref name="delta"/>
+    /// is the net byte change (new size minus any replaced size).
+    /// </summary>
+    private async Task EnsureWithinQuotaAsync(
+        RstashDbContext db, long userId, long delta, CancellationToken cancellationToken)
+    {
+        var userQuota = await db.Users
+            .Where(u => u.Id == userId)
+            .Select(u => u.StorageQuota)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (userQuota > 0)
+        {
+            var used = await db.Nodes
+                .Where(n => n.UserId == userId)
+                .SumAsync(n => n.ContentLength, cancellationToken);
+            if (used + delta > userQuota)
+            {
+                throw new StorageException(StorageError.QuotaExceeded);
+            }
+        }
+
+        var totalLimit = settings.Current.TotalStorageLimit;
+        if (totalLimit > 0)
+        {
+            var total = await db.Nodes.SumAsync(n => n.ContentLength, cancellationToken);
+            if (total + delta > totalLimit)
+            {
+                throw new StorageException(StorageError.QuotaExceeded);
+            }
+        }
     }
 
     private static async Task<byte[]> ReadAllAsync(Stream content, CancellationToken cancellationToken)

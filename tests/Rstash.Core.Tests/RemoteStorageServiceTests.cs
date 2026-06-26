@@ -1,6 +1,7 @@
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Rstash.Database;
+using Rstash.Services;
 using Rstash.Services.Storage;
 using Rstash.Storage;
 
@@ -26,7 +27,7 @@ public sealed class RemoteStorageServiceTests : IDisposable
             db.Database.Migrate();
         }
 
-        _service = new RemoteStorageService(factory, new FileSystemStorage(_blobDir));
+        _service = new RemoteStorageService(factory, new FileSystemStorage(_blobDir), new SettingsService(factory));
     }
 
     public void Dispose()

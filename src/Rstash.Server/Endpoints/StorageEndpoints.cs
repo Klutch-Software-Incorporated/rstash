@@ -245,6 +245,9 @@ internal static class StorageEndpoints
             case StorageError.ContentRejected:
                 await TextAsync(ctx, StatusCodes.Status415UnsupportedMediaType, ex.Message);
                 break;
+            case StorageError.QuotaExceeded:
+                await TextAsync(ctx, StatusCodes.Status507InsufficientStorage, "quota exceeded");
+                break;
             default:
                 await TextAsync(ctx, StatusCodes.Status500InternalServerError, "internal error");
                 break;

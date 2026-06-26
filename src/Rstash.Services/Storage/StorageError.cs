@@ -9,6 +9,7 @@ public enum StorageError
     NotModified,        // 304
     PayloadTooLarge,    // 413
     ContentRejected,    // 4xx (scanner)
+    QuotaExceeded,      // 507
 }
 
 /// <summary>
