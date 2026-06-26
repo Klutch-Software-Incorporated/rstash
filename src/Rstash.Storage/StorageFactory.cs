@@ -19,8 +19,10 @@ public static class StorageFactory
         return scheme switch
         {
             "fs" => new FileSystemStorage(spec),
-            "sqlite" or "postgres" or "mysql" or "mssql" => throw new NotSupportedException(
-                $"database blob backend ('{scheme}') is not wired yet (next storage chunk)."),
+            // The database backend takes the full DSN (it parses the scheme to
+            // pick a provider). SQLite is wired; other providers throw until
+            // their packages land.
+            "sqlite" or "postgres" or "mysql" or "mssql" => new DatabaseStorage(dsn),
             "s3" => throw new NotSupportedException("s3 blob backend deferred (needs the AWS SDK)."),
             "azureblob" => throw new NotSupportedException("azureblob backend deferred (needs the Azure SDK)."),
             _ => throw new NotSupportedException(
