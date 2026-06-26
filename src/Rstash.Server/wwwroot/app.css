@@ -480,6 +480,24 @@ textarea.rs-control {
 
 .rs-settings-body { padding: 18px 22px; }
 
+/* Definition list (account profile). */
+.rs-deflist {
+    display: grid;
+    grid-template-columns: max-content 1fr;
+    gap: .5rem 1.5rem;
+    margin: 0;
+    align-items: baseline;
+}
+
+.rs-deflist dt {
+    font-size: .72rem;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    color: var(--mud-palette-text-secondary);
+}
+
+.rs-deflist dd { margin: 0; }
+
 .rs-settings-actions {
     position: sticky;
     bottom: 0;
