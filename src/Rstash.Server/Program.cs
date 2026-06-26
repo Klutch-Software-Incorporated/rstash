@@ -67,6 +67,31 @@ await using (var scope = app.Services.CreateAsyncScope())
     await scope.ServiceProvider.GetRequiredService<SettingsService>().ReloadAsync();
 }
 
+// Security response headers (CSP tuned for Blazor + MudBlazor + Google Fonts).
+const string contentSecurityPolicy =
+    "default-src 'self'; " +
+    "script-src 'self' 'unsafe-inline'; " +
+    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; " +
+    "img-src 'self' data:; " +
+    "font-src 'self' https://fonts.gstatic.com; " +
+    "connect-src 'self'; " +
+    "frame-ancestors 'none'";
+var isHttps = baseUrl.StartsWith("https", StringComparison.OrdinalIgnoreCase);
+app.Use(async (context, next) =>
+{
+    var headers = context.Response.Headers;
+    headers["X-Content-Type-Options"] = "nosniff";
+    headers["X-Frame-Options"] = "DENY";
+    headers["Referrer-Policy"] = "strict-origin-when-cross-origin";
+    headers["Content-Security-Policy"] = contentSecurityPolicy;
+    if (isHttps)
+    {
+        headers["Strict-Transport-Security"] = "max-age=63072000; includeSubDomains";
+    }
+
+    await next();
+});
+
 app.MapStaticAssets();
 app.UseCors();
 app.UseAuthentication();
