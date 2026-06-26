@@ -22,13 +22,13 @@
         <MudSpacer />
         <AuthorizeView>
             <Authorized>
-                <MudButton Href="/" Color="Color.Inherit" Variant="Variant.Text"
+                <MudButton Href="/" Color="@NavColor(IsActive("/", exact: true))" Variant="Variant.Text"
                            StartIcon="@Icons.Material.Filled.Dashboard" Class="mx-1">Dashboard</MudButton>
-                <MudButton Href="/files" Color="Color.Inherit" Variant="Variant.Text"
+                <MudButton Href="/files" Color="@NavColor(IsActive("/files"))" Variant="Variant.Text"
                            StartIcon="@Icons.Material.Filled.Folder" Class="mx-1">Files</MudButton>
                 @if (_isAdmin)
                 {
-                    <MudButton Href="/admin/settings" Color="Color.Inherit" Variant="Variant.Text"
+                    <MudButton Href="/admin/settings" Color="@NavColor(IsActive("/admin"))" Variant="Variant.Text"
                                StartIcon="@Icons.Material.Filled.AdminPanelSettings" Class="mx-1">Admin</MudButton>
                 }
                 <a href="/account" class="rs-account mx-2">
@@ -68,10 +68,12 @@
     private string _siteName = "rstash";
     private string _accountLabel = "";
     private string _initial = "?";
+    private string _path = "/";
 
     protected override async Task OnInitializedAsync()
     {
         _siteName = Settings.Current.SiteName;
+        _path = new Uri(Navigation.Uri).AbsolutePath;
 
         if (HttpContext is null)
         {
@@ -95,4 +97,10 @@
             _initial = string.IsNullOrEmpty(name) ? "?" : name[..1];
         }
     }
+
+    // Highlight the nav entry for the active page in the brand gold.
+    private bool IsActive(string prefix, bool exact = false) =>
+        exact ? _path == prefix : _path.StartsWith(prefix, StringComparison.OrdinalIgnoreCase);
+
+    private static Color NavColor(bool active) => active ? Color.Secondary : Color.Inherit;
 }

@@ -342,6 +342,17 @@
     vertical-align: middle;
 }
 
+/* Sortable column headers (progressive enhancement). */
+.rs-sortable {
+    cursor: pointer;
+    user-select: none;
+    white-space: nowrap;
+}
+
+.rs-sortable:hover { color: var(--rs-gold-deep); }
+.rs-files-table th[data-sort-dir="asc"]::after { content: " \25B2"; font-size: .7em; }
+.rs-files-table th[data-sort-dir="desc"]::after { content: " \25BC"; font-size: .7em; }
+
 .rs-files-size,
 .rs-files-actions {
     text-align: right;
