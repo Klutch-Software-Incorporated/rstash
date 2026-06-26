@@ -9,6 +9,19 @@ using Rstash.Services;
 using Rstash.Services.Storage;
 using Rstash.Storage;
 
+// CLI: `rstash env` / `rstash check` short-circuit before the web host starts.
+if (args is ["env", ..])
+{
+    Rstash.Server.Cli.PrintEnvTemplate();
+    return;
+}
+
+if (args is ["check", ..])
+{
+    Environment.Exit(await Rstash.Server.Cli.CheckAsync(
+        new ConfigurationBuilder().AddEnvironmentVariables().Build()));
+}
+
 var builder = WebApplication.CreateBuilder(args);
 
 // Boot-critical configuration (env vars; see the settings registry for the rest).
@@ -18,6 +31,7 @@ var baseUrl = (builder.Configuration["RSTASH_BASE_URL"] ?? "http://localhost:808
 
 // Core services.
 builder.Services.AddHealthChecks();
+builder.Services.AddOpenApi();
 builder.Services.AddDbContextFactory<RstashDbContext>(options => options.UseRstashDatabase(databaseDsn));
 builder.Services.AddSingleton<IStorage>(_ => StorageFactory.Open(blobDsn));
 builder.Services.AddSingleton<SettingsService>();
@@ -139,6 +153,7 @@ app.Use(async (context, next) =>
 });
 
 app.MapHealthChecks("/healthz");
+app.MapOpenApi();
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode()
     .AddAdditionalAssemblies(typeof(Rstash.Web.Layout.MainLayout).Assembly);
