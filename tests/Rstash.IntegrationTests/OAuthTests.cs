@@ -1,0 +1,139 @@
+using System.Buffers.Text;
+using System.Net;
+using System.Net.Http.Headers;
+using System.Security.Cryptography;
+using System.Text;
+using System.Text.Json;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.Extensions.DependencyInjection;
+using Rstash.Database;
+using Rstash.Services;
+
+namespace Rstash.IntegrationTests;
+
+public sealed class OAuthTests(RstashAppFactory factory) : IClassFixture<RstashAppFactory>
+{
+    [Fact]
+    public async Task TokenEndpoint_ExchangesCodeWithPkce_AndIssuesWorkingToken()
+    {
+        const string verifier = "this-is-a-test-code-verifier-0123456789";
+        const string redirectUri = "https://app.example.com/callback";
+        var challenge = Pkce(verifier);
+
+        var code = await SeedCodeAsync("oauthuser", "https://app.example.com", redirectUri, "*:rw", challenge);
+        var client = factory.CreateClient();
+
+        var response = await client.PostAsync("/oauth/token", TokenForm(code, verifier, redirectUri));
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal("no-store", response.Headers.CacheControl?.ToString());
+
+        var json = JsonDocument.Parse(await response.Content.ReadAsStringAsync()).RootElement;
+        var accessToken = json.GetProperty("access_token").GetString();
+        Assert.False(string.IsNullOrEmpty(accessToken));
+        Assert.Equal("bearer", json.GetProperty("token_type").GetString());
+        Assert.Equal("*:rw", json.GetProperty("scope").GetString());
+
+        // One-time: a second exchange of the same code fails.
+        var second = await client.PostAsync("/oauth/token", TokenForm(code, verifier, redirectUri));
+        Assert.Equal(HttpStatusCode.BadRequest, second.StatusCode);
+
+        // The issued token works against the storage API.
+        var put = new HttpRequestMessage(HttpMethod.Put, "/storage/oauthuser/docs/a.txt")
+        {
+            Content = new StringContent("hi"),
+        };
+        put.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+        Assert.Equal(HttpStatusCode.Created, (await client.SendAsync(put)).StatusCode);
+    }
+
+    [Fact]
+    public async Task TokenEndpoint_BadVerifier_Rejected()
+    {
+        const string redirectUri = "https://app2.example.com/cb";
+        var code = await SeedCodeAsync("oauthuser2", "https://app2.example.com", redirectUri, "*:rw", Pkce("correct-verifier-1234567890"));
+
+        var response = await factory.CreateClient().PostAsync("/oauth/token", TokenForm(code, "WRONG-VERIFIER", redirectUri));
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Authorize_RequiresLogin()
+    {
+        var client = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+
+        var response = await client.GetAsync(
+            "/oauth/authorize?response_type=token&redirect_uri=https%3A%2F%2Fapp.example.com%2Fcb&scope=*%3Arw");
+
+        Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
+        Assert.Contains("/login?redirect=", response.Headers.Location?.OriginalString ?? string.Empty);
+    }
+
+    [Fact]
+    public async Task Revoke_InvalidatesToken()
+    {
+        var token = await SeedTokenAsync("revokeuser", "*:rw");
+        var client = factory.CreateClient();
+
+        Assert.Equal(HttpStatusCode.OK, (await GetStorage(client, "/storage/revokeuser/", token)).StatusCode);
+
+        var revoke = await client.PostAsync("/oauth/revoke",
+            new FormUrlEncodedContent(new Dictionary<string, string> { ["token"] = token }));
+        Assert.Equal(HttpStatusCode.OK, revoke.StatusCode);
+
+        Assert.Equal(HttpStatusCode.Unauthorized,
+            (await GetStorage(client, "/storage/revokeuser/docs/x.txt", token)).StatusCode);
+    }
+
+    private static string Pkce(string verifier) =>
+        Base64Url.EncodeToString(SHA256.HashData(Encoding.ASCII.GetBytes(verifier)));
+
+    private static FormUrlEncodedContent TokenForm(string code, string verifier, string redirectUri) =>
+        new(new Dictionary<string, string>
+        {
+            ["grant_type"] = "authorization_code",
+            ["code"] = code,
+            ["code_verifier"] = verifier,
+            ["redirect_uri"] = redirectUri,
+        });
+
+    private static async Task<HttpResponseMessage> GetStorage(HttpClient client, string url, string token)
+    {
+        var request = new HttpRequestMessage(HttpMethod.Get, url);
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        return await client.SendAsync(request);
+    }
+
+    private async Task<string> SeedCodeAsync(
+        string username, string clientId, string redirectUri, string scopes, string challenge)
+    {
+        using var scope = factory.Services.CreateScope();
+        var userId = await EnsureUserAsync(scope.ServiceProvider, username);
+        var tokens = scope.ServiceProvider.GetRequiredService<TokenStore>();
+        var code = await tokens.CreateCodeAsync(userId, clientId, redirectUri, scopes, challenge, "S256");
+        return code.Code;
+    }
+
+    private async Task<string> SeedTokenAsync(string username, string scopes)
+    {
+        using var scope = factory.Services.CreateScope();
+        var userId = await EnsureUserAsync(scope.ServiceProvider, username);
+        var tokens = scope.ServiceProvider.GetRequiredService<TokenStore>();
+        return (await tokens.CreateAsync(userId, "client", scopes, lifetime: null)).Token;
+    }
+
+    private static async Task<long> EnsureUserAsync(IServiceProvider services, string username)
+    {
+        var users = services.GetRequiredService<UserManager<ApplicationUser>>();
+        var user = await users.FindByNameAsync(username);
+        if (user is null)
+        {
+            user = new ApplicationUser { UserName = username, CreatedAt = DateTimeOffset.UtcNow, Approved = true };
+            var created = await users.CreateAsync(user, "Sup3r!secret");
+            Assert.True(created.Succeeded);
+        }
+
+        return user.Id;
+    }
+}

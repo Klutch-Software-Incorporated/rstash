@@ -1,0 +1,107 @@
+@page "/oauth/authorize"
+@inject NavigationManager Navigation
+
+<PageTitle>Authorize</PageTitle>
+
+@if (_error is not null)
+{
+    <MudText Typo="Typo.h5" GutterBottom="true">Authorization error</MudText>
+    <MudAlert Severity="Severity.Error">@_error</MudAlert>
+}
+else
+{
+    <MudText Typo="Typo.h5" GutterBottom="true">Authorize access</MudText>
+    <MudText Class="mb-2">
+        The application at <strong>@_origin</strong> is requesting access to your storage:
+    </MudText>
+    <ul>
+        @foreach (var scope in _scopes)
+        {
+            <li>@DescribeScope(scope)</li>
+        }
+    </ul>
+
+    <form action="/oauth/authorize" method="post">
+        <AntiforgeryToken />
+        <input type="hidden" name="redirect_uri" value="@RedirectUri" />
+        <input type="hidden" name="state" value="@State" />
+        <input type="hidden" name="response_type" value="@ResponseType" />
+        @foreach (var scope in _scopes)
+        {
+            <input type="hidden" name="scope" value="@scope" />
+        }
+        <input type="hidden" name="code_challenge" value="@CodeChallenge" />
+        <input type="hidden" name="code_challenge_method" value="@CodeChallengeMethod" />
+
+        <MudButton ButtonType="ButtonType.Submit" Variant="Variant.Filled" Color="Color.Primary"
+                   Class="mr-2" name="action" value="approve">
+            Authorize
+        </MudButton>
+        <MudButton ButtonType="ButtonType.Submit" Variant="Variant.Outlined" name="action" value="deny">
+            Deny
+        </MudButton>
+    </form>
+}
+
+@code {
+    [SupplyParameterFromQuery(Name = "response_type")] public string? ResponseType { get; set; }
+    [SupplyParameterFromQuery(Name = "redirect_uri")] public string? RedirectUri { get; set; }
+    [SupplyParameterFromQuery(Name = "scope")] public string? ScopeParam { get; set; }
+    [SupplyParameterFromQuery(Name = "state")] public string? State { get; set; }
+    [SupplyParameterFromQuery(Name = "code_challenge")] public string? CodeChallenge { get; set; }
+    [SupplyParameterFromQuery(Name = "code_challenge_method")] public string? CodeChallengeMethod { get; set; }
+
+    [CascadingParameter] private HttpContext? HttpContext { get; set; }
+
+    private string? _error;
+    private string _origin = "";
+    private IReadOnlyList<string> _scopes = [];
+
+    protected override void OnInitialized()
+    {
+        if (ResponseType is not ("token" or "code"))
+        {
+            _error = "The response_type parameter must be \"token\" or \"code\".";
+            return;
+        }
+
+        if (string.IsNullOrEmpty(RedirectUri)
+            || !Uri.TryCreate(RedirectUri, UriKind.Absolute, out var redirect)
+            || string.IsNullOrEmpty(redirect.Host))
+        {
+            _error = "The redirect URI provided by the application is not valid.";
+            return;
+        }
+
+        _origin = $"{redirect.Scheme}://{redirect.Authority}";
+
+        if (!Scope.TryParse(ScopeParam ?? "", out var scopes))
+        {
+            _error = "The application requested an invalid scope (expected \"module:r\" or \"module:rw\").";
+            return;
+        }
+
+        _scopes = scopes;
+
+        if (ResponseType == "code" && (string.IsNullOrEmpty(CodeChallenge) || CodeChallengeMethod != "S256"))
+        {
+            _error = "The code flow requires a code_challenge with method S256.";
+            return;
+        }
+
+        // Consent requires an authenticated user.
+        if (HttpContext?.User.Identity?.IsAuthenticated != true)
+        {
+            var returnUrl = "/oauth/authorize" + (HttpContext?.Request.QueryString.Value ?? "");
+            Navigation.NavigateTo($"/login?redirect={Uri.EscapeDataString(returnUrl)}", forceLoad: true);
+        }
+    }
+
+    private static string DescribeScope(string scope)
+    {
+        var parts = scope.Split(':', 2);
+        var target = parts[0] == "*" ? "all your data" : $"your /{parts[0]} data";
+        var permission = parts.Length > 1 && parts[1] == "rw" ? "Read and write" : "Read";
+        return $"{permission} {target}";
+    }
+}

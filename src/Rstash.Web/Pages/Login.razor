@@ -61,8 +61,13 @@
             return;
         }
 
-        Navigation.NavigateTo("/", forceLoad: true);
+        // Honor a local return URL (e.g. from /oauth/authorize); never off-site.
+        var target = ReturnUrl is { Length: > 0 } url && url.StartsWith('/') ? url : "/";
+        Navigation.NavigateTo(target, forceLoad: true);
     }
+
+    [SupplyParameterFromQuery(Name = "redirect")]
+    private string? ReturnUrl { get; set; }
 
     public sealed class LoginInput
     {

@@ -118,7 +118,7 @@ app.MapPost("/auth/logout", async (SignInManager<ApplicationUser> signInManager)
 // remoteStorage storage API (bearer-token auth + scopes).
 app.MapStorageEndpoints();
 app.MapWebFinger(baseUrl);
-// OAuth authorize/token/revoke land next in P4.
+app.MapOAuthEndpoints();
 
 app.Run();
 
