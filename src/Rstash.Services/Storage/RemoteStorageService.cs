@@ -230,6 +230,46 @@ public sealed class RemoteStorageService(
         return new StorageUsage(rows.Sum(r => r.ContentLength), folders);
     }
 
+    /// <summary>
+    /// UI-oriented listing of a folder's immediate children. Files carry their own size;
+    /// subfolders carry the recursive total of every document beneath them. Folders sort
+    /// first, then files, each alphabetically.
+    /// </summary>
+    public async Task<IReadOnlyList<BrowserEntry>> ListFolderAsync(
+        long userId, string folderPath, CancellationToken cancellationToken = default)
+    {
+        await using var db = await contextFactory.CreateDbContextAsync(cancellationToken);
+        var rows = await db.Nodes
+            .Where(n => n.UserId == userId && n.Path.StartsWith(folderPath))
+            .Select(n => new { n.Path, n.ContentLength, n.ContentType })
+            .ToListAsync(cancellationToken);
+
+        var files = new List<BrowserEntry>();
+        var folderSizes = new Dictionary<string, long>(StringComparer.Ordinal);
+
+        foreach (var row in rows)
+        {
+            var remainder = row.Path[folderPath.Length..];
+            var slash = remainder.IndexOf('/');
+            if (slash < 0)
+            {
+                files.Add(new BrowserEntry(remainder, IsFolder: false, row.ContentLength, row.ContentType));
+            }
+            else
+            {
+                var name = remainder[..slash];
+                folderSizes[name] = folderSizes.GetValueOrDefault(name) + row.ContentLength;
+            }
+        }
+
+        var entries = folderSizes
+            .Select(folder => new BrowserEntry(folder.Key + "/", IsFolder: true, folder.Value, ""))
+            .OrderBy(entry => entry.Name, StringComparer.Ordinal)
+            .ToList();
+        entries.AddRange(files.OrderBy(file => file.Name, StringComparer.Ordinal));
+        return entries;
+    }
+
     /// <summary>The top-level module folder of a path, e.g. <c>/photos/2026/x.jpg</c> → <c>/photos</c>.</summary>
     private static string TopFolder(string path)
     {
@@ -291,3 +331,6 @@ public sealed record StorageUsage(long TotalBytes, IReadOnlyList<FolderUsage> Fo
 
 /// <summary>Bytes stored under one top-level module folder (e.g. <c>/photos</c>).</summary>
 public sealed record FolderUsage(string Folder, long Bytes);
+
+/// <summary>One row in the file browser: a file (own size) or a subfolder (recursive size).</summary>
+public sealed record BrowserEntry(string Name, bool IsFolder, long Bytes, string ContentType);

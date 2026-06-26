@@ -10,65 +10,67 @@
 
 <MudBreadcrumbs Items="_crumbs" Class="px-0 mb-3" />
 
-<MudSimpleTable Hover="true" Elevation="1" Class="rs-files-table">
-    <thead>
-        <tr>
-            <th>Name</th>
-            <th class="rs-files-size">Size</th>
-            <th>Type</th>
-            <th class="rs-files-actions">Actions</th>
-        </tr>
-    </thead>
-    <tbody>
-        @if (_folderPath != "/")
-        {
+<form method="post" action="/files/delete" class="rs-files-form">
+    <AntiforgeryToken />
+    <input type="hidden" name="folder" value="@_folderPath" />
+
+    <div class="rs-bulkbar">
+        <span>Selected items will be permanently deleted.</span>
+        <button type="submit" class="rs-bulk-delete">Delete selected</button>
+    </div>
+
+    <MudSimpleTable Hover="true" Elevation="1" Class="rs-files-table">
+        <thead>
             <tr>
-                <td colspan="4">
-                    <a href="@ParentUrl" class="rs-files-name">
-                        <MudIcon Icon="@Icons.Material.Filled.Folder" Color="Color.Primary" Size="Size.Small" />../
-                    </a>
-                </td>
+                <th class="rs-files-check"></th>
+                <th>Name</th>
+                <th class="rs-files-size">Size</th>
+                <th>Type</th>
             </tr>
-        }
-        @foreach (var item in _items)
-        {
-            <tr>
-                <td>
-                    @if (item.IsFolder)
-                    {
-                        <a href="@($"/files/{_relativePath}{item.Name}")" class="rs-files-name">
-                            <MudIcon Icon="@Icons.Material.Filled.Folder" Color="Color.Primary" Size="Size.Small" />@item.Name
+        </thead>
+        <tbody>
+            @if (_folderPath != "/")
+            {
+                <tr>
+                    <td></td>
+                    <td colspan="3">
+                        <a href="@ParentUrl" class="rs-files-name">
+                            <MudIcon Icon="@Icons.Material.Filled.Folder" Color="Color.Primary" Size="Size.Small" />../
                         </a>
-                    }
-                    else
-                    {
-                        <a href="@($"/files/download/{_relativePath}{item.Name}")" class="rs-files-name">
-                            <MudIcon Icon="@Icons.Material.Filled.InsertDriveFile" Size="Size.Small" />@item.Name
-                        </a>
-                    }
-                </td>
-                <td class="rs-files-size rs-mono">@(item.IsFolder ? "" : Format(item.Size))</td>
-                <td class="rs-mono">@(item.IsFolder ? "folder" : item.Type)</td>
-                <td class="rs-files-actions">
-                    @if (!item.IsFolder)
-                    {
-                        <form method="post" action="/files/delete">
-                            <AntiforgeryToken />
-                            <input type="hidden" name="path" value="@($"{_folderPath}{item.Name}")" />
-                            <input type="hidden" name="folder" value="@_folderPath" />
-                            <MudButton ButtonType="ButtonType.Submit" Variant="Variant.Text"
-                                       Color="Color.Error" Size="Size.Small">Delete</MudButton>
-                        </form>
-                    }
-                </td>
-            </tr>
-        }
-        @if (_items.Count == 0)
-        {
-            <tr><td colspan="4" class="rs-empty">This folder is empty.</td></tr>
-        }
-    </tbody>
-</MudSimpleTable>
+                    </td>
+                </tr>
+            }
+            @foreach (var item in _items)
+            {
+                <tr>
+                    <td class="rs-files-check">
+                        <input type="checkbox" name="paths" value="@(_folderPath + item.Name)" class="rs-file-check" />
+                    </td>
+                    <td>
+                        @if (item.IsFolder)
+                        {
+                            <a href="@($"/files/{_relativePath}{item.Name}")" class="rs-files-name">
+                                <MudIcon Icon="@Icons.Material.Filled.Folder" Color="Color.Primary" Size="Size.Small" />@item.Name
+                            </a>
+                        }
+                        else
+                        {
+                            <a href="@($"/files/download/{_relativePath}{item.Name}")" class="rs-files-name">
+                                <MudIcon Icon="@Icons.Material.Filled.InsertDriveFile" Size="Size.Small" />@item.Name
+                            </a>
+                        }
+                    </td>
+                    <td class="rs-files-size rs-mono">@Format(item.Bytes)</td>
+                    <td class="rs-mono">@(item.IsFolder ? "" : item.ContentType)</td>
+                </tr>
+            }
+            @if (_items.Count == 0)
+            {
+                <tr><td colspan="4" class="rs-empty">This folder is empty.</td></tr>
+            }
+        </tbody>
+    </MudSimpleTable>
+</form>
 
 @code {
     [Parameter] public string? Path { get; set; }
@@ -76,7 +78,7 @@
 
     private string _relativePath = "";   // e.g. "documents/"
     private string _folderPath = "/";    // e.g. "/documents/"
-    private List<FileRow> _items = [];
+    private IReadOnlyList<BrowserEntry> _items = [];
     private List<BreadcrumbItem> _crumbs = [];
 
     protected override async Task OnInitializedAsync()
@@ -91,13 +93,7 @@
             return;
         }
 
-        var (description, _) = await Storage.GetFolderAsync(user.Id, _folderPath, new StorageConditions());
-        _items = description.Items
-            .Select(entry => new FileRow(
-                entry.Key, entry.Key.EndsWith('/'), entry.Value.ContentLength ?? 0, entry.Value.ContentType ?? ""))
-            .OrderByDescending(row => row.IsFolder)
-            .ThenBy(row => row.Name, StringComparer.Ordinal)
-            .ToList();
+        _items = await Storage.ListFolderAsync(user.Id, _folderPath);
     }
 
     private void BuildCrumbs()
@@ -136,6 +132,4 @@
 
         return unit == 0 ? $"{bytes} B" : $"{size:0.#} {units[unit]}";
     }
-
-    private sealed record FileRow(string Name, bool IsFolder, long Size, string Type);
 }

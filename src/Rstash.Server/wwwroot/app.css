@@ -359,4 +359,45 @@
 
 .rs-files-name:hover { text-decoration: underline; }
 
-.rs-files-table form { display: inline; margin: 0; }
+.rs-files-check { width: 1%; white-space: nowrap; text-align: center; }
+
+.rs-file-check {
+    width: 16px;
+    height: 16px;
+    accent-color: var(--rs-gold);
+    cursor: pointer;
+    vertical-align: middle;
+}
+
+/* Bulk-delete bar: revealed (pure CSS, no JS) only when a row is checked. */
+.rs-bulkbar {
+    display: none;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 14px;
+    margin-bottom: 12px;
+    border: 1px solid var(--rs-gold-tint-line);
+    background: var(--rs-gold-tint);
+    border-radius: 8px;
+    font-size: 13.5px;
+    color: var(--rs-gold-deep);
+}
+
+.rs-files-form:has(.rs-file-check:checked) .rs-bulkbar {
+    display: flex;
+}
+
+.rs-bulk-delete {
+    margin-left: auto;
+    background: var(--mud-palette-error);
+    color: #fff;
+    border: none;
+    border-radius: 7px;
+    padding: 7px 14px;
+    font: inherit;
+    font-weight: 600;
+    font-size: 13px;
+    cursor: pointer;
+}
+
+.rs-bulk-delete:hover { filter: brightness(.95); }

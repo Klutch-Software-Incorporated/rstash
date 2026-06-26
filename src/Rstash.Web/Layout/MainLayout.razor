@@ -22,6 +22,8 @@
         <MudSpacer />
         <AuthorizeView>
             <Authorized>
+                <MudButton Href="/" Color="Color.Inherit" Variant="Variant.Text"
+                           StartIcon="@Icons.Material.Filled.Dashboard" Class="mx-1">Dashboard</MudButton>
                 <MudButton Href="/files" Color="Color.Inherit" Variant="Variant.Text"
                            StartIcon="@Icons.Material.Filled.Folder" Class="mx-1">Files</MudButton>
                 @if (_isAdmin)

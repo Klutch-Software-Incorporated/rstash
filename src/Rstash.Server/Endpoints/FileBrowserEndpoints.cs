@@ -57,16 +57,31 @@ internal static class FileBrowserEndpoints
         }
 
         var form = await ctx.Request.ReadFormAsync();
-        var path = form["path"].ToString();
         var folder = form["folder"].ToString();
 
-        try
+        // One or more selected paths; folders (trailing '/') delete their whole subtree.
+        foreach (var path in form["paths"])
         {
-            await storage.DeleteDocumentAsync(user.Id, path, new StorageConditions(), ctx.RequestAborted);
-        }
-        catch (StorageException)
-        {
-            // Already gone — fine.
+            if (string.IsNullOrEmpty(path))
+            {
+                continue;
+            }
+
+            try
+            {
+                if (path.EndsWith('/'))
+                {
+                    await storage.DeleteFolderAsync(user.Id, path, ctx.RequestAborted);
+                }
+                else
+                {
+                    await storage.DeleteDocumentAsync(user.Id, path, new StorageConditions(), ctx.RequestAborted);
+                }
+            }
+            catch (StorageException)
+            {
+                // Already gone (or removed as part of a selected parent folder) — fine.
+            }
         }
 
         return Results.Redirect("/files" + folder);
