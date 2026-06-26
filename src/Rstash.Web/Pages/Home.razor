@@ -1,0 +1,7 @@
+@page "/"
+@inject Rstash.Services.SettingsService Settings
+
+<PageTitle>@Settings.Current.SiteName</PageTitle>
+
+<MudText Typo="Typo.h4" GutterBottom="true">Welcome to @Settings.Current.SiteName</MudText>
+<MudText>@Settings.Current.HomeSubtitle</MudText>

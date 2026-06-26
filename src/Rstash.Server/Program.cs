@@ -1,5 +1,7 @@
 using Microsoft.EntityFrameworkCore;
+using MudBlazor.Services;
 using Rstash.Database;
+using Rstash.Server.Components;
 using Rstash.Services;
 using Rstash.Services.Storage;
 using Rstash.Storage;
@@ -10,11 +12,16 @@ var builder = WebApplication.CreateBuilder(args);
 var databaseDsn = builder.Configuration["RSTASH_DB"] ?? "sqlite:rstash.sqlite";
 var blobDsn = builder.Configuration["RSTASH_BLOB"] ?? "sqlite:rstash-blobs.sqlite";
 
+// Core services.
 builder.Services.AddHealthChecks();
 builder.Services.AddDbContextFactory<RstashDbContext>(options => options.UseRstashDatabase(databaseDsn));
 builder.Services.AddSingleton<IStorage>(_ => StorageFactory.Open(blobDsn));
 builder.Services.AddSingleton<SettingsService>();
 builder.Services.AddSingleton<RemoteStorageService>();
+
+// Blazor Web App (interactive server) + MudBlazor.
+builder.Services.AddRazorComponents().AddInteractiveServerComponents();
+builder.Services.AddMudServices();
 
 var app = builder.Build();
 
@@ -28,11 +35,17 @@ await using (var scope = app.Services.CreateAsyncScope())
     await scope.ServiceProvider.GetRequiredService<SettingsService>().ReloadAsync();
 }
 
-app.MapHealthChecks("/healthz");
+app.MapStaticAssets();
+app.UseAntiforgery();
 
-// Storage protocol endpoints (GET/PUT/DELETE/HEAD /storage/...), the Blazor +
-// MudBlazor UI, WebFinger, and OAuth land in P3/P4 — they need user identity
-// and bearer-token auth, which are built next.
+app.MapHealthChecks("/healthz");
+app.MapRazorComponents<App>()
+    .AddInteractiveServerRenderMode()
+    .AddAdditionalAssemblies(typeof(Rstash.Web.Layout.MainLayout).Assembly);
+
+// Storage protocol endpoints (GET/PUT/DELETE/HEAD /storage/...), WebFinger, and
+// OAuth land in P4 — they need bearer-token auth. Identity + setup/login UI are
+// built across the rest of P3.
 
 app.Run();
 
