@@ -24,6 +24,12 @@ if (args is ["check", ..])
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Serve RCL static assets (MudBlazor CSS/JS at _content/…) in every environment, not just
+// Development. Reads the build-output manifest if present; no-op for published output, which
+// carries its own embedded endpoint manifest. Without this a non-published Production run
+// (e.g. launching the built DLL directly) serves the UI completely unstyled.
+builder.WebHost.UseStaticWebAssets();
+
 // Boot-critical configuration (env vars; see the settings registry for the rest).
 var databaseDsn = builder.Configuration["RSTASH_DB"] ?? "sqlite:rstash.sqlite";
 var blobDsn = builder.Configuration["RSTASH_BLOB"] ?? "sqlite:rstash-blobs.sqlite";
@@ -116,7 +122,7 @@ app.Use(async (context, next) =>
         headers["Strict-Transport-Security"] = "max-age=63072000; includeSubDomains";
     }
 
-    await next();
+    await next(context);
 });
 
 app.MapStaticAssets();
@@ -153,7 +159,7 @@ app.Use(async (context, next) =>
         }
     }
 
-    await next();
+    await next(context);
 });
 
 app.MapHealthChecks("/healthz");
