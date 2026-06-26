@@ -1,7 +1,195 @@
 @page "/"
 @inject Rstash.Services.SettingsService Settings
+@inject UserManager<ApplicationUser> Users
+@inject RemoteStorageService Storage
+@inject TokenStore Tokens
+@inject NavigationManager Navigation
 
 <PageTitle>@Settings.Current.SiteName</PageTitle>
 
-<MudText Typo="Typo.h4" GutterBottom="true">Welcome to @Settings.Current.SiteName</MudText>
-<MudText>@Settings.Current.HomeSubtitle</MudText>
+@if (_user is null)
+{
+    <MudText Typo="Typo.h4" GutterBottom="true">Welcome to @Settings.Current.SiteName</MudText>
+    <MudText Class="mb-4">@Settings.Current.HomeSubtitle</MudText>
+    <MudButton Href="/login" Variant="Variant.Filled" Color="Color.Primary">Sign in</MudButton>
+}
+else
+{
+    <MudPaper Class="rs-hero" Elevation="1">
+        <p class="rs-hero-label">Your storage address</p>
+        <div class="rs-address-row">
+            <div class="rs-address">@_username<span class="at">@@</span><span class="host">@_host</span></div>
+            <button class="rs-copy" type="button"
+                    onclick="navigator.clipboard.writeText('@_handle');this.textContent='Copied';setTimeout(()=>this.textContent='Copy',1500)">
+                Copy
+            </button>
+        </div>
+        <p class="rs-hero-help">
+            Paste this into any remoteStorage app to connect it to your data. You stay in control
+            and can disconnect an app at any time.
+        </p>
+    </MudPaper>
+
+    <div class="rs-grid">
+        <MudPaper Class="rs-card" Elevation="1">
+            <div class="rs-card-head">
+                <h2>Connected apps</h2>
+                <span class="rs-count">@_tokens.Count connected</span>
+            </div>
+            @if (_tokens.Count == 0)
+            {
+                <div class="rs-empty">No apps connected yet. Authorize one from its connect screen.</div>
+            }
+            else
+            {
+                @foreach (var token in _tokens)
+                {
+                    <div class="rs-app">
+                        <div class="rs-app-icon">@AppInitials(token.ClientId)</div>
+                        <div class="rs-app-body">
+                            <div class="rs-app-name">
+                                @AppName(token.ClientId)
+                                @foreach (var scope in Scopes(token.Scopes))
+                                {
+                                    <span class="rs-scope @(scope.EndsWith(":rw") ? "rw" : "")">@scope</span>
+                                }
+                            </div>
+                            <div class="rs-app-when">Connected @Relative(token.CreatedAt)</div>
+                        </div>
+                        <form method="post" action="/account/apps/revoke">
+                            <AntiforgeryToken />
+                            <input type="hidden" name="token" value="@token.Token" />
+                            <button type="submit" class="rs-disconnect">Disconnect</button>
+                        </form>
+                    </div>
+                }
+            }
+        </MudPaper>
+
+        <MudPaper Class="rs-card" Elevation="1">
+            <div class="rs-card-head">
+                <h2>What's using space</h2>
+            </div>
+            <div class="rs-quota">
+                <div class="rs-quota-top">
+                    <span class="rs-quota-used">@Format(_usage.TotalBytes)</span>
+                    @if (_quota > 0)
+                    {
+                        <span class="rs-quota-total">of @Format(_quota) used</span>
+                    }
+                    else
+                    {
+                        <span class="rs-quota-total">used · no limit</span>
+                    }
+                </div>
+                @if (_quota > 0)
+                {
+                    <MudProgressLinear Color="Color.Primary" Rounded="true"
+                                       Value="@Math.Min(100, _usage.TotalBytes * 100.0 / _quota)" />
+                }
+            </div>
+            @if (_usage.Folders.Count == 0)
+            {
+                <div class="rs-empty">No files yet — connect an app, or run <code>rstash seed</code>.</div>
+            }
+            else
+            {
+                @foreach (var folder in _usage.Folders)
+                {
+                    <div class="rs-cat">
+                        <div class="rs-cat-top">
+                            <span class="rs-cat-name">@folder.Folder</span>
+                            <span class="rs-cat-size">@Format(folder.Bytes)</span>
+                        </div>
+                        <MudProgressLinear Color="Color.Primary" Size="Size.Small" Rounded="true"
+                                           Value="@(_maxFolderBytes > 0 ? folder.Bytes * 100.0 / _maxFolderBytes : 0)" />
+                    </div>
+                }
+                <a class="rs-browse" href="/files">Browse all files →</a>
+            }
+        </MudPaper>
+    </div>
+}
+
+@code {
+    [CascadingParameter] private HttpContext? HttpContext { get; set; }
+
+    private ApplicationUser? _user;
+    private string _username = "";
+    private string _host = "";
+    private string _handle = "";
+    private long _quota;
+    private long _maxFolderBytes;
+    private List<OAuthToken> _tokens = [];
+    private StorageUsage _usage = new(0, []);
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (HttpContext?.User.Identity?.IsAuthenticated != true)
+        {
+            return;
+        }
+
+        _user = await Users.GetUserAsync(HttpContext.User);
+        if (_user is null)
+        {
+            return;
+        }
+
+        _username = _user.UserName ?? "";
+        _host = new Uri(Navigation.BaseUri).Host;
+        _handle = $"{_username}@{_host}";
+
+        _tokens = await Tokens.ListForUserAsync(_user.Id);
+        _usage = await Storage.GetUsageAsync(_user.Id);
+        _maxFolderBytes = _usage.Folders.Count > 0 ? _usage.Folders.Max(f => f.Bytes) : 0;
+
+        // Effective cap: the user's own quota wins; otherwise the global limit. 0 = unlimited.
+        _quota = _user.StorageQuota > 0 ? _user.StorageQuota : Settings.Current.TotalStorageLimit;
+    }
+
+    private static IEnumerable<string> Scopes(string scopes) =>
+        scopes.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+
+    // remoteStorage client_ids are typically an app origin; show something human.
+    private static string AppName(string clientId)
+    {
+        if (Uri.TryCreate(clientId, UriKind.Absolute, out var uri))
+        {
+            return uri.Host;
+        }
+
+        return string.IsNullOrWhiteSpace(clientId) ? "Unknown app" : clientId;
+    }
+
+    private static string AppInitials(string clientId)
+    {
+        var name = AppName(clientId);
+        var letters = new string(name.Where(char.IsLetterOrDigit).Take(2).ToArray());
+        return letters.Length == 0 ? "?" : letters.ToUpperInvariant();
+    }
+
+    private static string Relative(DateTimeOffset when)
+    {
+        var span = DateTimeOffset.UtcNow - when;
+        if (span.TotalDays >= 14) return $"{(int)(span.TotalDays / 7)} weeks ago";
+        if (span.TotalDays >= 2) return $"{(int)span.TotalDays} days ago";
+        if (span.TotalDays >= 1) return "yesterday";
+        if (span.TotalHours >= 1) return $"{(int)span.TotalHours} hours ago";
+        return "today";
+    }
+
+    private static string Format(long bytes)
+    {
+        string[] units = ["B", "KB", "MB", "GB", "TB"];
+        double size = bytes;
+        var unit = 0;
+        while (size >= 1024 && unit < units.Length - 1)
+        {
+            size /= 1024;
+            unit++;
+        }
+
+        return unit == 0 ? $"{bytes} B" : $"{size:0.#} {units[unit]}";
+    }
+}

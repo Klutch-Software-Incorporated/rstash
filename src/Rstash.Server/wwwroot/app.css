@@ -103,3 +103,205 @@
 .rs-footer a:hover {
     text-decoration: underline;
 }
+
+/* ---------- dashboard ---------- */
+
+/* Cards + hero share the hairline border (MudPaper supplies surface + shadow + radius). */
+.rs-card {
+    border: 1px solid var(--mud-palette-lines-default);
+    overflow: hidden;
+}
+
+/* Hero: the storage handle is the thing that makes remoteStorage work. */
+.rs-hero {
+    border: 1px solid var(--mud-palette-lines-default);
+    border-left: 4px solid var(--rs-gold);
+    padding: 24px 26px;
+    margin-bottom: 32px;
+}
+
+.rs-hero-label {
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 1.4px;
+    color: var(--mud-palette-text-secondary);
+    font-weight: 500;
+    margin: 0 0 12px;
+}
+
+.rs-address {
+    font-family: 'Roboto Mono', monospace;
+    font-weight: 500;
+    font-size: clamp(22px, 4.4vw, 30px);
+    letter-spacing: -.5px;
+    line-height: 1.1;
+    word-break: break-all;
+}
+
+.rs-address .at { color: var(--mud-palette-text-secondary); }
+.rs-address .host { color: var(--rs-gold-deep); }
+
+.rs-hero-help {
+    margin: 16px 0 0;
+    color: var(--mud-palette-text-secondary);
+    font-size: 13.5px;
+}
+
+.rs-address-row {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
+}
+
+.rs-copy {
+    margin-left: auto;
+    background: var(--rs-gold);
+    color: #2a2007;
+    border: none;
+    font: inherit;
+    font-weight: 700;
+    font-size: 14px;
+    padding: 10px 16px;
+    border-radius: 8px;
+    cursor: pointer;
+}
+
+.rs-copy:hover { background: #c79a2f; }
+
+/* Two-column card grid. */
+.rs-grid {
+    display: grid;
+    grid-template-columns: 1.45fr 1fr;
+    gap: 24px;
+    align-items: start;
+}
+
+@media (max-width: 760px) {
+    .rs-grid { grid-template-columns: 1fr; }
+}
+
+.rs-card-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    padding: 18px 22px;
+    border-bottom: 1px solid var(--mud-palette-lines-default);
+}
+
+.rs-card-head h2 {
+    margin: 0;
+    font-size: 15px;
+    font-weight: 700;
+    letter-spacing: -.2px;
+}
+
+.rs-count { font-size: 13px; color: var(--mud-palette-text-secondary); }
+
+/* Connected apps. */
+.rs-app {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 16px 22px;
+    border-bottom: 1px solid var(--mud-palette-lines-default);
+}
+
+.rs-app:last-child { border-bottom: none; }
+
+.rs-app-icon {
+    width: 38px;
+    height: 38px;
+    border-radius: 9px;
+    background: var(--rs-gold-tint);
+    border: 1px solid var(--rs-gold-tint-line);
+    display: grid;
+    place-items: center;
+    font-weight: 700;
+    color: var(--rs-gold-deep);
+    flex-shrink: 0;
+}
+
+.rs-app-body { flex: 1; min-width: 0; }
+
+.rs-app-name {
+    font-weight: 500;
+    font-size: 14.5px;
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    flex-wrap: wrap;
+}
+
+.rs-app-when { font-size: 12.5px; color: var(--mud-palette-text-secondary); margin-top: 3px; }
+
+.rs-scope {
+    font-family: 'Roboto Mono', monospace;
+    font-size: 11.5px;
+    font-weight: 500;
+    padding: 2px 7px;
+    border-radius: 5px;
+    border: 1px solid var(--mud-palette-lines-default);
+    color: var(--mud-palette-text-secondary);
+    background: var(--mud-palette-background);
+}
+
+.rs-scope.rw {
+    color: var(--rs-gold-deep);
+    background: var(--rs-gold-tint);
+    border-color: var(--rs-gold-tint-line);
+}
+
+.rs-disconnect {
+    background: none;
+    border: 1px solid var(--mud-palette-lines-default);
+    color: var(--mud-palette-text-secondary);
+    font: inherit;
+    font-size: 12.5px;
+    padding: 6px 12px;
+    border-radius: 7px;
+    cursor: pointer;
+    flex-shrink: 0;
+}
+
+.rs-disconnect:hover { border-color: #d99; color: #b44; }
+
+/* Storage breakdown. */
+.rs-quota { padding: 18px 22px; border-bottom: 1px solid var(--mud-palette-lines-default); }
+
+.rs-quota-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 10px;
+}
+
+.rs-quota-used { font-family: 'Roboto Mono', monospace; font-weight: 700; font-size: 20px; }
+.rs-quota-total { color: var(--mud-palette-text-secondary); font-size: 13px; }
+
+.rs-cat { padding: 13px 22px; border-bottom: 1px solid var(--mud-palette-lines-default); }
+.rs-cat:last-child { border-bottom: none; }
+
+.rs-cat-top {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 7px;
+    font-size: 13.5px;
+}
+
+.rs-cat-name { font-family: 'Roboto Mono', monospace; font-weight: 500; }
+.rs-cat-size { color: var(--mud-palette-text-secondary); font-family: 'Roboto Mono', monospace; font-size: 12.5px; }
+
+.rs-empty { padding: 22px; color: var(--mud-palette-text-secondary); font-size: 13.5px; }
+
+.rs-browse {
+    display: block;
+    text-align: center;
+    padding: 14px;
+    font-weight: 500;
+    font-size: 14px;
+    color: var(--rs-gold-deep);
+    text-decoration: none;
+}
+
+.rs-browse:hover { background: var(--rs-gold-tint); }

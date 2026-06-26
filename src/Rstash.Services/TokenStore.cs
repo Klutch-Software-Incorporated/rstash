@@ -56,6 +56,28 @@ public sealed class TokenStore(IDbContextFactory<RstashDbContext> contextFactory
         await db.OAuthTokens.Where(t => t.Token == token).ExecuteDeleteAsync(cancellationToken);
     }
 
+    /// <summary>All of a user's live tokens ("connected apps"), newest first.</summary>
+    public async Task<List<OAuthToken>> ListForUserAsync(long userId, CancellationToken cancellationToken = default)
+    {
+        await using var db = await contextFactory.CreateDbContextAsync(cancellationToken);
+        var tokens = await db.OAuthTokens.AsNoTracking()
+            .Where(t => t.UserId == userId)
+            .ToListAsync(cancellationToken);
+
+        // Order in memory — SQLite can't ORDER BY a DateTimeOffset.
+        return tokens.OrderByDescending(t => t.CreatedAt).ToList();
+    }
+
+    /// <summary>Revokes a token only if it belongs to the given user. Returns true if one was removed.</summary>
+    public async Task<bool> RevokeForUserAsync(long userId, string token, CancellationToken cancellationToken = default)
+    {
+        await using var db = await contextFactory.CreateDbContextAsync(cancellationToken);
+        var removed = await db.OAuthTokens
+            .Where(t => t.Token == token && t.UserId == userId)
+            .ExecuteDeleteAsync(cancellationToken);
+        return removed > 0;
+    }
+
     // ── Authorization codes (one-time, PKCE) ──
 
     public async Task<AuthorizationCode> CreateCodeAsync(

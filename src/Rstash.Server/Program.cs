@@ -188,6 +188,7 @@ app.MapWebFinger(baseUrl);
 app.MapOAuthEndpoints();
 app.MapFileBrowserEndpoints();
 app.MapAdminUserEndpoints();
+app.MapAccountEndpoints();
 app.MapUiEndpoints();
 
 app.Run();

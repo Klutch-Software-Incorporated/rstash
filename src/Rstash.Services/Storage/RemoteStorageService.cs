@@ -212,6 +212,32 @@ public sealed class RemoteStorageService(
         return (description, etag);
     }
 
+    /// <summary>Total bytes stored for a user plus a per-top-folder breakdown (largest first).</summary>
+    public async Task<StorageUsage> GetUsageAsync(long userId, CancellationToken cancellationToken = default)
+    {
+        await using var db = await contextFactory.CreateDbContextAsync(cancellationToken);
+        var rows = await db.Nodes
+            .Where(n => n.UserId == userId)
+            .Select(n => new { n.Path, n.ContentLength })
+            .ToListAsync(cancellationToken);
+
+        var folders = rows
+            .GroupBy(r => TopFolder(r.Path))
+            .Select(group => new FolderUsage(group.Key, group.Sum(r => r.ContentLength)))
+            .OrderByDescending(folder => folder.Bytes)
+            .ToList();
+
+        return new StorageUsage(rows.Sum(r => r.ContentLength), folders);
+    }
+
+    /// <summary>The top-level module folder of a path, e.g. <c>/photos/2026/x.jpg</c> → <c>/photos</c>.</summary>
+    private static string TopFolder(string path)
+    {
+        var trimmed = path.TrimStart('/');
+        var slash = trimmed.IndexOf('/');
+        return "/" + (slash < 0 ? trimmed : trimmed[..slash]);
+    }
+
     /// <summary>
     /// Enforces the per-user storage quota (ApplicationUser.StorageQuota; 0 =
     /// unlimited) and the global cap (settings; 0 = disabled). <paramref name="delta"/>
@@ -259,3 +285,9 @@ public sealed class RemoteStorageService(
         return buffer.ToArray();
     }
 }
+
+/// <summary>Aggregate storage usage for a user: total bytes and a per-top-folder breakdown.</summary>
+public sealed record StorageUsage(long TotalBytes, IReadOnlyList<FolderUsage> Folders);
+
+/// <summary>Bytes stored under one top-level module folder (e.g. <c>/photos</c>).</summary>
+public sealed record FolderUsage(string Folder, long Bytes);
