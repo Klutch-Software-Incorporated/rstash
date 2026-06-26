@@ -150,6 +150,7 @@ app.MapPost("/auth/logout", async (SignInManager<ApplicationUser> signInManager)
 app.MapStorageEndpoints();
 app.MapWebFinger(baseUrl);
 app.MapOAuthEndpoints();
+app.MapFileBrowserEndpoints();
 
 app.Run();
 

@@ -1,0 +1,88 @@
+@page "/files"
+@page "/files/{**Path}"
+@attribute [Authorize]
+@inject RemoteStorageService Storage
+@inject UserManager<ApplicationUser> Users
+
+<PageTitle>Files</PageTitle>
+
+<MudText Typo="Typo.h4" GutterBottom="true">Your files</MudText>
+<MudText Class="mb-2"><code>@_folderPath</code></MudText>
+
+@if (_folderPath != "/")
+{
+    <MudLink Href="@ParentUrl">⬆ Up</MudLink>
+}
+
+<ul>
+    @foreach (var item in _items)
+    {
+        <li>
+            @if (item.IsFolder)
+            {
+                <span>📁 <MudLink Href="@($"/files/{_relativePath}{item.Name}")">@item.Name</MudLink></span>
+            }
+            else
+            {
+                <span>📄 <MudLink Href="@($"/files/download/{_relativePath}{item.Name}")">@item.Name</MudLink></span>
+                <form action="/files/delete" method="post" style="display:inline; margin-left:.5rem">
+                    <AntiforgeryToken />
+                    <input type="hidden" name="path" value="@($"{_folderPath}{item.Name}")" />
+                    <input type="hidden" name="folder" value="@_folderPath" />
+                    <button type="submit">delete</button>
+                </form>
+            }
+        </li>
+    }
+    @if (_items.Count == 0)
+    {
+        <li><em>This folder is empty.</em></li>
+    }
+</ul>
+
+<MudText Typo="Typo.h6" Class="mt-4 mb-1">Upload to this folder</MudText>
+<form action="/files/upload" method="post" enctype="multipart/form-data">
+    <AntiforgeryToken />
+    <input type="hidden" name="folder" value="@_folderPath" />
+    <input type="file" name="file" />
+    <button type="submit">Upload</button>
+</form>
+
+@code {
+    [Parameter] public string? Path { get; set; }
+    [CascadingParameter] private HttpContext? HttpContext { get; set; }
+
+    private string _relativePath = "";   // e.g. "documents/"
+    private string _folderPath = "/";    // e.g. "/documents/"
+    private List<(string Name, bool IsFolder)> _items = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        _relativePath = string.IsNullOrEmpty(Path) ? "" : (Path.EndsWith('/') ? Path : Path + "/");
+        _folderPath = "/" + _relativePath;
+
+        var user = HttpContext is null ? null : await Users.GetUserAsync(HttpContext.User);
+        if (user is null)
+        {
+            return;
+        }
+
+        var (description, _) = await Storage.GetFolderAsync(user.Id, _folderPath, new StorageConditions());
+        _items = description.Items.Keys
+            .Select(name => (name, IsFolder: name.EndsWith('/')))
+            .OrderByDescending(entry => entry.IsFolder)
+            .ThenBy(entry => entry.name, StringComparer.Ordinal)
+            .ToList();
+    }
+
+    private string ParentUrl
+    {
+        get
+        {
+            var trimmed = _folderPath.TrimEnd('/');
+            var lastSlash = trimmed.LastIndexOf('/');
+            var parent = lastSlash <= 0 ? "" : trimmed[1..lastSlash] + "/";
+            return "/files/" + parent;
+        }
+    }
+}

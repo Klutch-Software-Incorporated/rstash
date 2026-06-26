@@ -11,7 +11,9 @@
         <MudSpacer />
         <AuthorizeView>
             <Authorized>
-                <MudText Class="mr-4">@context.User.Identity?.Name</MudText>
+                <MudButton Href="/files" Color="Color.Inherit" Variant="Variant.Text">Files</MudButton>
+                <MudButton Href="/admin/settings" Color="Color.Inherit" Variant="Variant.Text">Settings</MudButton>
+                <MudText Class="mx-4">@context.User.Identity?.Name</MudText>
                 <form action="/auth/logout" method="post">
                     <MudButton ButtonType="ButtonType.Submit" Color="Color.Inherit" Variant="Variant.Text">
                         Sign out
