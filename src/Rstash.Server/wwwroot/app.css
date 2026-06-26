@@ -412,3 +412,77 @@
 }
 
 .rs-bulk-delete:hover { filter: brightness(.95); }
+
+/* ---------- form controls (settings, account) ---------- */
+.rs-field { margin-bottom: 1.25rem; max-width: 36rem; }
+.rs-field:last-child { margin-bottom: 0; }
+
+.rs-label {
+    display: block;
+    font-weight: 600;
+    font-size: .9rem;
+    margin-bottom: .15rem;
+}
+
+.rs-help {
+    font-size: .8rem;
+    color: var(--mud-palette-text-secondary);
+    margin-bottom: .45rem;
+}
+
+.rs-help a { color: var(--rs-gold-deep); }
+
+.rs-control {
+    display: block;
+    width: 100%;
+    padding: .5rem .6rem;
+    border: 1px solid var(--mud-palette-lines-default);
+    border-radius: 8px;
+    background: var(--mud-palette-surface);
+    color: var(--mud-palette-text-primary);
+    font: inherit;
+    font-size: .9rem;
+}
+
+.rs-control:focus {
+    outline: none;
+    border-color: var(--rs-gold);
+    box-shadow: 0 0 0 3px var(--rs-gold-tint);
+}
+
+textarea.rs-control {
+    min-height: 7rem;
+    resize: vertical;
+    font-family: 'Roboto Mono', monospace;
+    font-size: .82rem;
+    line-height: 1.5;
+}
+
+.rs-field-error {
+    color: var(--mud-palette-error);
+    font-size: .8rem;
+    margin-top: .3rem;
+}
+
+.rs-badge-mod {
+    display: inline-block;
+    font-size: .62rem;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    color: var(--rs-gold-deep);
+    background: var(--rs-gold-tint);
+    border: 1px solid var(--rs-gold-tint-line);
+    border-radius: 4px;
+    padding: .05rem .35rem;
+    margin-left: .45rem;
+    vertical-align: middle;
+}
+
+.rs-settings-body { padding: 18px 22px; }
+
+.rs-settings-actions {
+    position: sticky;
+    bottom: 0;
+    padding: 14px 0;
+    background: linear-gradient(var(--mud-palette-background), var(--mud-palette-background) 60%, transparent);
+}

@@ -7,60 +7,65 @@
 <PageTitle>Settings — admin</PageTitle>
 
 <MudText Typo="Typo.h4" GutterBottom="true">Server settings</MudText>
-<MudLink Href="/admin/users" Class="mb-3">Manage users →</MudLink>
-<span> &nbsp; </span>
-<MudLink Href="/admin/audit" Class="mb-3">Audit log →</MudLink>
+<div class="mb-4">
+    <MudLink Href="/admin/users">Manage users →</MudLink>
+    <span class="mx-2">·</span>
+    <MudLink Href="/admin/audit">Audit log →</MudLink>
+</div>
 
 @if (_message is not null)
 {
-    <MudAlert Severity="Severity.Success" Class="mb-3">@_message</MudAlert>
+    <MudAlert Severity="Severity.Success" Class="mb-4">@_message</MudAlert>
 }
-@if (_error is not null)
+@if (_errors.Count > 0)
 {
-    <MudAlert Severity="Severity.Error" Class="mb-3">@_error</MudAlert>
+    <MudAlert Severity="Severity.Error" Class="mb-4">Some settings weren't saved — see the messages below.</MudAlert>
 }
 
-<EditForm Model="Input" method="post" OnValidSubmit="SaveAsync" FormName="setting">
-    <DataAnnotationsValidator />
-    <div class="mb-3">
-        <label>Setting<br />
-            <InputSelect @bind-Value="Input.Key">
-                <option value="">— choose a setting —</option>
-                @foreach (var def in SettingDefinitions.RuntimeEditable)
+<EditForm Model="_form" FormName="settings" OnValidSubmit="SaveAsync">
+    @foreach (var group in _groups)
+    {
+        <MudPaper Class="rs-card mb-4" Elevation="1">
+            <div class="rs-card-head"><h2>@group</h2></div>
+            <div class="rs-settings-body">
+                @foreach (var def in SettingDefinitions.RuntimeEditable.Where(d => d.Group == group))
                 {
-                    <option value="@def.Key">@def.Label (@def.Key)</option>
+                    <div class="rs-field">
+                        <label class="rs-label" for="@def.Key">
+                            @def.Label
+                            @if (_overridden.Contains(def.Key))
+                            {
+                                <span class="rs-badge-mod">modified</span>
+                            }
+                        </label>
+                        <div class="rs-help">@((MarkupString)def.Description)</div>
+                        @RenderControl(def)
+                        @if (_errors.TryGetValue(def.Key, out var error))
+                        {
+                            <div class="rs-field-error">@error</div>
+                        }
+                    </div>
                 }
-            </InputSelect>
-        </label>
+            </div>
+        </MudPaper>
+    }
+
+    <div class="rs-settings-actions">
+        <MudButton ButtonType="ButtonType.Submit" Variant="Variant.Filled" Color="Color.Primary">Save changes</MudButton>
     </div>
-    <div class="mb-3">
-        <label>Value<br /><InputText @bind-Value="Input.Value" /></label>
-    </div>
-    <MudButton ButtonType="ButtonType.Submit" Variant="Variant.Filled" Color="Color.Primary">Save</MudButton>
 </EditForm>
 
-<MudText Typo="Typo.h6" Class="mt-6 mb-2">Current overrides</MudText>
-@if (_overrides.Count == 0)
-{
-    <MudText>None — every setting is using its default.</MudText>
-}
-else
-{
-    <ul>
-        @foreach (var entry in _overrides)
-        {
-            <li><strong>@entry.Key</strong>: @entry.Value</li>
-        }
-    </ul>
-}
-
 @code {
-    [SupplyParameterFromForm] private SettingInput Input { get; set; } = new();
     [CascadingParameter] private HttpContext? HttpContext { get; set; }
+    [SupplyParameterFromForm] private SettingsForm _form { get; set; } = new();
 
-    private IReadOnlyDictionary<string, string> _overrides = new Dictionary<string, string>();
+    private readonly string[] _groups =
+        SettingDefinitions.RuntimeEditable.Select(d => d.Group).Distinct().ToArray();
+
+    private readonly Dictionary<string, string> _values = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, string> _errors = new(StringComparer.Ordinal);
+    private HashSet<string> _overridden = [];
     private string? _message;
-    private string? _error;
 
     protected override async Task OnInitializedAsync()
     {
@@ -71,31 +76,114 @@ else
             return;
         }
 
-        _overrides = await Settings.GetOverridesAsync();
+        var overrides = await Settings.GetOverridesAsync();
+        _overridden = overrides.Keys.ToHashSet(StringComparer.Ordinal);
+        foreach (var def in SettingDefinitions.RuntimeEditable)
+        {
+            _values[def.Key] = overrides.GetValueOrDefault(def.Key, def.Default);
+        }
     }
 
     private async Task SaveAsync()
     {
-        try
+        if (HttpContext is null)
         {
-            await Settings.SetAsync(Input.Key, Input.Value);
-            _message = $"Updated {Input.Key}.";
-            _error = null;
-        }
-        catch (SettingValidationException ex)
-        {
-            _error = ex.Message;
-            _message = null;
+            return;
         }
 
-        _overrides = await Settings.GetOverridesAsync();
+        var overrides = await Settings.GetOverridesAsync();
+        var saved = 0;
+
+        foreach (var def in SettingDefinitions.RuntimeEditable)
+        {
+            var posted = HttpContext.Request.Form[def.Key].ToString();
+            _values[def.Key] = posted; // keep what the admin typed, even on error
+            var current = overrides.GetValueOrDefault(def.Key, def.Default);
+            if (posted == current)
+            {
+                continue;
+            }
+
+            try
+            {
+                await Settings.SetAsync(def.Key, posted);
+                saved++;
+            }
+            catch (SettingValidationException ex)
+            {
+                _errors[def.Key] = ex.Message;
+            }
+        }
+
+        _overridden = (await Settings.GetOverridesAsync()).Keys.ToHashSet(StringComparer.Ordinal);
+        _message = saved > 0 ? $"Saved {saved} setting{(saved == 1 ? "" : "s")}." : null;
     }
 
-    public sealed class SettingInput
+    private string Value(SettingDef def) => _values.GetValueOrDefault(def.Key, def.Default);
+
+    private RenderFragment RenderControl(SettingDef def) => builder =>
     {
-        [Required]
-        public string Key { get; set; } = "";
+        switch (def.InputType)
+        {
+            case SettingInputType.Select:
+                builder.OpenElement(0, "select");
+                builder.AddAttribute(1, "name", def.Key);
+                builder.AddAttribute(2, "id", def.Key);
+                builder.AddAttribute(3, "class", "rs-control");
+                var current = Value(def);
+                var optionIndex = 4;
+                foreach (var option in def.ValidValues)
+                {
+                    builder.OpenElement(optionIndex++, "option");
+                    builder.AddAttribute(optionIndex++, "value", option);
+                    if (option == current)
+                    {
+                        builder.AddAttribute(optionIndex++, "selected", true);
+                    }
 
-        public string Value { get; set; } = "";
-    }
+                    builder.AddContent(optionIndex++, option.Length == 0 ? "(unset)" : option);
+                    builder.CloseElement();
+                }
+
+                builder.CloseElement();
+                break;
+
+            case SettingInputType.TextArea:
+                builder.OpenElement(0, "textarea");
+                builder.AddAttribute(1, "name", def.Key);
+                builder.AddAttribute(2, "id", def.Key);
+                builder.AddAttribute(3, "class", "rs-control");
+                builder.AddAttribute(4, "rows", "6");
+                builder.AddContent(5, Value(def));
+                builder.CloseElement();
+                break;
+
+            default:
+                builder.OpenElement(0, "input");
+                builder.AddAttribute(1, "name", def.Key);
+                builder.AddAttribute(2, "id", def.Key);
+                builder.AddAttribute(3, "class", "rs-control");
+                builder.AddAttribute(4, "value", Value(def));
+                if (def.InputType == SettingInputType.Number)
+                {
+                    builder.AddAttribute(5, "type", "number");
+                    if (def.NumberMin is not null) builder.AddAttribute(6, "min", def.NumberMin);
+                    if (def.NumberStep is not null) builder.AddAttribute(7, "step", def.NumberStep);
+                }
+                else
+                {
+                    builder.AddAttribute(5, "type", "text");
+                    if (def.InputType is SettingInputType.ByteSize or SettingInputType.Duration)
+                    {
+                        builder.AddAttribute(8, "placeholder", def.Default);
+                    }
+                }
+
+                builder.CloseElement();
+                break;
+        }
+    };
+
+    // Empty marker model — the real values are read from the posted form by key.
+    public sealed class SettingsForm;
 }
