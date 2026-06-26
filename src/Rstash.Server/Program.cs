@@ -22,6 +22,13 @@ if (args is ["check", ..])
         new ConfigurationBuilder().AddEnvironmentVariables().Build()));
 }
 
+if (args is ["seed", ..])
+{
+    Environment.Exit(await Rstash.Server.Cli.SeedAsync(
+        new ConfigurationBuilder().AddEnvironmentVariables().Build(),
+        args.Length > 1 ? args[1] : null));
+}
+
 var builder = WebApplication.CreateBuilder(args);
 
 // Serve RCL static assets (MudBlazor CSS/JS at _content/…) in every environment, not just

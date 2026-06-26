@@ -1,12 +1,17 @@
+using System.Text;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using Rstash.Database;
+using Rstash.Services;
 using Rstash.Services.Configuration;
+using Rstash.Services.Storage;
 using Rstash.Storage;
 
 namespace Rstash.Server;
 
-/// <summary>The minimal CLI: <c>env</c> (print config template) and <c>check</c>
-/// (validate config + connectivity). Everything else runs the server.</summary>
+/// <summary>The minimal CLI: <c>env</c> (print config template), <c>check</c>
+/// (validate config + connectivity), and <c>seed</c> (populate an account with
+/// sample data). Everything else runs the server.</summary>
 internal static class Cli
 {
     public static void PrintEnvTemplate()
@@ -56,5 +61,130 @@ internal static class Cli
 
         Console.WriteLine(ok ? "\nConfiguration OK." : "\nConfiguration has errors.");
         return ok ? 0 : 1;
+    }
+
+    /// <summary>
+    /// Populates an account with a spread of sample modules, folders, and documents
+    /// (handy for exercising the file browser and dashboard). Writes through the same
+    /// <see cref="RemoteStorageService"/> path the storage API uses. If no username is
+    /// given, seeds the first account. Re-running overwrites the same documents.
+    /// </summary>
+    public static async Task<int> SeedAsync(IConfiguration config, string? username)
+    {
+        var databaseDsn = config["RSTASH_DB"] ?? "sqlite:rstash.sqlite";
+        var blobDsn = config["RSTASH_BLOB"] ?? "sqlite:rstash-blobs.sqlite";
+
+        var services = new ServiceCollection();
+        services.AddDbContextFactory<RstashDbContext>(options => options.UseRstashDatabase(databaseDsn));
+        services.AddSingleton<IStorage>(_ => StorageFactory.Open(blobDsn));
+        services.AddSingleton<SettingsService>();
+        services.AddSingleton<RemoteStorageService>();
+        await using var provider = services.BuildServiceProvider();
+
+        var factory = provider.GetRequiredService<IDbContextFactory<RstashDbContext>>();
+        await using var db = await factory.CreateDbContextAsync();
+
+        ApplicationUser? user;
+        if (!string.IsNullOrWhiteSpace(username))
+        {
+            var normalized = username.ToUpperInvariant();
+            user = await db.Users.FirstOrDefaultAsync(u => u.NormalizedUserName == normalized);
+            if (user is null)
+            {
+                Console.WriteLine($"[FAIL] no account named '{username}'.");
+                return 1;
+            }
+        }
+        else
+        {
+            user = await db.Users.OrderBy(u => u.Id).FirstOrDefaultAsync();
+            if (user is null)
+            {
+                Console.WriteLine("[FAIL] no accounts exist yet — create one via /setup first.");
+                return 1;
+            }
+        }
+
+        await provider.GetRequiredService<SettingsService>().ReloadAsync();
+        var storage = provider.GetRequiredService<RemoteStorageService>();
+
+        Console.WriteLine($"Seeding sample data for '{user.UserName}' (id {user.Id})…");
+        var written = 0;
+        long totalBytes = 0;
+        foreach (var (path, contentType, content) in SeedItems())
+        {
+            await using var stream = new MemoryStream(content);
+            try
+            {
+                await storage.PutDocumentAsync(user.Id, path, stream, contentType, new StorageConditions());
+                Console.WriteLine($"  + {path} ({content.Length:N0} B)");
+                written++;
+                totalBytes += content.Length;
+            }
+            catch (StorageException ex)
+            {
+                Console.WriteLine($"  ! {path} — {ex.Error}");
+            }
+        }
+
+        Console.WriteLine($"\nDone: {written} documents, {totalBytes:N0} bytes.");
+        return 0;
+    }
+
+    /// <summary>The sample dataset: several remoteStorage modules with nested folders and
+    /// varied content types/sizes, including a couple of public documents.</summary>
+    private static IEnumerable<(string Path, string ContentType, byte[] Content)> SeedItems()
+    {
+        static byte[] Text(string value) => Encoding.UTF8.GetBytes(value);
+
+        // Deterministic filler for "binary" assets we can't ship for real (photos/media);
+        // only the byte count matters for exercising sizes in the UI.
+        static byte[] Filler(int bytes)
+        {
+            var buffer = new byte[bytes];
+            for (var i = 0; i < bytes; i++)
+            {
+                buffer[i] = (byte)(32 + (i % 95));
+            }
+
+            return buffer;
+        }
+
+        yield return ("/documents/welcome.md", "text/markdown",
+            Text("# Welcome to rstash\n\nThis document lives in your personal storage. Any\n"
+                + "remoteStorage app you connect can read and write here with your\npermission.\n"));
+        yield return ("/documents/notes/todo.md", "text/markdown",
+            Text("# To do\n\n- [x] Set up rstash\n- [ ] Connect a remoteStorage app\n- [ ] Tell a friend\n"));
+        yield return ("/documents/notes/ideas.md", "text/markdown",
+            Text("# Ideas\n\n- A recipe app backed by remoteStorage\n- Sync my bookmarks everywhere\n"));
+        yield return ("/documents/reports/2026-q1.txt", "text/plain",
+            Filler(4_200));
+
+        yield return ("/bookmarks/links/3f9a2c.json", "application/json",
+            Text("{\"url\":\"https://remotestorage.io\",\"title\":\"remoteStorage\",\"tags\":[\"spec\"]}"));
+        yield return ("/bookmarks/links/8b1e07.json", "application/json",
+            Text("{\"url\":\"https://rstash.cloud\",\"title\":\"rstash\",\"tags\":[\"self-hosted\"]}"));
+        yield return ("/bookmarks/archive/a4c910.json", "application/json",
+            Text("{\"url\":\"https://example.com\",\"title\":\"Example\",\"tags\":[\"archive\"]}"));
+
+        yield return ("/tasks/today.json", "application/json",
+            Text("[{\"text\":\"Review PRs\",\"done\":false},{\"text\":\"Water plants\",\"done\":true}]"));
+        yield return ("/tasks/someday.json", "application/json",
+            Text("[{\"text\":\"Learn to sail\",\"done\":false}]"));
+
+        yield return ("/recipes/pancakes.md", "text/markdown",
+            Text("# Pancakes\n\nFlour, milk, eggs, a pinch of salt. Whisk, rest, fry.\n"));
+        yield return ("/recipes/curry.md", "text/markdown",
+            Text("# Weeknight curry\n\nOnion, garlic, ginger, spices, coconut milk, veg.\n"));
+
+        yield return ("/photos/2026/hawaii-01.jpg", "image/jpeg", Filler(220_000));
+        yield return ("/photos/2026/hawaii-02.jpg", "image/jpeg", Filler(180_000));
+        yield return ("/photos/2026/sunset.jpg", "image/jpeg", Filler(140_000));
+        yield return ("/media/intro-clip.mp4", "video/mp4", Filler(340_000));
+
+        yield return ("/public/shared/readme.md", "text/markdown",
+            Text("# Shared\n\nDocuments under /public/ are readable without a token.\n"));
+        yield return ("/public/shared/logo-note.txt", "text/plain",
+            Text("Anyone with the link can read this file.\n"));
     }
 }

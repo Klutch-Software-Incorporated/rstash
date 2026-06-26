@@ -36,6 +36,7 @@ Running `rstash` starts the server (default). Subcommands short-circuit before t
 - `rstash` / `rstash serve` — start the HTTP server
 - `rstash env` — print a documented env-var template (generated from the setting registry)
 - `rstash check` — validate configuration and test database/blob connectivity (non-zero exit on failure)
+- `rstash seed [user]` — populate an account with sample modules/folders/files (defaults to the first account)
 
 All server management (users, settings, etc.) is done through the web UI.
 

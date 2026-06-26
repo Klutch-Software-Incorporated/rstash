@@ -24,6 +24,9 @@ Throughout, the server runs at **http://localhost:8080** unless you set `ASPNETC
       **Expect:** `[ok] database` + `[ok] blob store` + `Configuration OK.` (exit code 0).
 - [ ] **Do:** set `RSTASH_DB=postgres:bogus` then run `check`
       **Expect:** a `[FAIL] database …` line and `Configuration has errors.` (non-zero exit).
+- [ ] **Do (after §3 setup):** `dotnet run --project src/Rstash.Server -- seed admin`
+      **Expect:** writes a spread of sample modules/folders/files and prints a per-file log
+      plus a summary. Omit the username to seed the first account. Browse them in §6.
 
 ## 2. Start the server (fresh DB)
 
