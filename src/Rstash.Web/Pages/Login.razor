@@ -1,5 +1,6 @@
 @page "/login"
 @inject SignInManager<ApplicationUser> SignInManager
+@inject UserManager<ApplicationUser> UserManager
 @inject NavigationManager Navigation
 
 <PageTitle>Sign in</PageTitle>
@@ -32,8 +33,27 @@
 
     private async Task SignInAsync()
     {
+        var user = await UserManager.FindByNameAsync(Input.Username);
+        if (user is null)
+        {
+            _error = "Invalid username or password.";
+            return;
+        }
+
+        if (user.Disabled)
+        {
+            _error = "This account is disabled.";
+            return;
+        }
+
+        if (!user.Approved)
+        {
+            _error = "This account is pending approval.";
+            return;
+        }
+
         var result = await SignInManager.PasswordSignInAsync(
-            Input.Username, Input.Password, isPersistent: true, lockoutOnFailure: false);
+            user, Input.Password, isPersistent: true, lockoutOnFailure: false);
 
         if (!result.Succeeded)
         {

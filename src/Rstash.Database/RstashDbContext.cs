@@ -18,9 +18,9 @@ public class RstashDbContext(DbContextOptions<RstashDbContext> options)
 
     public DbSet<Setting> Settings => Set<Setting>();
 
-    protected override void OnModelCreating(ModelBuilder modelBuilder)
+    protected override void OnModelCreating(ModelBuilder builder)
     {
-        base.OnModelCreating(modelBuilder);
-        modelBuilder.ApplyConfigurationsFromAssembly(typeof(RstashDbContext).Assembly);
+        base.OnModelCreating(builder);
+        builder.ApplyConfigurationsFromAssembly(typeof(RstashDbContext).Assembly);
     }
 }
