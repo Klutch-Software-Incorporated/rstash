@@ -924,9 +924,12 @@ textarea.rs-control {
 .rs-card-head { padding: 20px 26px; }
 .rs-settings-body { padding: 24px 26px; }
 
-/* Larger primary buttons (MudButton picks up theme color; we just add size). */
+/* Action buttons (MudButton picks up theme color; we just tune the chrome).
+   Keep horizontal breathing room but trim the vertical padding so they don't
+   tower over the inputs. */
 .rs-form-actions { display: flex; gap: 12px; margin-top: 4px; }
-.rs-form-actions .mud-button-root { padding: 10px 22px; font-size: .95rem; }
+.rs-form-actions .mud-button-root,
+.rs-settings-actions .mud-button-root { padding: 6px 16px; font-size: .9rem; }
 
 @media (max-width: 860px) {
     /* Sidebar folds to a horizontal strip above the content (still no JS). */
