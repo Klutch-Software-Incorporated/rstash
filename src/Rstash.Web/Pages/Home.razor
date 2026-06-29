@@ -75,17 +75,20 @@ else
                     <span class="rs-quota-used">@Format(_usage.TotalBytes)</span>
                     @if (_quota > 0)
                     {
-                        <span class="rs-quota-total">of @Format(_quota) used</span>
+                        <span class="rs-quota-total">@_percent% of @Format(_quota)</span>
                     }
                     else
                     {
-                        <span class="rs-quota-total">used · no limit</span>
+                        <span class="rs-quota-total">used · <span class="rs-quota-pill">no limit</span></span>
                     }
                 </div>
                 @if (_quota > 0)
                 {
-                    <MudProgressLinear Color="Color.Primary" Rounded="true"
-                                       Value="@Math.Min(100, _usage.TotalBytes * 100.0 / _quota)" />
+                    <MudProgressLinear Color="@QuotaColor" Rounded="true" Value="@_percent" />
+                }
+                else
+                {
+                    <div class="rs-meter rs-meter-unlimited" aria-hidden="true"><span></span></div>
                 }
             </div>
             @if (_usage.Folders.Count == 0)
@@ -119,6 +122,7 @@ else
     private string _host = "";
     private string _handle = "";
     private long _quota;
+    private int _percent;
     private long _maxFolderBytes;
     private List<OAuthToken> _tokens = [];
     private StorageUsage _usage = new(0, []);
@@ -146,7 +150,11 @@ else
 
         // Effective cap: the user's own quota wins; otherwise the global limit. 0 = unlimited.
         _quota = _user.StorageQuota > 0 ? _user.StorageQuota : Settings.Current.TotalStorageLimit;
+        _percent = _quota > 0 ? (int)Math.Min(100, Math.Round(_usage.TotalBytes * 100.0 / _quota)) : 0;
     }
+
+    // Usage meter shifts gold -> amber -> red as the cap fills.
+    private Color QuotaColor => _percent >= 90 ? Color.Error : _percent >= 75 ? Color.Warning : Color.Primary;
 
     private static IEnumerable<string> Scopes(string scopes) =>
         scopes.Split(' ', StringSplitOptions.RemoveEmptyEntries);

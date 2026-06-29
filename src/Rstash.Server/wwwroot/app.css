@@ -342,6 +342,26 @@
 .rs-quota-used { font-family: 'Roboto Mono', monospace; font-weight: 700; font-size: 20px; }
 .rs-quota-total { color: var(--mud-palette-text-secondary); font-size: 13px; }
 
+/* "no limit" pill on the usage meter for unlimited (e.g. admin) accounts. */
+.rs-quota-pill {
+    font-size: 11px;
+    font-weight: 600;
+    padding: 1px 7px;
+    border-radius: 999px;
+    color: var(--rs-confirm-deep);
+    background: var(--rs-confirm-tint);
+    border: 1px solid var(--rs-confirm-tint-line);
+}
+
+/* Simple track used when there is no cap to chart against MudProgressLinear. */
+.rs-meter { height: 6px; border-radius: 999px; background: var(--mud-palette-lines-default); overflow: hidden; }
+.rs-meter > span { display: block; height: 100%; border-radius: 999px; }
+.rs-meter-unlimited > span {
+    width: 100%;
+    opacity: .45;
+    background: linear-gradient(90deg, var(--rs-gold-tint-line), var(--rs-gold));
+}
+
 .rs-cat { padding: 13px 22px; border-bottom: 1px solid var(--mud-palette-lines-default); }
 .rs-cat:last-child { border-bottom: none; }
 
