@@ -32,55 +32,63 @@
     </div>
 </MudPaper>
 
-<MudPaper Class="rs-card mb-4" Elevation="1">
-    <div class="rs-card-head"><h2>Change password</h2></div>
-    <div class="rs-settings-body">
-        @if (_passwordMessage is not null)
-        {
-            <MudAlert Severity="Severity.Success" Class="mb-3">@_passwordMessage</MudAlert>
-        }
-        @if (_passwordError is not null)
-        {
-            <MudAlert Severity="Severity.Error" Class="mb-3">@_passwordError</MudAlert>
-        }
-        <EditForm Model="PasswordModel" method="post" OnValidSubmit="ChangePasswordAsync" FormName="password">
-            <DataAnnotationsValidator />
-            <div class="rs-field">
-                <label class="rs-label" for="current-password">Current password</label>
-                <InputText id="current-password" type="password" class="rs-control"
-                           @bind-Value="PasswordModel.Current" autocomplete="current-password" />
-            </div>
-            <div class="rs-field">
-                <label class="rs-label" for="new-password">New password</label>
-                <InputText id="new-password" type="password" class="rs-control"
-                           @bind-Value="PasswordModel.New" autocomplete="new-password" />
-            </div>
-            <MudButton ButtonType="ButtonType.Submit" Variant="Variant.Filled" Color="Color.Primary">Update password</MudButton>
-        </EditForm>
-    </div>
-</MudPaper>
+<div class="rs-form-grid mb-4">
+    <MudPaper Class="rs-card" Elevation="1">
+        <div class="rs-card-head"><h2>Change password</h2></div>
+        <div class="rs-settings-body">
+            @if (_passwordMessage is not null)
+            {
+                <MudAlert Severity="Severity.Success" Class="mb-3">@_passwordMessage</MudAlert>
+            }
+            @if (_passwordError is not null)
+            {
+                <MudAlert Severity="Severity.Error" Class="mb-3">@_passwordError</MudAlert>
+            }
+            <EditForm Model="PasswordModel" method="post" OnValidSubmit="ChangePasswordAsync" FormName="password">
+                <DataAnnotationsValidator />
+                <div class="rs-field">
+                    <label class="rs-label" for="current-password">Current password</label>
+                    <InputText id="current-password" type="password" class="rs-control"
+                               @bind-Value="PasswordModel.Current" autocomplete="current-password" />
+                </div>
+                <div class="rs-field">
+                    <label class="rs-label" for="new-password">New password</label>
+                    <InputText id="new-password" type="password" class="rs-control"
+                               @bind-Value="PasswordModel.New" autocomplete="new-password" />
+                </div>
+                <div class="rs-form-actions">
+                    <MudButton ButtonType="ButtonType.Submit" Variant="Variant.Filled" Color="Color.Primary"
+                               Size="Size.Large">Update password</MudButton>
+                </div>
+            </EditForm>
+        </div>
+    </MudPaper>
 
-<MudPaper Class="rs-card mb-4" Elevation="1">
-    <div class="rs-card-head"><h2>Change email</h2></div>
-    <div class="rs-settings-body">
-        @if (_emailMessage is not null)
-        {
-            <MudAlert Severity="Severity.Success" Class="mb-3">@_emailMessage</MudAlert>
-        }
-        @if (_emailError is not null)
-        {
-            <MudAlert Severity="Severity.Error" Class="mb-3">@_emailError</MudAlert>
-        }
-        <EditForm Model="EmailModel" method="post" OnValidSubmit="ChangeEmailAsync" FormName="email">
-            <DataAnnotationsValidator />
-            <div class="rs-field">
-                <label class="rs-label" for="email">Email address</label>
-                <InputText id="email" class="rs-control" @bind-Value="EmailModel.Email" autocomplete="email" />
-            </div>
-            <MudButton ButtonType="ButtonType.Submit" Variant="Variant.Filled" Color="Color.Primary">Update email</MudButton>
-        </EditForm>
-    </div>
-</MudPaper>
+    <MudPaper Class="rs-card" Elevation="1">
+        <div class="rs-card-head"><h2>Change email</h2></div>
+        <div class="rs-settings-body">
+            @if (_emailMessage is not null)
+            {
+                <MudAlert Severity="Severity.Success" Class="mb-3">@_emailMessage</MudAlert>
+            }
+            @if (_emailError is not null)
+            {
+                <MudAlert Severity="Severity.Error" Class="mb-3">@_emailError</MudAlert>
+            }
+            <EditForm Model="EmailModel" method="post" OnValidSubmit="ChangeEmailAsync" FormName="email">
+                <DataAnnotationsValidator />
+                <div class="rs-field">
+                    <label class="rs-label" for="email">Email address</label>
+                    <InputText id="email" class="rs-control" @bind-Value="EmailModel.Email" autocomplete="email" />
+                </div>
+                <div class="rs-form-actions">
+                    <MudButton ButtonType="ButtonType.Submit" Variant="Variant.Filled" Color="Color.Primary"
+                               Size="Size.Large">Update email</MudButton>
+                </div>
+            </EditForm>
+        </div>
+    </MudPaper>
+</div>
 
 @code {
     [SupplyParameterFromForm(FormName = "password")] private PasswordInput PasswordModel { get; set; } = new();

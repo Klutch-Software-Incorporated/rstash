@@ -19,7 +19,7 @@ internal static class AdminUserEndpoints
 
     private static async Task<IResult> ApproveAsync(HttpContext ctx, IAntiforgery af, UserManager<ApplicationUser> users)
     {
-        var (ok, target) = await ResolveAsync(ctx, af, users);
+        var (ok, _, target) = await ResolveAsync(ctx, af, users);
         if (!ok)
         {
             return Results.Forbid();
@@ -34,15 +34,21 @@ internal static class AdminUserEndpoints
         return Results.Redirect("/admin/users");
     }
 
+    // Admins — including the acting admin — are shielded from disable/delete so the
+    // server can never be locked out of all administrative access.
+    private static bool IsProtected(ApplicationUser actor, ApplicationUser target) =>
+        target.IsAdmin || target.Id == actor.Id;
+
     private static async Task<IResult> ToggleDisabledAsync(HttpContext ctx, IAntiforgery af, UserManager<ApplicationUser> users)
     {
-        var (ok, target) = await ResolveAsync(ctx, af, users);
+        var (ok, actor, target) = await ResolveAsync(ctx, af, users);
         if (!ok)
         {
             return Results.Forbid();
         }
 
-        if (target is not null)
+        // Admins (incl. yourself) must retain access — never disable them.
+        if (target is not null && !IsProtected(actor, target))
         {
             target.Disabled = !target.Disabled;
             await users.UpdateAsync(target);
@@ -53,13 +59,14 @@ internal static class AdminUserEndpoints
 
     private static async Task<IResult> DeleteAsync(HttpContext ctx, IAntiforgery af, UserManager<ApplicationUser> users)
     {
-        var (ok, target) = await ResolveAsync(ctx, af, users);
+        var (ok, actor, target) = await ResolveAsync(ctx, af, users);
         if (!ok)
         {
             return Results.Forbid();
         }
 
-        if (target is not null)
+        // Admins (incl. yourself) must retain access — never delete them.
+        if (target is not null && !IsProtected(actor, target))
         {
             await users.DeleteAsync(target);
         }
@@ -69,7 +76,7 @@ internal static class AdminUserEndpoints
 
     private static async Task<IResult> QuotaAsync(HttpContext ctx, IAntiforgery af, UserManager<ApplicationUser> users)
     {
-        var (ok, target) = await ResolveAsync(ctx, af, users);
+        var (ok, _, target) = await ResolveAsync(ctx, af, users);
         if (!ok)
         {
             return Results.Forbid();
@@ -85,7 +92,7 @@ internal static class AdminUserEndpoints
         return Results.Redirect("/admin/users");
     }
 
-    private static async Task<(bool Ok, ApplicationUser? Target)> ResolveAsync(
+    private static async Task<(bool Ok, ApplicationUser Actor, ApplicationUser? Target)> ResolveAsync(
         HttpContext ctx, IAntiforgery af, UserManager<ApplicationUser> users)
     {
         try
@@ -94,16 +101,16 @@ internal static class AdminUserEndpoints
         }
         catch (AntiforgeryValidationException)
         {
-            return (false, null);
+            return (false, null!, null);
         }
 
         var actor = await users.GetUserAsync(ctx.User);
         if (actor is null || !actor.IsAdmin)
         {
-            return (false, null);
+            return (false, null!, null);
         }
 
         var id = (await ctx.Request.ReadFormAsync())["id"].ToString();
-        return (true, await users.FindByIdAsync(id));
+        return (true, actor, await users.FindByIdAsync(id));
     }
 }

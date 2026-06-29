@@ -24,11 +24,15 @@
             }
         });
 
+        // Numeric columns sort by value: the file "size" column, or any header
+        // tagged data-sort-type="number" (quota, timestamps, counts).
+        const numeric = key === "size" || th.dataset.sortType === "number";
+
         // Pinned rows (the "../" up-row, empty-state row) stay put.
         const rows = Array.from(tbody.rows).filter(row => !row.hasAttribute("data-pin"));
         rows.sort((a, b) => {
-            if (key === "size") {
-                const delta = Number(a.dataset.size) - Number(b.dataset.size);
+            if (numeric) {
+                const delta = Number(a.dataset[key]) - Number(b.dataset[key]);
                 return ascending ? delta : -delta;
             }
             const av = a.dataset[key] || "";
@@ -47,6 +51,31 @@
         if (th) {
             sortTable(th);
         }
+    });
+
+    // ----- Tables: live client-side filter via a card's search box -----
+    // A .rs-table-search input filters the rows of the table in its card, matching
+    // each row's data-search attribute (falling back to its text content).
+    document.addEventListener("input", event => {
+        const input = event.target;
+        if (!input.classList.contains("rs-table-search")) {
+            return;
+        }
+
+        const scope = input.closest(".rs-card") || document;
+        const table = scope.querySelector("table");
+        if (!table || !table.tBodies.length) {
+            return;
+        }
+
+        const query = input.value.trim().toLowerCase();
+        Array.from(table.tBodies[0].rows).forEach(row => {
+            if (row.hasAttribute("data-pin")) {
+                return;
+            }
+            const hay = row.dataset.search || row.textContent.toLowerCase();
+            row.style.display = !query || hay.includes(query) ? "" : "none";
+        });
     });
 
     // ----- File browser: header "select all" + indeterminate sync -----

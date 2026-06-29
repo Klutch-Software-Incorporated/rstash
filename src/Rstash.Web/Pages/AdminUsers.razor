@@ -7,44 +7,90 @@
 <PageTitle>Users — admin</PageTitle>
 
 <MudText Typo="Typo.h4" GutterBottom="true">Users</MudText>
-<MudLink Href="/admin/settings" Class="mb-3">Server settings →</MudLink>
 
-<MudSimpleTable Dense="true" Bordered="true" Class="mt-3">
-    <thead>
-        <tr>
-            <th>User</th><th>Email</th><th>Admin</th><th>Approved</th>
-            <th>Disabled</th><th>Quota</th><th>Actions</th>
-        </tr>
-    </thead>
-    <tbody>
-        @foreach (var user in _users)
-        {
+<MudPaper Class="rs-card" Elevation="1">
+    <div class="rs-card-head">
+        <h2>Accounts</h2>
+        <div class="rs-head-tools">
+            <input type="search" class="rs-table-search" placeholder="Search name or email…"
+                   aria-label="Search users" autocomplete="off" />
+            <span class="rs-count">@_users.Count total</span>
+        </div>
+    </div>
+    <MudSimpleTable Dense="true" Class="rs-table" Style="box-shadow:none;">
+        <thead>
             <tr>
-                <td>@user.UserName</td>
-                <td>@user.Email</td>
-                <td>@(user.IsAdmin ? "yes" : "")</td>
-                <td>@(user.Approved ? "yes" : "no")</td>
-                <td>@(user.Disabled ? "yes" : "")</td>
-                <td>@FormatQuota(user.StorageQuota)</td>
-                <td>
-                    @if (!user.Approved)
-                    {
-                        <PostButton Action="/admin/users/approve" Id="@user.Id" Label="approve" />
-                    }
-                    <PostButton Action="/admin/users/toggle-disabled" Id="@user.Id"
-                                Label="@(user.Disabled ? "enable" : "disable")" />
-                    <PostButton Action="/admin/users/delete" Id="@user.Id" Label="delete" />
-                    <form action="/admin/users/quota" method="post" style="display:inline">
-                        <AntiforgeryToken />
-                        <input type="hidden" name="id" value="@user.Id" />
-                        <input type="text" name="storageQuota" placeholder="e.g. 1GB" size="8" />
-                        <button type="submit">set quota</button>
-                    </form>
-                </td>
+                <th class="rs-sortable" data-sort-key="user">User</th>
+                <th class="rs-sortable" data-sort-key="email">Email</th>
+                <th class="rs-sortable" data-sort-key="role">Role</th>
+                <th class="rs-sortable" data-sort-key="status">Status</th>
+                <th class="rs-sortable rs-num" data-sort-key="quota" data-sort-type="number">Quota</th>
+                <th>Actions</th>
             </tr>
-        }
-    </tbody>
-</MudSimpleTable>
+        </thead>
+        <tbody>
+            @foreach (var user in _users)
+            {
+                <tr data-user="@user.UserName" data-email="@(user.Email ?? "")"
+                    data-role="@(user.IsAdmin ? "admin" : "user")" data-status="@StatusKey(user)"
+                    data-quota="@user.StorageQuota"
+                    data-search="@($"{user.UserName} {user.Email}".ToLowerInvariant())">
+                    <td>@user.UserName</td>
+                    <td>@(string.IsNullOrEmpty(user.Email) ? (MarkupString)"<span class=\"rs-muted\">—</span>" : (MarkupString)System.Net.WebUtility.HtmlEncode(user.Email))</td>
+                    <td>
+                        @if (user.IsAdmin)
+                        {
+                            <span class="rs-badge rs-badge-admin">Admin</span>
+                        }
+                        else
+                        {
+                            <span class="rs-muted">User</span>
+                        }
+                    </td>
+                    <td>
+                        @if (user.Disabled)
+                        {
+                            <span class="rs-badge rs-badge-off">Disabled</span>
+                        }
+                        else if (!user.Approved)
+                        {
+                            <span class="rs-badge rs-badge-warn">Pending</span>
+                        }
+                        else
+                        {
+                            <span class="rs-badge rs-badge-ok">Active</span>
+                        }
+                    </td>
+                    <td class="rs-num">@FormatQuota(user.StorageQuota)</td>
+                    <td class="rs-actions">
+                        <div class="rs-actions-cell">
+                            @if (!user.Approved)
+                            {
+                                <PostButton Action="/admin/users/approve" Id="@user.Id" Label="Approve" />
+                            }
+                            @if (user.IsAdmin)
+                            {
+                                <span class="rs-protected" title="Admins keep access and can't be disabled or deleted">Protected</span>
+                            }
+                            else
+                            {
+                                <PostButton Action="/admin/users/toggle-disabled" Id="@user.Id"
+                                            Label="@(user.Disabled ? "Enable" : "Disable")" />
+                                <PostButton Action="/admin/users/delete" Id="@user.Id" Label="Delete" Danger="true" />
+                            }
+                            <form action="/admin/users/quota" method="post" class="rs-quota-form">
+                                <AntiforgeryToken />
+                                <input type="hidden" name="id" value="@user.Id" />
+                                <input type="text" name="storageQuota" placeholder="e.g. 1GB" class="rs-quota-input" />
+                                <button type="submit" class="rs-action">Set quota</button>
+                            </form>
+                        </div>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </MudSimpleTable>
+</MudPaper>
 
 @code {
     [CascadingParameter] private HttpContext? HttpContext { get; set; }
@@ -64,4 +110,8 @@
     }
 
     private static string FormatQuota(long bytes) => bytes == 0 ? "unlimited" : ByteSize.Format(bytes);
+
+    // Sort key for the combined status column.
+    private static string StatusKey(ApplicationUser u) =>
+        u.Disabled ? "disabled" : !u.Approved ? "pending" : "active";
 }

@@ -15,6 +15,11 @@
     font-family: 'Roboto Mono', ui-monospace, monospace;
 }
 
+/* Text links: the bright brand gold (Primary) fails contrast on white, so render
+   MudLink text in the deeper gold. Buttons/chips that fill with gold are unaffected. */
+.mud-link.mud-primary-text { color: var(--rs-gold-deep); }
+.mud-link.mud-primary-text:hover { color: #6f5800; }
+
 /* App bar: blends with the page, separated by a hairline instead of a shadow. */
 .rs-appbar {
     border-bottom: 1px solid var(--mud-palette-lines-default);
@@ -71,9 +76,9 @@
     text-transform: uppercase;
 }
 
-/* Page content width — matches the brand reference (1040px). */
+/* Page content width — narrower now that a sidebar carries navigation. */
 .rs-main {
-    max-width: 1040px;
+    max-width: 960px;
     margin: 0 auto;
 }
 
@@ -220,6 +225,27 @@
 
 .rs-count { font-size: 13px; color: var(--mud-palette-text-secondary); }
 
+/* Card-head right-side tools (search + count). */
+.rs-head-tools { display: flex; align-items: center; gap: 14px; }
+
+.rs-table-search {
+    width: 16rem;
+    max-width: 46vw;
+    padding: .5rem .8rem;
+    border: 1px solid var(--mud-palette-lines-default);
+    border-radius: 8px;
+    background: var(--mud-palette-surface);
+    color: var(--mud-palette-text-primary);
+    font: inherit;
+    font-size: .88rem;
+}
+
+.rs-table-search:focus {
+    outline: none;
+    border-color: var(--rs-gold);
+    box-shadow: 0 0 0 3px var(--rs-gold-tint);
+}
+
 /* Connected apps. */
 .rs-app {
     display: flex;
@@ -328,8 +354,9 @@
 
 .rs-browse:hover { background: var(--rs-gold-tint); }
 
-/* ---------- file browser ---------- */
-.rs-files-table th {
+/* ---------- file browser + generic data tables ---------- */
+.rs-files-table th,
+.rs-table th {
     font-size: .72rem;
     text-transform: uppercase;
     letter-spacing: .04em;
@@ -338,9 +365,92 @@
 }
 
 .rs-files-table td,
-.rs-files-table th {
+.rs-files-table th,
+.rs-table td,
+.rs-table th {
     vertical-align: middle;
 }
+
+/* Numeric columns (quota, counts) align right. */
+.rs-table .rs-num { text-align: right; white-space: nowrap; }
+.rs-table td.rs-actions { text-align: left; }
+
+/* Status badges (admin tables). */
+.rs-badge {
+    display: inline-block;
+    font-size: .7rem;
+    font-weight: 600;
+    padding: .12rem .55rem;
+    border-radius: 999px;
+    line-height: 1.6;
+    border: 1px solid transparent;
+    white-space: nowrap;
+}
+
+.rs-badge-admin { color: var(--rs-gold-deep); background: var(--rs-gold-tint); border-color: var(--rs-gold-tint-line); }
+.rs-badge-ok { color: #2f7d32; background: #eaf5ea; border-color: #cfe6cf; }
+.rs-badge-warn { color: #8a5a00; background: #fbf0d6; border-color: #f0dca8; }
+.rs-badge-off { color: #b23b3b; background: #fbeaea; border-color: #f0caca; }
+.rs-muted { color: var(--mud-palette-text-secondary); }
+
+/* Per-row action buttons (approve / disable / delete) — clearly distinct pills. */
+.rs-actions-cell {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    justify-content: flex-start;
+    align-items: center;
+}
+
+/* Admins are shielded from disable/delete; show why rather than dead buttons. */
+.rs-protected {
+    font-size: .72rem;
+    font-weight: 600;
+    color: var(--mud-palette-text-secondary);
+    padding: .35rem .6rem;
+    border: 1px dashed var(--mud-palette-lines-default);
+    border-radius: 7px;
+}
+
+.rs-action-form { display: inline-flex; margin: 0; }
+
+.rs-action {
+    font: inherit;
+    font-size: .8rem;
+    font-weight: 600;
+    padding: .35rem .75rem;
+    border-radius: 7px;
+    border: 1px solid var(--mud-palette-lines-default);
+    background: var(--mud-palette-surface);
+    color: var(--mud-palette-text-primary);
+    cursor: pointer;
+    white-space: nowrap;
+    transition: border-color .12s ease, background .12s ease, color .12s ease;
+}
+
+.rs-action:hover {
+    border-color: var(--rs-gold);
+    background: var(--rs-gold-tint);
+    color: var(--rs-gold-deep);
+}
+
+.rs-action-danger { color: #b23b3b; border-color: #e6c4c4; }
+.rs-action-danger:hover { border-color: #b23b3b; background: #fbeaea; color: #8f2f2f; }
+
+/* Compact inline quota form on the users table. */
+.rs-quota-form { display: inline-flex; gap: 6px; align-items: center; }
+.rs-quota-input {
+    width: 7rem;
+    padding: .3rem .5rem;
+    border: 1px solid var(--mud-palette-lines-default);
+    border-radius: 6px;
+    background: var(--mud-palette-surface);
+    color: var(--mud-palette-text-primary);
+    font: inherit;
+    font-size: .82rem;
+}
+
+.rs-quota-input:focus { outline: none; border-color: var(--rs-gold); box-shadow: 0 0 0 2px var(--rs-gold-tint); }
 
 /* Sortable column headers (progressive enhancement). */
 .rs-sortable {
@@ -350,8 +460,10 @@
 }
 
 .rs-sortable:hover { color: var(--rs-gold-deep); }
-.rs-files-table th[data-sort-dir="asc"]::after { content: " \25B2"; font-size: .7em; }
-.rs-files-table th[data-sort-dir="desc"]::after { content: " \25BC"; font-size: .7em; }
+
+/* Sort direction arrows — generic, so every sortable table shows them. */
+th[data-sort-dir="asc"]::after { content: " \25B2"; font-size: .7em; }
+th[data-sort-dir="desc"]::after { content: " \25BC"; font-size: .7em; }
 
 .rs-files-size,
 .rs-files-actions {
@@ -414,35 +526,42 @@
 .rs-bulk-delete:hover { filter: brightness(.95); }
 
 /* ---------- form controls (settings, account) ---------- */
-.rs-field { margin-bottom: 1.25rem; max-width: 36rem; }
+.rs-field { margin-bottom: 1.5rem; }
 .rs-field:last-child { margin-bottom: 0; }
 
 .rs-label {
     display: block;
     font-weight: 600;
     font-size: .9rem;
-    margin-bottom: .15rem;
+    margin-bottom: .25rem;
 }
 
 .rs-help {
-    font-size: .8rem;
+    font-size: .82rem;
     color: var(--mud-palette-text-secondary);
-    margin-bottom: .45rem;
+    margin-bottom: .55rem;
+    line-height: 1.4;
 }
 
 .rs-help a { color: var(--rs-gold-deep); }
 
+/* Larger, MudBlazor-outlined-style inputs: generous height + padding. */
 .rs-control {
     display: block;
     width: 100%;
-    padding: .5rem .6rem;
+    box-sizing: border-box;
+    min-height: 3.25rem;
+    padding: .85rem 1rem;
     border: 1px solid var(--mud-palette-lines-default);
     border-radius: 8px;
     background: var(--mud-palette-surface);
     color: var(--mud-palette-text-primary);
     font: inherit;
-    font-size: .9rem;
+    font-size: 1rem;
+    transition: border-color .12s ease, box-shadow .12s ease;
 }
+
+.rs-control:hover { border-color: var(--mud-palette-text-secondary); }
 
 .rs-control:focus {
     outline: none;
@@ -450,12 +569,29 @@
     box-shadow: 0 0 0 3px var(--rs-gold-tint);
 }
 
+select.rs-control { cursor: pointer; }
+
 textarea.rs-control {
-    min-height: 7rem;
+    min-height: 8rem;
     resize: vertical;
     font-family: 'Roboto Mono', monospace;
-    font-size: .82rem;
-    line-height: 1.5;
+    font-size: .85rem;
+    line-height: 1.55;
+}
+
+/* Responsive two-column field grid for settings/account forms.
+   Short controls pair two-up; wide ones opt out with .rs-field-wide. */
+.rs-form-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1.25rem 2rem;
+}
+
+.rs-form-grid .rs-field { margin-bottom: 0; }
+.rs-field-wide { grid-column: 1 / -1; }
+
+@media (max-width: 720px) {
+    .rs-form-grid { grid-template-columns: 1fr; }
 }
 
 .rs-field-error {
@@ -499,8 +635,269 @@ textarea.rs-control {
 .rs-deflist dd { margin: 0; }
 
 .rs-settings-actions {
+    padding: 4px 0 8px;
+}
+
+/* ============================================================
+   App shell — gold top bar + left sidebar + gray content.
+   Static-SSR only; the sidebar is persistent (no toggle JS).
+   ============================================================ */
+
+:root {
+    /* Warm gray that cards sit on, so white surfaces lift off it. */
+    --rs-content-bg: #f1efe9;
+}
+
+.rs-shell {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
+/* --- Top bar (cream) --- */
+.rs-topbar {
     position: sticky;
-    bottom: 0;
-    padding: 14px 0;
-    background: linear-gradient(var(--mud-palette-background), var(--mud-palette-background) 60%, transparent);
+    top: 0;
+    z-index: 30;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    height: 60px;
+    padding: 0 20px;
+    background: #fdfaf2;
+    border-bottom: 1px solid var(--rs-gold-tint-line);
+    box-shadow: 0 1px 3px rgba(42, 38, 32, .05);
+}
+
+/* On the cream bar the brand wordmark reads in deep ink. */
+.rs-topbar .rs-brand { color: #2a2007; }
+.rs-topbar .rs-brand-logo { width: 24px; height: 24px; }
+
+.rs-topbar-right {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+/* Account pill: white surface against the cream bar. */
+.rs-topbar .rs-account {
+    background: #fff;
+    border-color: var(--rs-gold-tint-line);
+    color: var(--mud-palette-text-secondary);
+}
+
+.rs-topbar .rs-account:hover { border-color: var(--rs-gold); }
+.rs-account-name { font-weight: 500; }
+
+.rs-iconbtn {
+    display: grid;
+    place-items: center;
+    width: 38px;
+    height: 38px;
+    border-radius: 8px;
+    border: 1px solid transparent;
+    background: transparent;
+    color: var(--mud-palette-text-secondary);
+    cursor: pointer;
+}
+
+.rs-iconbtn:hover { background: rgba(42, 32, 7, .07); color: #2a2007; }
+
+/* --- Body: sidebar + content --- */
+.rs-body {
+    flex: 1;
+    display: flex;
+    align-items: stretch;
+    min-height: 0;
+}
+
+.rs-sidebar {
+    flex-shrink: 0;
+    width: 240px;
+    background: var(--mud-palette-surface);
+    border-right: 1px solid var(--mud-palette-lines-default);
+    padding: 18px 12px;
+    position: sticky;
+    top: 60px;
+    align-self: flex-start;
+    height: calc(100vh - 60px);
+    overflow-y: auto;
+}
+
+.rs-nav { display: flex; flex-direction: column; gap: 2px; }
+
+.rs-nav-section {
+    margin: 18px 12px 6px;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .08em;
+    color: var(--mud-palette-text-secondary);
+}
+
+.rs-navlink {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 12px;
+    border-radius: 9px;
+    color: var(--mud-palette-text-primary);
+    text-decoration: none;
+    font-size: 14.5px;
+    font-weight: 500;
+    line-height: 1;
+}
+
+.rs-navlink .mud-icon-root { color: var(--mud-palette-text-secondary); font-size: 1.25rem; }
+.rs-navlink:hover { background: var(--mud-palette-action-default-hover, rgba(0, 0, 0, .04)); }
+
+.rs-navlink.active {
+    background: var(--rs-gold-tint);
+    color: var(--rs-gold-deep);
+    font-weight: 600;
+}
+
+.rs-navlink.active .mud-icon-root { color: var(--rs-gold-deep); }
+
+/* Collapsible nav group (native <details>, no JS). */
+.rs-navgroup { }
+.rs-navsummary { list-style: none; cursor: pointer; }
+.rs-navsummary::-webkit-details-marker { display: none; }
+
+.rs-chevron {
+    margin-left: auto;
+    transition: transform .15s ease;
+    color: var(--mud-palette-text-secondary) !important;
+}
+
+.rs-navgroup[open] > .rs-navsummary .rs-chevron { transform: rotate(90deg); }
+
+.rs-subnav-list {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    margin: 2px 0 6px;
+    padding-left: 40px;
+}
+
+.rs-subnavlink {
+    display: block;
+    padding: 7px 12px;
+    border-radius: 7px;
+    font-size: 13.5px;
+    color: var(--mud-palette-text-secondary);
+    text-decoration: none;
+}
+
+.rs-subnavlink:hover {
+    color: var(--mud-palette-text-primary);
+    background: var(--mud-palette-action-default-hover, rgba(0, 0, 0, .04));
+}
+
+.rs-subnavlink.active {
+    color: var(--rs-gold-deep);
+    background: var(--rs-gold-tint);
+    font-weight: 600;
+}
+
+/* --- Content area --- */
+.rs-content {
+    flex: 1;
+    min-width: 0;
+    background: var(--rs-content-bg);
+    padding: 30px 36px 12px;
+    display: flex;
+    flex-direction: column;
+}
+
+.rs-content .rs-main { flex: 1; width: 100%; }
+
+/* The footer rides along the bottom of the content column. */
+.rs-content .rs-footer { max-width: 960px; margin: 0 auto; width: 100%; }
+
+/* --- Signed-out (plain, centered) layout --- */
+.rs-plain {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
+.rs-topbar-plain {
+    background: transparent;
+    box-shadow: none;
+    border-bottom: 1px solid var(--mud-palette-lines-default);
+}
+
+.rs-topbar-plain .rs-brand { color: var(--mud-palette-text-primary); }
+.rs-topbar-plain .rs-iconbtn { color: var(--mud-palette-text-primary); }
+
+.rs-signin {
+    padding: 8px 18px;
+    border-radius: 8px;
+    background: var(--rs-gold);
+    color: #2a2007;
+    font-weight: 600;
+    font-size: 14px;
+    text-decoration: none;
+}
+
+.rs-signin:hover { background: #c79a2f; }
+
+.rs-content-plain {
+    background: transparent;
+    align-items: center;
+    justify-content: flex-start;
+    padding-top: 56px;
+}
+
+/* --- Settings group tab strip --- */
+.rs-subnav {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-bottom: 24px;
+    border-bottom: 1px solid var(--mud-palette-lines-default);
+}
+
+.rs-subnav a {
+    padding: 9px 15px;
+    border-radius: 8px 8px 0 0;
+    margin-bottom: -1px;
+    text-decoration: none;
+    color: var(--mud-palette-text-secondary);
+    font-size: 14px;
+    font-weight: 500;
+    border-bottom: 2px solid transparent;
+}
+
+.rs-subnav a:hover { color: var(--mud-palette-text-primary); }
+
+.rs-subnav a.active {
+    color: var(--rs-gold-deep);
+    border-bottom-color: var(--rs-gold);
+    font-weight: 600;
+}
+
+/* --- Bigger card chrome to match the larger inputs --- */
+.rs-card-head { padding: 20px 26px; }
+.rs-settings-body { padding: 24px 26px; }
+
+/* Larger primary buttons (MudButton picks up theme color; we just add size). */
+.rs-form-actions { display: flex; gap: 12px; margin-top: 4px; }
+.rs-form-actions .mud-button-root { padding: 10px 22px; font-size: .95rem; }
+
+@media (max-width: 860px) {
+    /* Sidebar folds to a horizontal strip above the content (still no JS). */
+    .rs-body { flex-direction: column; }
+    .rs-sidebar {
+        width: auto;
+        height: auto;
+        position: static;
+        border-right: none;
+        border-bottom: 1px solid var(--mud-palette-lines-default);
+    }
+    .rs-nav { flex-flow: row wrap; gap: 6px; }
+    .rs-nav-section { display: none; }
+    .rs-content { padding: 22px 18px 12px; }
 }

@@ -1,17 +1,20 @@
 @page "/admin/settings"
+@page "/admin/settings/{Group}"
 @attribute [Authorize]
 @inject SettingsService Settings
 @inject UserManager<ApplicationUser> Users
 @inject NavigationManager Navigation
 
-<PageTitle>Settings — admin</PageTitle>
+<PageTitle>@_activeGroup settings — admin</PageTitle>
 
 <MudText Typo="Typo.h4" GutterBottom="true">Server settings</MudText>
-<div class="mb-4">
-    <MudLink Href="/admin/users">Manage users →</MudLink>
-    <span class="mx-2">·</span>
-    <MudLink Href="/admin/audit">Audit log →</MudLink>
-</div>
+
+<nav class="rs-subnav">
+    @foreach (var g in _groups)
+    {
+        <a href="/admin/settings/@Slug(g)" class="@(g == _activeGroup ? "active" : "")">@g</a>
+    }
+</nav>
 
 @if (_message is not null)
 {
@@ -23,14 +26,13 @@
 }
 
 <EditForm Model="_form" FormName="settings" OnValidSubmit="SaveAsync">
-    @foreach (var group in _groups)
-    {
-        <MudPaper Class="rs-card mb-4" Elevation="1">
-            <div class="rs-card-head"><h2>@group</h2></div>
-            <div class="rs-settings-body">
-                @foreach (var def in SettingDefinitions.RuntimeEditable.Where(d => d.Group == group))
+    <MudPaper Class="rs-card mb-4" Elevation="1">
+        <div class="rs-card-head"><h2>@_activeGroup</h2></div>
+        <div class="rs-settings-body">
+            <div class="rs-form-grid">
+                @foreach (var def in ActiveDefs)
                 {
-                    <div class="rs-field">
+                    <div class="rs-field @(IsWide(def) ? "rs-field-wide" : "")">
                         <label class="rs-label" for="@def.Key">
                             @def.Label
                             @if (_overridden.Contains(def.Key))
@@ -47,17 +49,19 @@
                     </div>
                 }
             </div>
-        </MudPaper>
-    }
+        </div>
+    </MudPaper>
 
     <div class="rs-settings-actions">
-        <MudButton ButtonType="ButtonType.Submit" Variant="Variant.Filled" Color="Color.Primary">Save changes</MudButton>
+        <MudButton ButtonType="ButtonType.Submit" Variant="Variant.Filled" Color="Color.Primary"
+                   Size="Size.Large">Save changes</MudButton>
     </div>
 </EditForm>
 
 @code {
     [CascadingParameter] private HttpContext? HttpContext { get; set; }
     [SupplyParameterFromForm] private SettingsForm _form { get; set; } = new();
+    [Parameter] public string? Group { get; set; }
 
     private readonly string[] _groups =
         SettingDefinitions.RuntimeEditable.Select(d => d.Group).Distinct().ToArray();
@@ -65,7 +69,12 @@
     private readonly Dictionary<string, string> _values = new(StringComparer.Ordinal);
     private readonly Dictionary<string, string> _errors = new(StringComparer.Ordinal);
     private HashSet<string> _overridden = [];
+    private string _activeGroup = "";
     private string? _message;
+
+    // Settings for the group the admin is currently viewing.
+    private IEnumerable<SettingDef> ActiveDefs =>
+        SettingDefinitions.RuntimeEditable.Where(d => d.Group == _activeGroup);
 
     protected override async Task OnInitializedAsync()
     {
@@ -75,6 +84,10 @@
             Navigation.NavigateTo("/", forceLoad: true);
             return;
         }
+
+        // Resolve the route slug (e.g. "rate-limiting") back to a group; default to the first.
+        _activeGroup = _groups.FirstOrDefault(
+            g => string.Equals(Slug(g), Group, StringComparison.OrdinalIgnoreCase)) ?? _groups[0];
 
         var overrides = await Settings.GetOverridesAsync();
         _overridden = overrides.Keys.ToHashSet(StringComparer.Ordinal);
@@ -94,7 +107,8 @@
         var overrides = await Settings.GetOverridesAsync();
         var saved = 0;
 
-        foreach (var def in SettingDefinitions.RuntimeEditable)
+        // Only the active group's fields are posted on this page.
+        foreach (var def in ActiveDefs)
         {
             var posted = HttpContext.Request.Form[def.Key].ToString();
             _values[def.Key] = posted; // keep what the admin typed, even on error
@@ -120,6 +134,12 @@
     }
 
     private string Value(SettingDef def) => _values.GetValueOrDefault(def.Key, def.Default);
+
+    // Multi-line settings take the full row; short controls pair two-up.
+    private static bool IsWide(SettingDef def) => def.InputType == SettingInputType.TextArea;
+
+    // URL slug for a group name, e.g. "Rate Limiting" -> "rate-limiting".
+    private static string Slug(string group) => group.ToLowerInvariant().Replace(' ', '-');
 
     private RenderFragment RenderControl(SettingDef def) => builder =>
     {
