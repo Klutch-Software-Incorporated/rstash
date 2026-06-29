@@ -40,6 +40,8 @@ internal static class AccountEndpoints
             await tokens.RevokeForUserAsync(user.Id, token);
         }
 
-        return Results.LocalRedirect("/");
+        // Return to the page the disconnect was triggered from (dashboard or apps page).
+        var returnUrl = form["returnUrl"].ToString();
+        return Results.LocalRedirect(returnUrl.StartsWith('/') ? returnUrl : "/");
     }
 }

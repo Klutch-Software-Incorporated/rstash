@@ -1,0 +1,47 @@
+@page "/account/apps"
+@attribute [Authorize]
+@inject UserManager<ApplicationUser> Users
+@inject TokenStore Tokens
+
+<PageTitle>Connected apps</PageTitle>
+
+<MudText Typo="Typo.h4" GutterBottom="true">Connected apps</MudText>
+<MudText Class="mb-4">
+    Apps you've authorized to read or write your storage. Disconnect one to immediately
+    revoke its access — it will need to be re-authorized to connect again.
+</MudText>
+
+<MudPaper Class="rs-card" Elevation="1">
+    <div class="rs-card-head">
+        <h2>Authorized apps</h2>
+        <span class="rs-count">@_tokens.Count connected</span>
+    </div>
+    @if (_tokens.Count == 0)
+    {
+        <div class="rs-empty">No apps connected yet. Authorize one from its connect screen.</div>
+    }
+    else
+    {
+        @foreach (var token in _tokens)
+        {
+            <ConnectedApp Token="token" ReturnUrl="/account/apps" />
+        }
+    }
+</MudPaper>
+
+@code {
+    [CascadingParameter] private HttpContext? HttpContext { get; set; }
+
+    private List<OAuthToken> _tokens = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        var user = HttpContext is null ? null : await Users.GetUserAsync(HttpContext.User);
+        if (user is null)
+        {
+            return;
+        }
+
+        _tokens = await Tokens.ListForUserAsync(user.Id);
+    }
+}
