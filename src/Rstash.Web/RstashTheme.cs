@@ -5,7 +5,8 @@ namespace Rstash.Web;
 /// <summary>
 /// The rstash brand theme. A single shared <see cref="MudTheme"/> consumed by the layout's
 /// <c>MudThemeProvider</c>; light/dark are selected at render time from a cookie preference.
-/// Brand: warm gold (<c>#d4a840</c>) and deep gold (<c>#8a6d00</c>) on an off-white canvas.
+/// Brand: warm gold (<c>#e2b13e</c>) and deep gold (<c>#8a6d00</c>) on an off-white canvas.
+/// Gold is an accent (icons, highlights); action buttons use semantic green/red.
 /// </summary>
 public static class RstashTheme
 {
@@ -16,7 +17,7 @@ public static class RstashTheme
     {
         PaletteLight = new PaletteLight
         {
-            Primary = "#D4A840",
+            Primary = "#E2B13E",
             PrimaryContrastText = "#2A2007",
             Secondary = "#8A6D00",
             SecondaryContrastText = "#FFFFFF",
@@ -39,7 +40,7 @@ public static class RstashTheme
         },
         PaletteDark = new PaletteDark
         {
-            Primary = "#D4A840",
+            Primary = "#E2B13E",
             PrimaryContrastText = "#2A2007",
             Secondary = "#D8B85F",
             SecondaryContrastText = "#2A2007",

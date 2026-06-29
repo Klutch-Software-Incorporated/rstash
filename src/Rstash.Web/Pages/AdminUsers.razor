@@ -66,7 +66,7 @@
                         <div class="rs-actions-cell">
                             @if (!user.Approved)
                             {
-                                <PostButton Action="/admin/users/approve" Id="@user.Id" Label="Approve" />
+                                <PostButton Action="/admin/users/approve" Id="@user.Id" Label="Approve" Kind="confirm" />
                             }
                             @if (user.IsAdmin)
                             {
@@ -75,8 +75,9 @@
                             else
                             {
                                 <PostButton Action="/admin/users/toggle-disabled" Id="@user.Id"
-                                            Label="@(user.Disabled ? "Enable" : "Disable")" />
-                                <PostButton Action="/admin/users/delete" Id="@user.Id" Label="Delete" Danger="true" />
+                                            Label="@(user.Disabled ? "Enable" : "Disable")"
+                                            Kind="@(user.Disabled ? "confirm" : "danger")" />
+                                <PostButton Action="/admin/users/delete" Id="@user.Id" Label="Delete" Kind="danger" />
                             }
                             <form action="/admin/users/quota" method="post" class="rs-quota-form">
                                 <AntiforgeryToken />

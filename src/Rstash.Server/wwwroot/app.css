@@ -3,10 +3,23 @@
    everything adapts automatically when the theme switches to dark mode. */
 
 :root {
-    --rs-gold: #d4a840;
+    /* Brand gold — accents only (links, badges, nav highlight, focus rings).
+       Buttons no longer fill with gold; they use the semantic colors below. */
+    --rs-gold: #e2b13e;
     --rs-gold-deep: #8a6d00;
     --rs-gold-tint: #f7efd8;
     --rs-gold-tint-line: #ecddae;
+
+    /* Semantic action colors: green confirms, red destroys. */
+    --rs-confirm: #2e9e6b;
+    --rs-confirm-deep: #1f7d52;
+    --rs-confirm-tint: #e9f6ef;
+    --rs-confirm-tint-line: #bfe3d0;
+    --rs-danger: #c0392b;
+    --rs-danger-deep: #9e2d22;
+    --rs-danger-tint: #fbeaea;
+    --rs-danger-tint-line: #f0caca;
+
     --rs-shadow: 0 1px 2px rgba(42, 38, 32, .04), 0 1px 12px rgba(42, 38, 32, .03);
 }
 
@@ -183,8 +196,8 @@
 
 .rs-copy {
     margin-left: auto;
-    background: var(--rs-gold);
-    color: #2a2007;
+    background: var(--rs-confirm);
+    color: #fff;
     border: none;
     font: inherit;
     font-weight: 700;
@@ -194,7 +207,7 @@
     cursor: pointer;
 }
 
-.rs-copy:hover { background: #c79a2f; }
+.rs-copy:hover { background: var(--rs-confirm-deep); }
 
 /* Two-column card grid. */
 .rs-grid {
@@ -300,11 +313,13 @@
     border-color: var(--rs-gold-tint-line);
 }
 
+/* Disconnect revokes an app's access — destructive, so styled red. */
 .rs-disconnect {
     background: none;
-    border: 1px solid var(--mud-palette-lines-default);
-    color: var(--mud-palette-text-secondary);
+    border: 1px solid var(--rs-danger-tint-line);
+    color: var(--rs-danger);
     font: inherit;
+    font-weight: 600;
     font-size: 12.5px;
     padding: 6px 12px;
     border-radius: 7px;
@@ -312,7 +327,7 @@
     flex-shrink: 0;
 }
 
-.rs-disconnect:hover { border-color: #d99; color: #b44; }
+.rs-disconnect:hover { border-color: var(--rs-danger); background: var(--rs-danger-tint); color: var(--rs-danger-deep); }
 
 /* Storage breakdown. */
 .rs-quota { padding: 18px 22px; border-bottom: 1px solid var(--mud-palette-lines-default); }
@@ -428,14 +443,20 @@
     transition: border-color .12s ease, background .12s ease, color .12s ease;
 }
 
+/* Neutral secondary action (e.g. Set quota) — gray hover, no gold. */
 .rs-action:hover {
-    border-color: var(--rs-gold);
-    background: var(--rs-gold-tint);
-    color: var(--rs-gold-deep);
+    border-color: var(--mud-palette-text-secondary);
+    background: var(--mud-palette-action-default-hover, rgba(0, 0, 0, .04));
+    color: var(--mud-palette-text-primary);
 }
 
-.rs-action-danger { color: #b23b3b; border-color: #e6c4c4; }
-.rs-action-danger:hover { border-color: #b23b3b; background: #fbeaea; color: #8f2f2f; }
+/* Confirm/positive action (Approve, Enable) — green. */
+.rs-action-confirm { color: var(--rs-confirm-deep); border-color: var(--rs-confirm-tint-line); }
+.rs-action-confirm:hover { border-color: var(--rs-confirm); background: var(--rs-confirm-tint); color: var(--rs-confirm-deep); }
+
+/* Destructive action (Delete, Disable) — red. */
+.rs-action-danger { color: var(--rs-danger); border-color: var(--rs-danger-tint-line); }
+.rs-action-danger:hover { border-color: var(--rs-danger); background: var(--rs-danger-tint); color: var(--rs-danger-deep); }
 
 /* Compact inline quota form on the users table. */
 .rs-quota-form { display: inline-flex; gap: 6px; align-items: center; }
@@ -835,14 +856,14 @@ textarea.rs-control {
 .rs-signin {
     padding: 8px 18px;
     border-radius: 8px;
-    background: var(--rs-gold);
-    color: #2a2007;
+    background: var(--rs-confirm);
+    color: #fff;
     font-weight: 600;
     font-size: 14px;
     text-decoration: none;
 }
 
-.rs-signin:hover { background: #c79a2f; }
+.rs-signin:hover { background: var(--rs-confirm-deep); }
 
 .rs-content-plain {
     background: transparent;
