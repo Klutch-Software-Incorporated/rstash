@@ -14,7 +14,7 @@ Throughout, the server runs at **http://localhost:8080** unless you set `ASPNETC
 - [ ] **Do:** `dotnet build Rstash.slnx`
       **Expect:** builds with 0 errors, 0 warnings.
 - [ ] **Do:** `dotnet test Rstash.slnx`
-      **Expect:** all tests pass (159 unit + 28 integration).
+      **Expect:** all tests pass (159 unit + 32 integration).
 
 ## 1. CLI
 
@@ -41,17 +41,22 @@ Throughout, the server runs at **http://localhost:8080** unless you set `ASPNETC
 - [ ] **Do:** open `http://localhost:8080/` in a browser.
       **Expect:** redirected to **/setup** ("Create the first admin account").
 - [ ] **Do:** create an admin (e.g. username `admin`, a strong password, optional email).
-      **Expect:** you're signed in and land on the home page; the app bar shows your username,
-      **Files**, **Settings**, **Sign out**.
+      **Expect:** you're signed in and land on the **dashboard**. The cream top bar shows the brand
+      and an account pill + sign-out; the left sidebar links **Dashboard**, **Files**,
+      **Connected apps**, and (admin) **Settings**, **Users**, **Audit log**.
 - [ ] **Do:** refresh `http://localhost:8080/`
-      **Expect:** the home page renders (no more setup redirect); "Welcome to rstash".
+      **Expect:** the dashboard renders (no more setup redirect): your storage address, the
+      **Usage** card (On disk + Bandwidth meters), and **Connected apps**.
 
 ## 4. Auth & account
 
-- [ ] **Do:** click **Sign out**, then go to `/login` and sign back in.
-      **Expect:** sign-out returns home; sign-in returns home.
+- [ ] **Do:** click **Sign out**, then visit `/` while signed out.
+      **Expect:** sign-out lands on the signed-out view; visiting `/` redirects to a centered,
+      themed **sign-in card** at `/login` (brand mark, gold top accent, full-width Sign in button).
+- [ ] **Do:** sign back in from that card.
+      **Expect:** returns to the dashboard.
 - [ ] **Do:** `/login` with a wrong password.
-      **Expect:** "Invalid username or password."
+      **Expect:** "Invalid username or password." shown in the card.
 - [ ] **Do:** click your username (→ `/account`). Change your password (current + new).
       **Expect:** "Password updated."; you stay signed in. Sign out and back in with the new password.
 - [ ] **Do:** on `/account`, set/change your email.
@@ -83,12 +88,16 @@ Throughout, the server runs at **http://localhost:8080** unless you set `ASPNETC
 - [ ] **Do:** as a non-admin user, visit `/admin/settings`.
       **Expect:** bounced to home (`/`).
 - [ ] **Do:** as admin, `/admin/settings` → set `site_name` = `My Cloud`, save.
-      **Expect:** "Updated site_name."; it appears under "Current overrides"; the home page now
-      greets "Welcome to My Cloud".
+      **Expect:** "Saved 1 setting."; `site_name` shows a **modified** badge; the brand wordmark in
+      the top bar and the page titles now read "My Cloud".
 - [ ] **Do:** set an invalid value (e.g. `max_upload_size` = `abc`).
-      **Expect:** a validation error; the setting is not changed.
-- [ ] **Do:** `/admin/users` — approve/disable/enable/delete, and **set quota** (e.g. `10MB`) on a user.
-      **Expect:** the table reflects each change; quota shows human-readable.
+      **Expect:** a per-field validation error; the setting is not changed.
+- [ ] **Do:** `/admin/users` — approve/disable/enable/delete. Protected: admins (incl. yourself)
+      show a **Protected** chip instead of disable/delete.
+- [ ] **Do:** on a non-admin user, set **Storage** and **Egress** quotas (e.g. `10MB` / `1GB`) in
+      the inline form and click **Save**.
+      **Expect:** both fields persist (pre-filled on reload) and the **Storage** + **Egress**
+      columns show human-readable values. Clearing a field saves it as `unlimited`.
 - [ ] **Do:** `/admin/audit`.
       **Expect:** a table of recent entries (you'll see `storage.put` / `storage.delete` after §7).
 
@@ -173,13 +182,46 @@ approve, then `POST /oauth/token` with `grant_type=authorization_code&code=…&c
 - [ ] **Do (revoke):** `curl.exe -X POST --data "token=$T" http://localhost:8080/oauth/revoke -i`
       **Expect:** `200`. The token then fails on storage (`401`).
 
-## 8. Quotas
+### 7f. Public-write operator policy
 
-- [ ] **Do:** `/admin/users` → set `admin`'s quota to e.g. `20` (bytes) — or use the global
+- [ ] **Do:** `/admin/settings` (Storage) → set **Public writes** = `disabled`.
+- [ ] **Do:** with a `*:rw` token, PUT to `/storage/admin/public/site/x.txt`.
+      **Expect:** `403` "public writes are disabled". A DELETE under `/public/` is likewise `403`.
+- [ ] **Do:** GET an existing `/public/…` document **without** a token; and PUT to a non-public
+      path (e.g. `/storage/admin/notes/y.txt`).
+      **Expect:** public reads still `200`; non-public writes still `201`. (Deleting public files
+      from the **Files** UI also still works — it bypasses the protocol.)
+- [ ] **Do:** set **Public writes** back to `enabled`.
+
+## 8. Quotas & egress
+
+### 8a. Storage quota
+
+- [ ] **Do:** `/admin/users` → set `admin`'s Storage quota to e.g. `20` (bytes) — or use the global
       `total_storage_limit` in `/admin/settings`.
 - [ ] **Do:** PUT a body larger than the remaining quota (token with `*:rw`).
       **Expect:** `507 Insufficient Storage`.
 - [ ] **Do:** reset the quota to `0` (unlimited) afterward.
+
+### 8b. Egress (bandwidth) quota
+
+- [ ] **Do:** `/admin/users` → set `admin`'s **Egress** quota to a small value (e.g. `20` bytes).
+- [ ] **Do:** PUT a document, then GET it repeatedly with a `*:rw` token until the monthly total
+      would exceed the cap.
+      **Expect:** the GET that would exceed returns `429 Too Many Requests` with a `Retry-After`
+      header (seconds until the next UTC month). `HEAD` is **not** charged and still `200`.
+- [ ] **Do:** on the dashboard, check the **Usage** card.
+      **Expect:** the **Bandwidth · this month** meter reflects the egress consumed; with the cap
+      set it shows `used of <cap>`, otherwise a faint "no limit" track. Storage shows likewise.
+- [ ] **Do:** reset the egress quota to `0` afterward.
+
+### 8c. New-account defaults
+
+- [ ] **Do:** `/admin/settings` (Storage) → set `default_user_storage_limit` and
+      `default_user_egress_limit` (e.g. `2GB` / `5GB`). Register a new user (open mode).
+      **Expect:** the new user's **Storage**/**Egress** columns show those defaults.
+- [ ] **Do:** change the defaults, then check an **existing** user.
+      **Expect:** existing users are unchanged — defaults apply only at account creation.
 
 ## 9. Hardening & ops
 
@@ -189,7 +231,18 @@ approve, then `POST /oauth/token` with `grant_type=authorization_code&code=…&c
 - [ ] **Do:** `curl.exe http://localhost:8080/openapi/v1.json`
       **Expect:** an OpenAPI JSON document.
 
-## 10. Single-file & container
+## 10. UI & mobile
+
+- [ ] **Do:** narrow the browser to a phone width (or use device emulation).
+      **Expect:** the left sidebar collapses; a **hamburger** appears in the top bar. Tapping it
+      opens a **full-screen** nav drawer (with a ✕ to close); tapping any link closes it.
+- [ ] **Do:** on a narrow screen, open `/admin/users` and `/admin/audit`.
+      **Expect:** wide tables scroll horizontally **within their card**, not stretching the page.
+      The settings tab strip is hidden on mobile (the drawer already links each subpage).
+- [ ] **Do:** view `/login` and the dashboard at phone width.
+      **Expect:** the sign-in card and the Usage/Connected-apps cards stack and stay readable.
+
+## 11. Single-file & container
 
 - [ ] **Do:**
       `dotnet publish src/Rstash.Server -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o publish/server`
@@ -203,8 +256,9 @@ approve, then `POST /oauth/token` with `grant_type=authorization_code&code=…&c
 
 ## Notes / known gaps (deferred, not bugs)
 
-- Egress (download) limits, runtime rate limiting, abuse reports, refresh-token grant, and the
-  OAuthClient registry are not yet ported.
+- Egress/bandwidth limits and the public-write operator toggle are now implemented (see §7f, §8b).
+- Runtime rate limiting, abuse reports, refresh-token grant, and the OAuthClient registry are not
+  yet ported.
 - Postgres/MySQL/SQL Server DB providers and S3/Azure blob backends are stubbed (factories throw)
   pending their NuGet packages — SQLite + filesystem + database blobs work today.
 - The original Go server lives in `legacy/` for reference; it is not built.
