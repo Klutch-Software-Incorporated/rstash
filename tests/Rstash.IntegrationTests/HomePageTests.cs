@@ -1,4 +1,6 @@
+using System.Net;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
 using Rstash.Database;
 
@@ -7,17 +9,17 @@ namespace Rstash.IntegrationTests;
 public sealed class HomePageTests(RstashAppFactory factory) : IClassFixture<RstashAppFactory>
 {
     [Fact]
-    public async Task Home_RendersWelcomeFromSettings()
+    public async Task Home_WhenSignedOut_RedirectsToLogin()
     {
+        // An account exists (so the setup guard is satisfied), but the request is
+        // unauthenticated — the dashboard redirects signed-out visitors to /login.
         await SeedAdminAsync();
 
-        var client = factory.CreateClient();
-        var html = await client.GetStringAsync("/");
+        var client = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+        var response = await client.GetAsync("/");
 
-        // Server-prerendered Blazor content, with the site name/subtitle pulled
-        // from the settings snapshot.
-        Assert.Contains("Welcome to rstash", html);
-        Assert.Contains("A personal remoteStorage server.", html);
+        Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
+        Assert.Contains("/login", response.Headers.Location?.OriginalString);
     }
 
     private async Task SeedAdminAsync()
