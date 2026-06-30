@@ -3,6 +3,7 @@
 @inject UserManager<ApplicationUser> Users
 @inject RemoteStorageService Storage
 @inject TokenStore Tokens
+@inject Rstash.Services.Storage.EgressTracker Egress
 @inject NavigationManager Navigation
 
 <PageTitle>@Settings.Current.SiteName</PageTitle>
@@ -55,28 +56,53 @@ else
 
         <MudPaper Class="rs-card" Elevation="1">
             <div class="rs-card-head">
-                <h2>What's using space</h2>
+                <h2>Usage</h2>
             </div>
-            <div class="rs-quota">
-                <div class="rs-quota-top">
-                    <span class="rs-quota-used">@Format(_usage.TotalBytes)</span>
+            <div class="rs-usage">
+                <div class="rs-stat">
+                    <span class="rs-stat-label">On disk</span>
+                    <div class="rs-stat-top">
+                        <span class="rs-stat-value">@Format(_usage.TotalBytes)</span>
+                        @if (_quota > 0)
+                        {
+                            <span class="rs-stat-of">of @Format(_quota) · @_storagePercent%</span>
+                        }
+                        else
+                        {
+                            <span class="rs-stat-of">used · <span class="rs-quota-pill">no limit</span></span>
+                        }
+                    </div>
                     @if (_quota > 0)
                     {
-                        <span class="rs-quota-total">@_percent% of @Format(_quota)</span>
+                        <MudProgressLinear Color="@MeterColor(_storagePercent)" Rounded="true" Value="@_storagePercent" />
                     }
                     else
                     {
-                        <span class="rs-quota-total">used · <span class="rs-quota-pill">no limit</span></span>
+                        <div class="rs-meter rs-meter-unlimited" aria-hidden="true"><span></span></div>
                     }
                 </div>
-                @if (_quota > 0)
-                {
-                    <MudProgressLinear Color="@QuotaColor" Rounded="true" Value="@_percent" />
-                }
-                else
-                {
-                    <div class="rs-meter rs-meter-unlimited" aria-hidden="true"><span></span></div>
-                }
+                <div class="rs-stat">
+                    <span class="rs-stat-label">Bandwidth <span class="rs-stat-sub">this month</span></span>
+                    <div class="rs-stat-top">
+                        <span class="rs-stat-value">@Format(_egressUsed)</span>
+                        @if (_egressQuota > 0)
+                        {
+                            <span class="rs-stat-of">of @Format(_egressQuota) · @_egressPercent%</span>
+                        }
+                        else
+                        {
+                            <span class="rs-stat-of">out · <span class="rs-quota-pill">no limit</span></span>
+                        }
+                    </div>
+                    @if (_egressQuota > 0)
+                    {
+                        <MudProgressLinear Color="@MeterColor(_egressPercent)" Rounded="true" Value="@_egressPercent" />
+                    }
+                    else
+                    {
+                        <div class="rs-meter rs-meter-unlimited" aria-hidden="true"><span></span></div>
+                    }
+                </div>
             </div>
             @if (_usage.Folders.Count == 0)
             {
@@ -84,6 +110,7 @@ else
             }
             else
             {
+                <div class="rs-breakdown-head">What's using space</div>
                 @foreach (var folder in _usage.Folders)
                 {
                     <div class="rs-cat">
@@ -112,7 +139,10 @@ else
     private string _host = "";
     private string _handle = "";
     private long _quota;
-    private int _percent;
+    private int _storagePercent;
+    private long _egressUsed;
+    private long _egressQuota;
+    private int _egressPercent;
     private long _maxFolderBytes;
     private List<OAuthToken> _tokens = [];
     private StorageUsage _usage = new(0, []);
@@ -138,13 +168,20 @@ else
         _usage = await Storage.GetUsageAsync(_user.Id);
         _maxFolderBytes = _usage.Folders.Count > 0 ? _usage.Folders.Max(f => f.Bytes) : 0;
 
-        // Effective cap: the user's own quota wins; otherwise the global limit. 0 = unlimited.
+        // Effective storage cap: the user's own quota wins; otherwise the global limit. 0 = unlimited.
         _quota = _user.StorageQuota > 0 ? _user.StorageQuota : Settings.Current.TotalStorageLimit;
-        _percent = _quota > 0 ? (int)Math.Min(100, Math.Round(_usage.TotalBytes * 100.0 / _quota)) : 0;
+        _storagePercent = _quota > 0 ? (int)Math.Min(100, Math.Round(_usage.TotalBytes * 100.0 / _quota)) : 0;
+
+        // Bandwidth shows the user's own monthly egress against their personal cap only —
+        // the global limit is a server-wide backstop, not a meaningful per-user figure.
+        _egressUsed = await Egress.GetUsedAsync(_user.Id);
+        _egressQuota = _user.EgressQuota;
+        _egressPercent = _egressQuota > 0 ? (int)Math.Min(100, Math.Round(_egressUsed * 100.0 / _egressQuota)) : 0;
     }
 
-    // Usage meter shifts gold -> amber -> red as the cap fills.
-    private Color QuotaColor => _percent >= 90 ? Color.Error : _percent >= 75 ? Color.Warning : Color.Primary;
+    // Usage meters shift gold -> amber -> red as a cap fills.
+    private static Color MeterColor(int percent) =>
+        percent >= 90 ? Color.Error : percent >= 75 ? Color.Warning : Color.Primary;
 
     private static string Format(long bytes)
     {

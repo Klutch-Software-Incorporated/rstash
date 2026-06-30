@@ -102,6 +102,27 @@ public sealed class EgressTracker(
         return true;
     }
 
+    /// <summary>
+    /// Current-period egress for a user: persisted bytes plus any not-yet-flushed
+    /// pending. Drives the dashboard bandwidth meter.
+    /// </summary>
+    public async Task<long> GetUsedAsync(long userId, CancellationToken cancellationToken = default)
+    {
+        long pending;
+        lock (_gate)
+        {
+            pending = _pending.GetValueOrDefault(userId);
+        }
+
+        var period = CurrentPeriod();
+        await using var db = await contextFactory.CreateDbContextAsync(cancellationToken);
+        var persisted = await db.EgressUsage
+            .Where(e => e.UserId == userId && e.Period == period)
+            .Select(e => e.BytesOut)
+            .FirstOrDefaultAsync(cancellationToken);
+        return persisted + pending;
+    }
+
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         using var timer = new PeriodicTimer(FlushInterval);

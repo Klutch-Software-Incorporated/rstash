@@ -329,18 +329,39 @@
 
 .rs-disconnect:hover { border-color: var(--rs-danger); background: var(--rs-danger-tint); color: var(--rs-danger-deep); }
 
-/* Storage breakdown. */
-.rs-quota { padding: 18px 22px; border-bottom: 1px solid var(--mud-palette-lines-default); }
-
-.rs-quota-top {
-    display: flex;
-    justify-content: space-between;
-    align-items: baseline;
-    margin-bottom: 10px;
+/* Usage summary: headline storage + bandwidth stats, above the per-module breakdown. */
+.rs-usage {
+    padding: 20px 22px 10px;
+    display: grid;
+    gap: 18px;
+    border-bottom: 1px solid var(--mud-palette-lines-default);
 }
 
-.rs-quota-used { font-family: 'Roboto Mono', monospace; font-weight: 700; font-size: 20px; }
-.rs-quota-total { color: var(--mud-palette-text-secondary); font-size: 13px; }
+.rs-stat-label {
+    display: block;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .05em;
+    color: var(--mud-palette-text-secondary);
+    margin-bottom: 5px;
+}
+
+.rs-stat-sub { font-weight: 500; opacity: .75; }
+
+.rs-stat-top { display: flex; align-items: baseline; gap: 8px; margin-bottom: 9px; }
+.rs-stat-value { font-family: 'Roboto Mono', monospace; font-weight: 700; font-size: 22px; line-height: 1; }
+.rs-stat-of { color: var(--mud-palette-text-secondary); font-size: 13px; }
+
+/* Eyebrow heading introducing the per-module breakdown list. */
+.rs-breakdown-head {
+    padding: 14px 22px 2px;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .05em;
+    color: var(--mud-palette-text-secondary);
+}
 
 /* "no limit" pill on the usage meter for unlimited (e.g. admin) accounts. */
 .rs-quota-pill {
