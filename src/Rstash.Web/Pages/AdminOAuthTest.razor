@@ -1,0 +1,119 @@
+@page "/admin/oauth-test"
+@attribute [Authorize]
+@inject UserManager<ApplicationUser> Users
+@inject NavigationManager Navigation
+
+<PageTitle>OAuth test — admin</PageTitle>
+
+<MudText Typo="Typo.h4" GutterBottom="true">OAuth test</MudText>
+<MudText Class="mb-4">
+    Walk the remoteStorage authorization flow as a minimal client to confirm an app can request
+    read/write access to a module for your account. Uses the implicit (token) grant.
+</MudText>
+
+@if (!string.IsNullOrEmpty(_accessToken))
+{
+    <MudPaper Class="rs-card mb-4" Elevation="1">
+        <div class="rs-card-head"><h2>Access granted</h2></div>
+        <div class="rs-settings-body">
+            <MudAlert Severity="Severity.Success" Class="mb-3">
+                Access token received — it works against the storage API below.
+            </MudAlert>
+            <dl class="rs-deflist">
+                <dt>Access token</dt>
+                <dd class="rs-mono" style="word-break: break-all">@_accessToken</dd>
+                <dt>Token type</dt>
+                <dd>@(_tokenType ?? "bearer")</dd>
+                @if (!string.IsNullOrEmpty(_state))
+                {
+                    <dt>State</dt>
+                    <dd>@_state</dd>
+                }
+                <dt>Try it</dt>
+                <dd class="rs-mono" style="word-break: break-all">curl -H "Authorization: Bearer @_accessToken" @_baseUrl/storage/@_username/</dd>
+            </dl>
+            <a class="rs-browse" href="/admin/oauth-test">Run another test →</a>
+        </div>
+    </MudPaper>
+}
+else
+{
+    @if (!string.IsNullOrEmpty(_error))
+    {
+        <MudAlert Severity="Severity.Error" Class="mb-4">Authorization error: <strong>@_error</strong></MudAlert>
+    }
+
+    <MudPaper Class="rs-card mb-4" Elevation="1">
+        <div class="rs-card-head"><h2>Request access</h2></div>
+        <div class="rs-settings-body">
+            <form method="get" action="/oauth/authorize" data-enhance="false">
+                <input type="hidden" name="response_type" value="token" />
+                <input type="hidden" name="redirect_uri" value="@_callbackUrl" />
+                <div class="rs-field">
+                    <label class="rs-label" for="scope">Scope</label>
+                    <div class="rs-help">
+                        Space-separated module scopes, e.g. <code>*:rw</code> (everything),
+                        <code>documents:rw</code>, or <code>contacts:r photos:rw</code>.
+                    </div>
+                    <input id="scope" name="scope" class="rs-control" value="*:rw" required />
+                </div>
+                <div class="rs-field">
+                    <label class="rs-label" for="state">State (optional)</label>
+                    <div class="rs-help">Opaque value echoed back in the redirect.</div>
+                    <input id="state" name="state" class="rs-control" />
+                </div>
+                <div class="rs-form-actions">
+                    <button type="submit" class="rs-action rs-action-confirm">Start authorization</button>
+                </div>
+            </form>
+        </div>
+    </MudPaper>
+}
+
+@* The implicit grant returns the token in the URL fragment, which the server never sees.
+   Convert it to a query string and reload so the page can render it. Runs on the full-page
+   callback load. *@
+<script>
+    (function () {
+        var hash = window.location.hash.substring(1);
+        if (!hash) return;
+        var params = new URLSearchParams(hash);
+        if (params.has('access_token') || params.has('error')) {
+            window.location.replace(window.location.pathname + '?callback=1&' + hash);
+        }
+    })();
+</script>
+
+@code {
+    [CascadingParameter] private HttpContext? HttpContext { get; set; }
+    [SupplyParameterFromQuery(Name = "access_token")] private string? AccessTokenParam { get; set; }
+    [SupplyParameterFromQuery(Name = "token_type")] private string? TokenTypeParam { get; set; }
+    [SupplyParameterFromQuery(Name = "state")] private string? StateParam { get; set; }
+    [SupplyParameterFromQuery(Name = "error")] private string? ErrorParam { get; set; }
+
+    private string _callbackUrl = "";
+    private string _baseUrl = "";
+    private string _username = "";
+    private string? _accessToken;
+    private string? _tokenType;
+    private string? _state;
+    private string? _error;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var user = HttpContext is null ? null : await Users.GetUserAsync(HttpContext.User);
+        if (user is null || !user.IsAdmin)
+        {
+            Navigation.NavigateTo("/", forceLoad: true);
+            return;
+        }
+
+        _username = user.UserName ?? "";
+        _baseUrl = new Uri(Navigation.BaseUri).GetLeftPart(UriPartial.Authority);
+        _callbackUrl = $"{_baseUrl}/admin/oauth-test";
+        _accessToken = AccessTokenParam;
+        _tokenType = TokenTypeParam;
+        _state = StateParam;
+        _error = ErrorParam;
+    }
+}
