@@ -782,6 +782,7 @@ textarea.rs-control {
 .rs-topbar-left { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .rs-navtoggle { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
 .rs-hamburger { display: none; }
+.rs-nav-close { display: none; }
 
 /* --- Body: sidebar + content --- */
 .rs-body {
@@ -984,25 +985,34 @@ textarea.rs-control {
     }
     .rs-hamburger:hover { background: rgba(42, 32, 7, .07); color: #2a2007; }
 
-    /* Sidebar becomes a full-screen overlay menu below the sticky top bar; the
-       hamburger stays visible in the bar to close it. Out of flow, so content
-       spans the full width underneath. */
+    /* Sidebar becomes a full-screen overlay menu covering the entire viewport
+       (above the top bar). Its own close button dismisses it. */
     .rs-sidebar {
         position: fixed;
-        top: 60px;
+        top: 0;
         left: 0;
-        right: 0;
-        bottom: 0;
-        height: auto;
         width: 100%;
         max-width: none;
-        z-index: 40;
+        height: 100dvh;
+        z-index: 50;
         border-right: none;
-        padding: 14px;
+        padding: 12px 14px 24px;
         transform: translateX(-100%);
         transition: transform .22s ease;
     }
     #rs-navtoggle:checked ~ .rs-body .rs-sidebar { transform: translateX(0); }
+
+    .rs-nav-close {
+        display: grid;
+        place-items: center;
+        width: 40px;
+        height: 40px;
+        margin: 0 0 6px auto;
+        border-radius: 8px;
+        color: var(--mud-palette-text-secondary);
+        cursor: pointer;
+    }
+    .rs-nav-close:hover { background: rgba(42, 32, 7, .07); color: #2a2007; }
 
     /* The in-content settings tab strip is redundant on mobile — the drawer
        already links every admin subpage. */

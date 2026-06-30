@@ -38,6 +38,10 @@
             </header>
             <div class="rs-body">
                 <aside class="rs-sidebar">
+                    @* Close control for the full-screen mobile drawer (hidden on desktop). *@
+                    <label for="rs-navtoggle" class="rs-nav-close" aria-label="Close menu">
+                        <MudIcon Icon="@Icons.Material.Filled.Close" Size="Size.Small" />
+                    </label>
                     <nav class="rs-nav">
                         <a href="/" class="rs-navlink @Active("/", exact: true)">
                             <MudIcon Icon="@Icons.Material.Filled.Dashboard" Size="Size.Small" />
