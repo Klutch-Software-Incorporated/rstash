@@ -1,0 +1,67 @@
+@page "/admin/audit"
+@attribute [Authorize]
+@using Microsoft.EntityFrameworkCore
+@inject AuditService Audit
+@inject UserManager<ApplicationUser> Users
+@inject NavigationManager Navigation
+
+<PageTitle>Audit log — admin</PageTitle>
+
+<MudText Typo="Typo.h4" GutterBottom="true">Audit log</MudText>
+
+<MudPaper Class="rs-card" Elevation="1">
+    <div class="rs-card-head">
+        <h2>Recent activity</h2>
+        <span class="rs-count">@_entries.Count shown</span>
+    </div>
+    <MudSimpleTable Dense="true" Class="rs-table" Style="box-shadow:none;">
+        <thead>
+            <tr>
+                <th class="rs-sortable" data-sort-key="time" data-sort-type="number">Time (UTC)</th>
+                <th class="rs-sortable" data-sort-key="actor">Actor</th>
+                <th class="rs-sortable" data-sort-key="action">Action</th>
+                <th class="rs-sortable" data-sort-key="target">Target</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var entry in _entries)
+            {
+                <tr data-time="@entry.CreatedAt.UtcTicks" data-actor="@ActorName(entry.ActorId)"
+                    data-action="@entry.Action" data-target="@($"{entry.TargetType}:{entry.TargetId}")">
+                    <td class="rs-mono">@entry.CreatedAt.UtcDateTime.ToString("yyyy-MM-dd HH:mm:ss")</td>
+                    <td>@ActorName(entry.ActorId)</td>
+                    <td><span class="rs-mono">@entry.Action</span></td>
+                    <td class="rs-mono rs-muted">@entry.TargetType:@entry.TargetId</td>
+                </tr>
+            }
+            @if (_entries.Count == 0)
+            {
+                <tr data-pin="1"><td colspan="4"><em class="rs-muted">No audit entries yet.</em></td></tr>
+            }
+        </tbody>
+    </MudSimpleTable>
+</MudPaper>
+
+@code {
+    [CascadingParameter] private HttpContext? HttpContext { get; set; }
+
+    private IReadOnlyList<AuditEntry> _entries = [];
+    private Dictionary<long, string> _actors = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        var actor = HttpContext is null ? null : await Users.GetUserAsync(HttpContext.User);
+        if (actor is null || !actor.IsAdmin)
+        {
+            Navigation.NavigateTo("/", forceLoad: true);
+            return;
+        }
+
+        _actors = await Users.Users.ToDictionaryAsync(u => u.Id, u => u.UserName ?? $"#{u.Id}");
+        _entries = await Audit.RecentAsync(200);
+    }
+
+    // Resolve an actor id to a username, falling back to the raw id (e.g. system/0).
+    private string ActorName(long id) =>
+        id == 0 ? "system" : _actors.GetValueOrDefault(id, $"#{id}");
+}

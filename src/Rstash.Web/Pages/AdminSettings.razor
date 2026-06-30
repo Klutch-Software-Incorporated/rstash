@@ -1,0 +1,209 @@
+@page "/admin/settings"
+@page "/admin/settings/{Group}"
+@attribute [Authorize]
+@inject SettingsService Settings
+@inject UserManager<ApplicationUser> Users
+@inject NavigationManager Navigation
+
+<PageTitle>@_activeGroup settings — admin</PageTitle>
+
+<MudText Typo="Typo.h4" GutterBottom="true">Server settings</MudText>
+
+<nav class="rs-subnav">
+    @foreach (var g in _groups)
+    {
+        <a href="/admin/settings/@Slug(g)" class="@(g == _activeGroup ? "active" : "")">@g</a>
+    }
+</nav>
+
+@if (_message is not null)
+{
+    <MudAlert Severity="Severity.Success" Class="mb-4">@_message</MudAlert>
+}
+@if (_errors.Count > 0)
+{
+    <MudAlert Severity="Severity.Error" Class="mb-4">Some settings weren't saved — see the messages below.</MudAlert>
+}
+
+<EditForm Model="_form" FormName="settings" OnValidSubmit="SaveAsync">
+    <MudPaper Class="rs-card mb-4" Elevation="1">
+        <div class="rs-card-head"><h2>@_activeGroup</h2></div>
+        <div class="rs-settings-body">
+            <div class="rs-form-grid">
+                @foreach (var def in ActiveDefs)
+                {
+                    <div class="rs-field @(IsWide(def) ? "rs-field-wide" : "")">
+                        <label class="rs-label" for="@def.Key">
+                            @def.Label
+                            @if (_overridden.Contains(def.Key))
+                            {
+                                <span class="rs-badge-mod">modified</span>
+                            }
+                        </label>
+                        <div class="rs-help">@((MarkupString)def.Description)</div>
+                        @RenderControl(def)
+                        @if (_errors.TryGetValue(def.Key, out var error))
+                        {
+                            <div class="rs-field-error">@error</div>
+                        }
+                    </div>
+                }
+            </div>
+        </div>
+    </MudPaper>
+
+    <div class="rs-settings-actions">
+        <MudButton ButtonType="ButtonType.Submit" Variant="Variant.Filled"
+                   Color="Color.Success">Save changes</MudButton>
+    </div>
+</EditForm>
+
+@code {
+    [CascadingParameter] private HttpContext? HttpContext { get; set; }
+    [SupplyParameterFromForm] private SettingsForm _form { get; set; } = new();
+    [Parameter] public string? Group { get; set; }
+
+    private readonly string[] _groups =
+        SettingDefinitions.RuntimeEditable.Select(d => d.Group).Distinct().ToArray();
+
+    private readonly Dictionary<string, string> _values = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, string> _errors = new(StringComparer.Ordinal);
+    private HashSet<string> _overridden = [];
+    private string _activeGroup = "";
+    private string? _message;
+
+    // Settings for the group the admin is currently viewing.
+    private IEnumerable<SettingDef> ActiveDefs =>
+        SettingDefinitions.RuntimeEditable.Where(d => d.Group == _activeGroup);
+
+    protected override async Task OnInitializedAsync()
+    {
+        var user = HttpContext is null ? null : await Users.GetUserAsync(HttpContext.User);
+        if (user is null || !user.IsAdmin)
+        {
+            Navigation.NavigateTo("/", forceLoad: true);
+            return;
+        }
+
+        // Resolve the route slug (e.g. "rate-limiting") back to a group; default to the first.
+        _activeGroup = _groups.FirstOrDefault(
+            g => string.Equals(Slug(g), Group, StringComparison.OrdinalIgnoreCase)) ?? _groups[0];
+
+        var overrides = await Settings.GetOverridesAsync();
+        _overridden = overrides.Keys.ToHashSet(StringComparer.Ordinal);
+        foreach (var def in SettingDefinitions.RuntimeEditable)
+        {
+            _values[def.Key] = overrides.GetValueOrDefault(def.Key, def.Default);
+        }
+    }
+
+    private async Task SaveAsync()
+    {
+        if (HttpContext is null)
+        {
+            return;
+        }
+
+        var overrides = await Settings.GetOverridesAsync();
+        var saved = 0;
+
+        // Only the active group's fields are posted on this page.
+        foreach (var def in ActiveDefs)
+        {
+            var posted = HttpContext.Request.Form[def.Key].ToString();
+            _values[def.Key] = posted; // keep what the admin typed, even on error
+            var current = overrides.GetValueOrDefault(def.Key, def.Default);
+            if (posted == current)
+            {
+                continue;
+            }
+
+            try
+            {
+                await Settings.SetAsync(def.Key, posted);
+                saved++;
+            }
+            catch (SettingValidationException ex)
+            {
+                _errors[def.Key] = ex.Message;
+            }
+        }
+
+        _overridden = (await Settings.GetOverridesAsync()).Keys.ToHashSet(StringComparer.Ordinal);
+        _message = saved > 0 ? $"Saved {saved} setting{(saved == 1 ? "" : "s")}." : null;
+    }
+
+    private string Value(SettingDef def) => _values.GetValueOrDefault(def.Key, def.Default);
+
+    // Multi-line settings take the full row; short controls pair two-up.
+    private static bool IsWide(SettingDef def) => def.InputType == SettingInputType.TextArea;
+
+    // URL slug for a group name, e.g. "Rate Limiting" -> "rate-limiting".
+    private static string Slug(string group) => group.ToLowerInvariant().Replace(' ', '-');
+
+    private RenderFragment RenderControl(SettingDef def) => builder =>
+    {
+        switch (def.InputType)
+        {
+            case SettingInputType.Select:
+                builder.OpenElement(0, "select");
+                builder.AddAttribute(1, "name", def.Key);
+                builder.AddAttribute(2, "id", def.Key);
+                builder.AddAttribute(3, "class", "rs-control");
+                var current = Value(def);
+                var optionIndex = 4;
+                foreach (var option in def.ValidValues)
+                {
+                    builder.OpenElement(optionIndex++, "option");
+                    builder.AddAttribute(optionIndex++, "value", option);
+                    if (option == current)
+                    {
+                        builder.AddAttribute(optionIndex++, "selected", true);
+                    }
+
+                    builder.AddContent(optionIndex++, option.Length == 0 ? "(unset)" : option);
+                    builder.CloseElement();
+                }
+
+                builder.CloseElement();
+                break;
+
+            case SettingInputType.TextArea:
+                builder.OpenElement(0, "textarea");
+                builder.AddAttribute(1, "name", def.Key);
+                builder.AddAttribute(2, "id", def.Key);
+                builder.AddAttribute(3, "class", "rs-control");
+                builder.AddAttribute(4, "rows", "6");
+                builder.AddContent(5, Value(def));
+                builder.CloseElement();
+                break;
+
+            default:
+                builder.OpenElement(0, "input");
+                builder.AddAttribute(1, "name", def.Key);
+                builder.AddAttribute(2, "id", def.Key);
+                builder.AddAttribute(3, "class", "rs-control");
+                builder.AddAttribute(4, "value", Value(def));
+                if (def.InputType == SettingInputType.Number)
+                {
+                    builder.AddAttribute(5, "type", "number");
+                    if (def.NumberMin is not null) builder.AddAttribute(6, "min", def.NumberMin);
+                    if (def.NumberStep is not null) builder.AddAttribute(7, "step", def.NumberStep);
+                }
+                else
+                {
+                    builder.AddAttribute(5, "type", "text");
+                    if (def.InputType is SettingInputType.ByteSize or SettingInputType.Duration)
+                    {
+                        builder.AddAttribute(8, "placeholder", def.Default);
+                    }
+                }
+
+                builder.CloseElement();
+                break;
+        }
+    };
+
+    // Empty marker model — the real values are read from the posted form by key.
+    public sealed class SettingsForm;
+}

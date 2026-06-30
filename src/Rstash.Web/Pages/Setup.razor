@@ -1,0 +1,76 @@
+@page "/setup"
+@inject UserManager<ApplicationUser> UserManager
+@inject SignInManager<ApplicationUser> SignInManager
+@inject NavigationManager Navigation
+@inject SetupState SetupStatus
+@inject SettingsService Settings
+
+<PageTitle>Setup</PageTitle>
+
+<MudText Typo="Typo.h4" GutterBottom="true">Create the first admin account</MudText>
+<MudText Class="mb-4">Welcome to rstash. Create an administrator account to finish setup.</MudText>
+
+@if (_error is not null)
+{
+    <MudAlert Severity="Severity.Error" Class="mb-4">@_error</MudAlert>
+}
+
+<EditForm Model="Input" method="post" OnValidSubmit="CreateAdminAsync" FormName="setup">
+    <DataAnnotationsValidator />
+    <div class="mb-3">
+        <label>Username<br /><InputText @bind-Value="Input.Username" autocomplete="username" /></label>
+    </div>
+    <div class="mb-3">
+        <label>Email (optional)<br /><InputText @bind-Value="Input.Email" autocomplete="email" /></label>
+    </div>
+    <div class="mb-3">
+        <label>Password<br /><InputText type="password" @bind-Value="Input.Password" autocomplete="new-password" /></label>
+    </div>
+    <MudButton ButtonType="ButtonType.Submit" Variant="Variant.Filled" Color="Color.Success">
+        Create account
+    </MudButton>
+</EditForm>
+
+@code {
+    [SupplyParameterFromForm]
+    private SetupInput Input { get; set; } = new();
+
+    private string? _error;
+
+    private async Task CreateAdminAsync()
+    {
+        var user = new ApplicationUser
+        {
+            UserName = Input.Username,
+            Email = string.IsNullOrWhiteSpace(Input.Email) ? null : Input.Email,
+            IsAdmin = true,
+            Approved = true,
+            CreatedAt = DateTimeOffset.UtcNow,
+        };
+
+        var result = await UserManager.CreateAsync(user, Input.Password);
+        if (!result.Succeeded)
+        {
+            _error = string.Join(" ", result.Errors.Select(e => e.Description));
+            return;
+        }
+
+        await UserProvisioning.ApplyDefaultLimitsAsync(UserManager, user, Settings.Current);
+
+        SetupStatus.MarkComplete();
+        await SignInManager.SignInAsync(user, isPersistent: true);
+        Navigation.NavigateTo("/", forceLoad: true);
+    }
+
+    public sealed class SetupInput
+    {
+        [Required]
+        public string Username { get; set; } = "";
+
+        [EmailAddress]
+        public string? Email { get; set; }
+
+        [Required]
+        public string Password { get; set; } = "";
+    }
+}

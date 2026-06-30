@@ -1,0 +1,207 @@
+@page "/"
+@inject Rstash.Services.SettingsService Settings
+@inject UserManager<ApplicationUser> Users
+@inject RemoteStorageService Storage
+@inject TokenStore Tokens
+@inject Rstash.Services.Storage.EgressTracker Egress
+@inject NavigationManager Navigation
+
+<PageTitle>@Settings.Current.SiteName</PageTitle>
+
+@if (_user is not null)
+{
+    <MudPaper Class="rs-hero" Elevation="1">
+        <p class="rs-hero-label">Your storage address</p>
+        <div class="rs-address-row">
+            <div class="rs-address">@_username<span class="at">@@</span><span class="host">@_host</span></div>
+            <button class="rs-copy" type="button"
+                    onclick="navigator.clipboard.writeText('@_handle');this.textContent='Copied';setTimeout(()=>this.textContent='Copy',1500)">
+                Copy
+            </button>
+        </div>
+        <p class="rs-hero-help">
+            Paste this into any remoteStorage app to connect it to your data. You stay in control
+            and can disconnect an app at any time.
+        </p>
+    </MudPaper>
+
+    <div class="rs-grid">
+        <div class="rs-col">
+            <MudPaper Class="rs-card" Elevation="1">
+                <div class="rs-card-head">
+                    <h2>Usage</h2>
+                </div>
+                <div class="rs-usage">
+                <div class="rs-stat">
+                    <span class="rs-stat-label">On disk</span>
+                    <div class="rs-stat-top">
+                        <span class="rs-stat-value">@Format(_usage.TotalBytes)</span>
+                        @if (_quota > 0)
+                        {
+                            <span class="rs-stat-of">of @Format(_quota) · @_storagePercent%</span>
+                        }
+                        else
+                        {
+                            <span class="rs-stat-of">used · <span class="rs-quota-pill">no limit</span></span>
+                        }
+                    </div>
+                    @if (_quota > 0)
+                    {
+                        <MudProgressLinear Color="@MeterColor(_storagePercent)" Rounded="true" Value="@_storagePercent" />
+                    }
+                    else
+                    {
+                        <div class="rs-meter rs-meter-unlimited" aria-hidden="true"><span></span></div>
+                    }
+                </div>
+                <div class="rs-stat">
+                    <span class="rs-stat-label">Bandwidth <span class="rs-stat-sub">this month</span></span>
+                    <div class="rs-stat-top">
+                        <span class="rs-stat-value">@Format(_egressUsed)</span>
+                        @if (_egressQuota > 0)
+                        {
+                            <span class="rs-stat-of">of @Format(_egressQuota) · @_egressPercent%</span>
+                        }
+                        else
+                        {
+                            <span class="rs-stat-of">out · <span class="rs-quota-pill">no limit</span></span>
+                        }
+                    </div>
+                    @if (_egressQuota > 0)
+                    {
+                        <MudProgressLinear Color="@MeterColor(_egressPercent)" Rounded="true" Value="@_egressPercent" />
+                    }
+                    else
+                    {
+                        <div class="rs-meter rs-meter-unlimited" aria-hidden="true"><span></span></div>
+                    }
+                </div>
+                </div>
+            </MudPaper>
+
+            <MudPaper Class="rs-card" Elevation="1">
+                <div class="rs-card-head">
+                    <h2>Connected apps</h2>
+                    <span class="rs-count">@_tokens.Count connected</span>
+                </div>
+                @if (_tokens.Count == 0)
+                {
+                    <div class="rs-empty">No apps connected yet. Authorize one from its connect screen.</div>
+                }
+                else
+                {
+                    @foreach (var token in _tokens.Take(MaxApps))
+                    {
+                        <ConnectedApp Token="token" />
+                    }
+                    @if (_tokens.Count > MaxApps)
+                    {
+                        <a class="rs-browse" href="/account/apps">Manage all @_tokens.Count apps →</a>
+                    }
+                }
+            </MudPaper>
+        </div>
+
+        <div class="rs-col">
+            <MudPaper Class="rs-card" Elevation="1">
+                <div class="rs-card-head">
+                    <h2>What's using space</h2>
+                </div>
+                @if (_usage.Folders.Count == 0)
+                {
+                    <div class="rs-empty">No files yet — connect an app, or run <code>rstash seed</code>.</div>
+                }
+                else
+                {
+                    @foreach (var folder in _usage.Folders.Take(MaxFolders))
+                    {
+                        <div class="rs-cat">
+                            <div class="rs-cat-top">
+                                <span class="rs-cat-name">@folder.Folder</span>
+                                <span class="rs-cat-size">@Format(folder.Bytes)</span>
+                            </div>
+                            <MudProgressLinear Color="Color.Primary" Size="Size.Small" Rounded="true"
+                                               Value="@(_maxFolderBytes > 0 ? folder.Bytes * 100.0 / _maxFolderBytes : 0)" />
+                        </div>
+                    }
+                    <a class="rs-browse" href="/files">Browse all files →</a>
+                }
+            </MudPaper>
+        </div>
+    </div>
+}
+
+@code {
+    // Show only the most recent apps on the dashboard; the rest live on /account/apps.
+    private const int MaxApps = 5;
+
+    // Show only the largest modules; the rest are reachable via the file browser.
+    private const int MaxFolders = 5;
+
+    [CascadingParameter] private HttpContext? HttpContext { get; set; }
+
+    private ApplicationUser? _user;
+    private string _username = "";
+    private string _host = "";
+    private string _handle = "";
+    private long _quota;
+    private int _storagePercent;
+    private long _egressUsed;
+    private long _egressQuota;
+    private int _egressPercent;
+    private long _maxFolderBytes;
+    private List<OAuthToken> _tokens = [];
+    private StorageUsage _usage = new(0, []);
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (HttpContext?.User.Identity?.IsAuthenticated != true)
+        {
+            // Signed-out visitors get the sign-in page, not an empty dashboard.
+            Navigation.NavigateTo("/login", forceLoad: true);
+            return;
+        }
+
+        _user = await Users.GetUserAsync(HttpContext.User);
+        if (_user is null)
+        {
+            return;
+        }
+
+        _username = _user.UserName ?? "";
+        _host = new Uri(Navigation.BaseUri).Host;
+        _handle = $"{_username}@{_host}";
+
+        _tokens = await Tokens.ListForUserAsync(_user.Id);
+        _usage = await Storage.GetUsageAsync(_user.Id);
+        _maxFolderBytes = _usage.Folders.Count > 0 ? _usage.Folders.Max(f => f.Bytes) : 0;
+
+        // Effective storage cap: the user's own quota wins; otherwise the global limit. 0 = unlimited.
+        _quota = _user.StorageQuota > 0 ? _user.StorageQuota : Settings.Current.TotalStorageLimit;
+        _storagePercent = _quota > 0 ? (int)Math.Min(100, Math.Round(_usage.TotalBytes * 100.0 / _quota)) : 0;
+
+        // Bandwidth shows the user's own monthly egress against their personal cap only —
+        // the global limit is a server-wide backstop, not a meaningful per-user figure.
+        _egressUsed = await Egress.GetUsedAsync(_user.Id);
+        _egressQuota = _user.EgressQuota;
+        _egressPercent = _egressQuota > 0 ? (int)Math.Min(100, Math.Round(_egressUsed * 100.0 / _egressQuota)) : 0;
+    }
+
+    // Usage meters shift gold -> amber -> red as a cap fills.
+    private static Color MeterColor(int percent) =>
+        percent >= 90 ? Color.Error : percent >= 75 ? Color.Warning : Color.Primary;
+
+    private static string Format(long bytes)
+    {
+        string[] units = ["B", "KB", "MB", "GB", "TB"];
+        double size = bytes;
+        var unit = 0;
+        while (size >= 1024 && unit < units.Length - 1)
+        {
+            size /= 1024;
+            unit++;
+        }
+
+        return unit == 0 ? $"{bytes} B" : $"{size:0.#} {units[unit]}";
+    }
+}

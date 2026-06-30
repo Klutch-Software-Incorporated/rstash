@@ -1,0 +1,94 @@
+@page "/login"
+@inject SignInManager<ApplicationUser> SignInManager
+@inject UserManager<ApplicationUser> UserManager
+@inject SettingsService Settings
+@inject NavigationManager Navigation
+
+<PageTitle>Sign in · @Settings.Current.SiteName</PageTitle>
+
+<div class="rs-auth">
+    <div class="rs-auth-card">
+        <div class="rs-auth-head">
+            <img src="/favicon.svg" class="rs-auth-logo" alt="" />
+            <h1>Sign in</h1>
+            <p>Access your @Settings.Current.SiteName storage.</p>
+        </div>
+
+        @if (_error is not null)
+        {
+            <div class="rs-auth-error">@_error</div>
+        }
+
+        <EditForm Model="Input" method="post" OnValidSubmit="SignInAsync" FormName="login">
+            <DataAnnotationsValidator />
+            <div class="rs-field">
+                <label class="rs-label" for="login-username">Username</label>
+                <InputText id="login-username" class="rs-control" @bind-Value="Input.Username" autocomplete="username" />
+            </div>
+            <div class="rs-field">
+                <label class="rs-label" for="login-password">Password</label>
+                <InputText id="login-password" type="password" class="rs-control"
+                           @bind-Value="Input.Password" autocomplete="current-password" />
+            </div>
+            <button type="submit" class="rs-auth-submit">Sign in</button>
+        </EditForm>
+
+        <div class="rs-auth-foot">
+            <a href="/forgot-password">Forgot your password?</a>
+        </div>
+    </div>
+</div>
+
+@code {
+    [SupplyParameterFromForm]
+    private LoginInput Input { get; set; } = new();
+
+    private string? _error;
+
+    private async Task SignInAsync()
+    {
+        var user = await UserManager.FindByNameAsync(Input.Username);
+        if (user is null)
+        {
+            _error = "Invalid username or password.";
+            return;
+        }
+
+        if (user.Disabled)
+        {
+            _error = "This account is disabled.";
+            return;
+        }
+
+        if (!user.Approved)
+        {
+            _error = "This account is pending approval.";
+            return;
+        }
+
+        var result = await SignInManager.PasswordSignInAsync(
+            user, Input.Password, isPersistent: true, lockoutOnFailure: false);
+
+        if (!result.Succeeded)
+        {
+            _error = "Invalid username or password.";
+            return;
+        }
+
+        // Honor a local return URL (e.g. from /oauth/authorize); never off-site.
+        var target = ReturnUrl is { Length: > 0 } url && url.StartsWith('/') ? url : "/";
+        Navigation.NavigateTo(target, forceLoad: true);
+    }
+
+    [SupplyParameterFromQuery(Name = "redirect")]
+    private string? ReturnUrl { get; set; }
+
+    public sealed class LoginInput
+    {
+        [Required]
+        public string Username { get; set; } = "";
+
+        [Required]
+        public string Password { get; set; } = "";
+    }
+}

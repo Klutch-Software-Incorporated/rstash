@@ -1,0 +1,119 @@
+@page "/register"
+@inject SettingsService Settings
+@inject UserManager<ApplicationUser> UserManager
+@inject SignInManager<ApplicationUser> SignInManager
+@inject NavigationManager Navigation
+
+<PageTitle>Create an account</PageTitle>
+
+<MudText Typo="Typo.h4" GutterBottom="true">Create an account</MudText>
+
+@if (_mode == "closed")
+{
+    <MudAlert Severity="Severity.Info">Registration is currently closed.</MudAlert>
+}
+else if (_mode == "external")
+{
+    <MudText>Redirecting to the registration page…</MudText>
+}
+else
+{
+    @if (_message is not null)
+    {
+        <MudAlert Severity="Severity.Success" Class="mb-4">@_message</MudAlert>
+    }
+    @if (_error is not null)
+    {
+        <MudAlert Severity="Severity.Error" Class="mb-4">@_error</MudAlert>
+    }
+
+    @if (_message is null)
+    {
+        <EditForm Model="Input" method="post" OnValidSubmit="RegisterAsync" FormName="register">
+            <DataAnnotationsValidator />
+            <div class="mb-3">
+                <label>Username<br /><InputText @bind-Value="Input.Username" autocomplete="username" /></label>
+            </div>
+            <div class="mb-3">
+                <label>Email (optional)<br /><InputText @bind-Value="Input.Email" autocomplete="email" /></label>
+            </div>
+            <div class="mb-3">
+                <label>Password<br /><InputText type="password" @bind-Value="Input.Password" autocomplete="new-password" /></label>
+            </div>
+            <MudButton ButtonType="ButtonType.Submit" Variant="Variant.Filled" Color="Color.Success">
+                Register
+            </MudButton>
+        </EditForm>
+    }
+}
+
+@code {
+    [SupplyParameterFromForm]
+    private RegisterInput Input { get; set; } = new();
+
+    private string _mode = "closed";
+    private string? _error;
+    private string? _message;
+
+    protected override void OnInitialized()
+    {
+        _mode = Settings.Current.RegistrationMode;
+
+        if (_mode == "external")
+        {
+            var url = Settings.Current.RegistrationExternalUrl;
+            if (!string.IsNullOrWhiteSpace(url))
+            {
+                Navigation.NavigateTo(url, forceLoad: true);
+            }
+        }
+    }
+
+    private async Task RegisterAsync()
+    {
+        if (_mode is "closed" or "external")
+        {
+            return;
+        }
+
+        var approved = _mode == "open";
+        var user = new ApplicationUser
+        {
+            UserName = Input.Username,
+            Email = string.IsNullOrWhiteSpace(Input.Email) ? null : Input.Email,
+            Approved = approved,
+            CreatedAt = DateTimeOffset.UtcNow,
+        };
+
+        var result = await UserManager.CreateAsync(user, Input.Password);
+        if (!result.Succeeded)
+        {
+            _error = string.Join(" ", result.Errors.Select(e => e.Description));
+            return;
+        }
+
+        await UserProvisioning.ApplyDefaultLimitsAsync(UserManager, user, Settings.Current);
+
+        if (approved)
+        {
+            await SignInManager.SignInAsync(user, isPersistent: true);
+            Navigation.NavigateTo("/", forceLoad: true);
+        }
+        else
+        {
+            _message = "Your account was created and is pending administrator approval.";
+        }
+    }
+
+    public sealed class RegisterInput
+    {
+        [Required]
+        public string Username { get; set; } = "";
+
+        [EmailAddress]
+        public string? Email { get; set; }
+
+        [Required]
+        public string Password { get; set; } = "";
+    }
+}

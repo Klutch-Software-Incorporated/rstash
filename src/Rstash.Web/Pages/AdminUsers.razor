@@ -1,0 +1,150 @@
+@page "/admin/users"
+@attribute [Authorize]
+@using Microsoft.EntityFrameworkCore
+@inject UserManager<ApplicationUser> Users
+@inject NavigationManager Navigation
+
+<PageTitle>Users — admin</PageTitle>
+
+<MudText Typo="Typo.h4" GutterBottom="true">Users</MudText>
+
+<MudPaper Class="rs-card" Elevation="1">
+    <div class="rs-card-head">
+        <h2>Accounts</h2>
+        <div class="rs-head-tools">
+            <input type="search" class="rs-table-search" placeholder="Search name or email…"
+                   aria-label="Search users" autocomplete="off" />
+            <span class="rs-count">@_users.Count total</span>
+        </div>
+    </div>
+    <MudSimpleTable Dense="true" Class="rs-table" Style="box-shadow:none;">
+        <thead>
+            <tr>
+                <th class="rs-sortable" data-sort-key="user">User</th>
+                <th class="rs-sortable" data-sort-key="email">Email</th>
+                <th class="rs-sortable" data-sort-key="role">Role</th>
+                <th class="rs-sortable" data-sort-key="status">Status</th>
+                <th class="rs-sortable rs-num" data-sort-key="quota" data-sort-type="number">Storage</th>
+                <th class="rs-sortable rs-num" data-sort-key="egress" data-sort-type="number">Egress</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var user in _users)
+            {
+                <tr data-user="@user.UserName" data-email="@(user.Email ?? "")"
+                    data-role="@(user.IsAdmin ? "admin" : "user")" data-status="@StatusKey(user)"
+                    data-quota="@user.StorageQuota" data-egress="@user.EgressQuota"
+                    data-search="@($"{user.UserName} {user.Email}".ToLowerInvariant())">
+                    <td>@user.UserName</td>
+                    <td>@(string.IsNullOrEmpty(user.Email) ? (MarkupString)"<span class=\"rs-muted\">—</span>" : (MarkupString)System.Net.WebUtility.HtmlEncode(user.Email))</td>
+                    <td>
+                        @if (user.IsAdmin)
+                        {
+                            <span class="rs-badge rs-badge-admin">Admin</span>
+                        }
+                        else
+                        {
+                            <span class="rs-muted">User</span>
+                        }
+                    </td>
+                    <td>
+                        @if (user.Disabled)
+                        {
+                            <span class="rs-badge rs-badge-off">Disabled</span>
+                        }
+                        else if (!user.Approved)
+                        {
+                            <span class="rs-badge rs-badge-warn">Pending</span>
+                        }
+                        else
+                        {
+                            <span class="rs-badge rs-badge-ok">Active</span>
+                        }
+                    </td>
+                    <td class="rs-num">@FormatQuota(user.StorageQuota)</td>
+                    <td class="rs-num">@FormatQuota(user.EgressQuota)</td>
+                    <td class="rs-actions">
+                        <div class="rs-actions-cell">
+                            @if (!user.Approved)
+                            {
+                                <PostButton Action="/admin/users/approve" Id="@user.Id" Label="Approve" Kind="confirm" />
+                            }
+                            @if (user.IsAdmin)
+                            {
+                                <span class="rs-protected" title="Admins keep access and can't be disabled or deleted">Protected</span>
+                            }
+                            else
+                            {
+                                <PostButton Action="/admin/users/toggle-disabled" Id="@user.Id"
+                                            Label="@(user.Disabled ? "Enable" : "Disable")"
+                                            Kind="@(user.Disabled ? "confirm" : "danger")" />
+                                <PostButton Action="/admin/users/delete" Id="@user.Id" Label="Delete" Kind="danger" />
+                            }
+                            <form action="/admin/users/quota" method="post" class="rs-quota-form">
+                                <AntiforgeryToken />
+                                <input type="hidden" name="id" value="@user.Id" />
+                                <label class="rs-quota-field">
+                                    <span>Storage</span>
+                                    <input type="text" name="storageQuota" value="@QuotaEditValue(user.StorageQuota)"
+                                           placeholder="unlimited" class="rs-quota-input" />
+                                </label>
+                                <label class="rs-quota-field">
+                                    <span>Egress/mo</span>
+                                    <input type="text" name="egressQuota" value="@QuotaEditValue(user.EgressQuota)"
+                                           placeholder="unlimited" class="rs-quota-input" />
+                                </label>
+                                <button type="submit" class="rs-action">Save</button>
+                            </form>
+                        </div>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </MudSimpleTable>
+</MudPaper>
+
+@code {
+    [CascadingParameter] private HttpContext? HttpContext { get; set; }
+
+    private List<ApplicationUser> _users = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        var actor = HttpContext is null ? null : await Users.GetUserAsync(HttpContext.User);
+        if (actor is null || !actor.IsAdmin)
+        {
+            Navigation.NavigateTo("/", forceLoad: true);
+            return;
+        }
+
+        _users = await Users.Users.OrderBy(u => u.UserName).ToListAsync();
+    }
+
+    private static string FormatQuota(long bytes) => bytes == 0 ? "unlimited" : ByteSize.Format(bytes);
+
+    // Pre-fill value for a quota input: blank for unlimited, otherwise the largest
+    // whole unit so an unchanged field round-trips exactly on re-save (ByteSize.Format
+    // rounds to one decimal and would be lossy here). Falls back to raw bytes.
+    private static string QuotaEditValue(long bytes)
+    {
+        if (bytes <= 0)
+        {
+            return "";
+        }
+
+        foreach (var (suffix, multiplier) in new[] { ("TB", 1L << 40), ("GB", 1L << 30), ("MB", 1L << 20), ("KB", 1L << 10) })
+        {
+            if (bytes % multiplier == 0)
+            {
+                return $"{bytes / multiplier}{suffix}";
+            }
+        }
+
+        return bytes.ToString(System.Globalization.CultureInfo.InvariantCulture);
+    }
+
+    // Sort key for the combined status column.
+    private static string StatusKey(ApplicationUser u) =>
+        u.Disabled ? "disabled" : !u.Approved ? "pending" : "active";
+}

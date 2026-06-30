@@ -1,0 +1,15 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Rstash.Database/Rstash.Database.csproj" />
+    <Project Path="src/Rstash.Model/Rstash.Model.csproj" />
+    <Project Path="src/Rstash.Notifications/Rstash.Notifications.csproj" />
+    <Project Path="src/Rstash.Server/Rstash.Server.csproj" />
+    <Project Path="src/Rstash.Services/Rstash.Services.csproj" />
+    <Project Path="src/Rstash.Storage/Rstash.Storage.csproj" />
+    <Project Path="src/Rstash.Web/Rstash.Web.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Rstash.Core.Tests/Rstash.Core.Tests.csproj" />
+    <Project Path="tests/Rstash.IntegrationTests/Rstash.IntegrationTests.csproj" />
+  </Folder>
+</Solution>

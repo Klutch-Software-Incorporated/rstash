@@ -1,0 +1,28 @@
+@* One connected-app row: avatar, name + granted scopes, when, and a Disconnect
+   form that revokes the token and returns to ReturnUrl. *@
+<div class="rs-app">
+    <div class="rs-app-icon">@AppDisplay.AppInitials(Token.ClientId)</div>
+    <div class="rs-app-body">
+        <div class="rs-app-name">
+            @AppDisplay.AppName(Token.ClientId)
+            @foreach (var scope in AppDisplay.Scopes(Token.Scopes))
+            {
+                <span class="rs-scope @(scope.EndsWith(":rw") ? "rw" : "")">@scope</span>
+            }
+        </div>
+        <div class="rs-app-when">Connected @AppDisplay.Relative(Token.CreatedAt)</div>
+    </div>
+    <form method="post" action="/account/apps/revoke">
+        <AntiforgeryToken />
+        <input type="hidden" name="token" value="@Token.Token" />
+        <input type="hidden" name="returnUrl" value="@ReturnUrl" />
+        <button type="submit" class="rs-disconnect">Disconnect</button>
+    </form>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public OAuthToken Token { get; set; } = default!;
+
+    /// <summary>Local path to return to after revoking (defaults to the dashboard).</summary>
+    [Parameter] public string ReturnUrl { get; set; } = "/";
+}

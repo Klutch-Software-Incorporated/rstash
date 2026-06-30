@@ -1,0 +1,195 @@
+@inherits LayoutComponentBase
+@inject Rstash.Services.SettingsService Settings
+@inject UserManager<ApplicationUser> Users
+@inject NavigationManager Navigation
+
+<MudThemeProvider Theme="RstashTheme.Theme" IsDarkMode="_isDarkMode" />
+<MudPopoverProvider />
+<MudDialogProvider />
+<MudSnackbarProvider />
+
+<AuthorizeView>
+    <Authorized>
+        <div class="rs-shell">
+            @* CSS-only mobile nav drawer: this hidden checkbox toggles the off-canvas
+               sidebar; a full-page SSR navigation resets it, so it auto-closes on click. *@
+            <input type="checkbox" id="rs-navtoggle" class="rs-navtoggle" aria-label="Toggle navigation menu" />
+            <header class="rs-topbar">
+                <div class="rs-topbar-left">
+                    <label for="rs-navtoggle" class="rs-hamburger" aria-hidden="true">
+                        <MudIcon Icon="@Icons.Material.Filled.Menu" Size="Size.Small" />
+                    </label>
+                    <a href="/" class="rs-brand">
+                        <img src="/favicon.svg" class="rs-brand-logo" alt="" />
+                        <span>@_siteName</span>
+                    </a>
+                </div>
+                <div class="rs-topbar-right">
+                    <a href="/account" class="rs-account">
+                        <span class="rs-avatar">@_initial</span>
+                        <span class="rs-account-name">@_accountLabel</span>
+                    </a>
+                    <form action="/auth/logout" method="post" class="d-flex">
+                        <button type="submit" class="rs-iconbtn" title="Sign out">
+                            <MudIcon Icon="@Icons.Material.Filled.Logout" Size="Size.Small" />
+                        </button>
+                    </form>
+                </div>
+            </header>
+            <div class="rs-body">
+                <aside class="rs-sidebar">
+                    @* Close control for the full-screen mobile drawer (hidden on desktop). *@
+                    <label for="rs-navtoggle" class="rs-nav-close" aria-label="Close menu">
+                        <MudIcon Icon="@Icons.Material.Filled.Close" Size="Size.Small" />
+                    </label>
+                    <nav class="rs-nav">
+                        <a href="/" class="rs-navlink @Active("/", exact: true)">
+                            <MudIcon Icon="@Icons.Material.Filled.Dashboard" Size="Size.Small" />
+                            <span>Dashboard</span>
+                        </a>
+                        <a href="/files" class="rs-navlink @Active("/files")">
+                            <MudIcon Icon="@Icons.Material.Filled.Folder" Size="Size.Small" />
+                            <span>Files</span>
+                        </a>
+                        <a href="/account/apps" class="rs-navlink @Active("/account/apps")">
+                            <MudIcon Icon="@Icons.Material.Filled.Apps" Size="Size.Small" />
+                            <span>Connected apps</span>
+                        </a>
+                        @if (_isAdmin)
+                        {
+                            <div class="rs-nav-section">Admin</div>
+                            <details class="rs-navgroup" open="@IsActive("/admin/settings")">
+                                <summary class="rs-navlink rs-navsummary @Active("/admin/settings")">
+                                    <MudIcon Icon="@Icons.Material.Filled.Settings" Size="Size.Small" />
+                                    <span>Settings</span>
+                                    <MudIcon Icon="@Icons.Material.Filled.ChevronRight" Size="Size.Small" Class="rs-chevron" />
+                                </summary>
+                                <div class="rs-subnav-list">
+                                    @foreach (var (name, slug) in SettingGroups)
+                                    {
+                                        <a href="/admin/settings/@slug"
+                                           class="rs-subnavlink @(slug == _settingsSlug ? "active" : "")">@name</a>
+                                    }
+                                </div>
+                            </details>
+                            <a href="/admin/users" class="rs-navlink @Active("/admin/users")">
+                                <MudIcon Icon="@Icons.Material.Filled.People" Size="Size.Small" />
+                                <span>Users</span>
+                            </a>
+                            <a href="/admin/audit" class="rs-navlink @Active("/admin/audit")">
+                                <MudIcon Icon="@Icons.Material.Filled.History" Size="Size.Small" />
+                                <span>Audit log</span>
+                            </a>
+                            <a href="/admin/oauth-test" class="rs-navlink @Active("/admin/oauth-test")">
+                                <MudIcon Icon="@Icons.Material.Filled.Key" Size="Size.Small" />
+                                <span>OAuth test</span>
+                            </a>
+                        }
+                    </nav>
+                </aside>
+                <main class="rs-content">
+                    <div class="rs-main">
+                        @Body
+                    </div>
+                    <footer class="rs-footer">
+                        <span class="rs-mono">@_siteName</span>
+                        <span>Open source · self-hosted</span>
+                        <a href="/files">Files</a>
+                        <a href="/account">Account</a>
+                    </footer>
+                </main>
+            </div>
+        </div>
+    </Authorized>
+    <NotAuthorized>
+        <div class="rs-shaper" aria-hidden="true">
+            <svg viewBox="0 0 1000 1000" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M180 0 Q140 150 180 300 T180 600 T180 900 T180 1000 H0 V0Z" class="rs-wave-a" />
+                <path d="M140 0 Q110 120 140 250 T130 500 T150 750 T140 1000 H0 V0Z" class="rs-wave-b" />
+                <path d="M100 0 Q70 200 100 400 T110 800 T100 1000 H0 V0Z" class="rs-wave-c" />
+            </svg>
+        </div>
+        <div class="rs-plain">
+            <header class="rs-topbar rs-topbar-plain">
+                <a href="/" class="rs-brand">
+                    <img src="/favicon.svg" class="rs-brand-logo" alt="" />
+                    <span>@_siteName</span>
+                </a>
+                <a href="/login" class="rs-signin">Sign in</a>
+            </header>
+            <main class="rs-content rs-content-plain">
+                <div class="rs-main">
+                    @Body
+                </div>
+            </main>
+        </div>
+    </NotAuthorized>
+</AuthorizeView>
+
+@code {
+    [CascadingParameter] private HttpContext? HttpContext { get; set; }
+
+    private bool _isDarkMode;
+    private bool _isAdmin;
+    private string _siteName = "rstash";
+    private string _accountLabel = "";
+    private string _initial = "?";
+    private string _path = "/";
+    private string _settingsSlug = "";
+
+    // Settings groups, as (display name, url slug), for the collapsible sidebar menu.
+    private static readonly (string Name, string Slug)[] SettingGroups =
+        SettingDefinitions.RuntimeEditable
+            .Select(d => d.Group).Distinct()
+            .Select(g => (g, g.ToLowerInvariant().Replace(' ', '-')))
+            .ToArray();
+
+    protected override async Task OnInitializedAsync()
+    {
+        _siteName = Settings.Current.SiteName;
+        _path = new Uri(Navigation.Uri).AbsolutePath;
+        _settingsSlug = CurrentSettingsSlug();
+
+        if (HttpContext is null)
+        {
+            return;
+        }
+
+        // Dark mode is not user-toggleable yet (planned as an account setting); we still
+        // honor the cookie so that future setting can drive it without a layout change.
+        _isDarkMode = HttpContext.Request.Cookies.TryGetValue(RstashTheme.ThemeCookie, out var pref)
+            && string.Equals(pref, "dark", StringComparison.OrdinalIgnoreCase);
+
+        if (HttpContext.User.Identity?.IsAuthenticated == true)
+        {
+            var user = await Users.GetUserAsync(HttpContext.User);
+            _isAdmin = user?.IsAdmin ?? false;
+
+            // Show the remoteStorage handle (user@host) — the brand's identity anchor.
+            var name = user?.UserName ?? HttpContext.User.Identity.Name ?? "";
+            var host = new Uri(Navigation.BaseUri).Host;
+            _accountLabel = string.IsNullOrEmpty(name) ? host : $"{name}@{host}";
+            _initial = string.IsNullOrEmpty(name) ? "?" : name[..1];
+        }
+    }
+
+    // Highlight the nav entry for the active page in the brand gold.
+    private bool IsActive(string prefix, bool exact = false) =>
+        exact ? _path == prefix : _path.StartsWith(prefix, StringComparison.OrdinalIgnoreCase);
+
+    private string Active(string prefix, bool exact = false) => IsActive(prefix, exact) ? "active" : "";
+
+    // The settings group slug for the current path; defaults to the first group on
+    // the bare /admin/settings route (which itself defaults to that group).
+    private string CurrentSettingsSlug()
+    {
+        const string prefix = "/admin/settings";
+        if (!_path.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+        {
+            return "";
+        }
+
+        var rest = _path.Length > prefix.Length ? _path[prefix.Length..].Trim('/') : "";
+        return rest.Length == 0 ? SettingGroups[0].Slug : rest.ToLowerInvariant();
+    }
+}

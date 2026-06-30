@@ -1,9 +1,9 @@
 name: Release
 
-# Cross-compiles the release binaries and attaches them to a GitHub Release.
-# Triggered by pushing a SemVer tag, e.g. v0.4.1 (see CONTRIBUTING.md for the
-# bump rules). The tag — with its leading "v" — is baked into the binary via
-# the build's ldflags. Replaces the old Azure Artifacts Universal Package feed.
+# Publishes self-contained, single-file binaries and attaches them to a GitHub
+# Release. Triggered by pushing a SemVer tag, e.g. v0.4.1 (see CONTRIBUTING.md
+# for the bump rules). The numeric version is baked as the assembly Version and
+# the full tag (with leading "v") as InformationalVersion.
 
 on:
   push:
@@ -19,32 +19,30 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-dotnet@v4
         with:
-          go-version: '1.24.0'
-          cache: true
+          dotnet-version: '10.0.x'
 
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: npm
-          cache-dependency-path: site/package-lock.json
-
-      - uses: arduino/setup-task@v2
-        with:
-          version: 3.x
-          repo-token: ${{ secrets.GITHUB_TOKEN }}
-
-      - run: go mod download
-
-      - name: Install site dependencies
-        run: npm ci
-        working-directory: site
-
-      - name: Cross-compile release binaries
-        # Pass the tag verbatim (with the leading "v") so the baked version
-        # matches the git tag and `git describe` exactly: v0.4.1, not 0.4.1.
-        run: task build VERSION="${GITHUB_REF_NAME}"
+      - name: Publish all targets
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          mkdir -p dist
+          for rid in linux-x64 linux-arm64 win-x64 osx-x64 osx-arm64; do
+            echo "::group::publish $rid"
+            dotnet publish src/Rstash.Server -c Release -r "$rid" \
+              --self-contained true \
+              -p:PublishSingleFile=true \
+              -p:IncludeNativeLibrariesForSelfExtract=true \
+              -p:Version="$VERSION" \
+              -p:InformationalVersion="$GITHUB_REF_NAME" \
+              -o "publish/$rid"
+            if [ -f "publish/$rid/Rstash.Server.exe" ]; then
+              cp "publish/$rid/Rstash.Server.exe" "dist/rstash-$rid.exe"
+            else
+              cp "publish/$rid/Rstash.Server" "dist/rstash-$rid"
+            fi
+            echo "::endgroup::"
+          done
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2

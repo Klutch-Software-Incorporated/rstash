@@ -1,0 +1,1185 @@
+/* rstash brand layer — small custom pieces that sit on top of MudBlazor.
+   Colors reference MudBlazor's own palette CSS variables (--mud-palette-*) so
+   everything adapts automatically when the theme switches to dark mode. */
+
+:root {
+    /* Brand gold — accents only (links, badges, nav highlight, focus rings).
+       Buttons no longer fill with gold; they use the semantic colors below. */
+    --rs-gold: #e2b13e;
+    --rs-gold-deep: #8a6d00;
+    --rs-gold-tint: #f7efd8;
+    --rs-gold-tint-line: #ecddae;
+
+    /* Semantic action colors: green confirms, red destroys. */
+    --rs-confirm: #2e9e6b;
+    --rs-confirm-deep: #1f7d52;
+    --rs-confirm-tint: #e9f6ef;
+    --rs-confirm-tint-line: #bfe3d0;
+    --rs-danger: #c0392b;
+    --rs-danger-deep: #9e2d22;
+    --rs-danger-tint: #fbeaea;
+    --rs-danger-tint-line: #f0caca;
+
+    --rs-shadow: 0 1px 2px rgba(42, 38, 32, .04), 0 1px 12px rgba(42, 38, 32, .03);
+}
+
+.rs-mono,
+.mono {
+    font-family: 'Roboto Mono', ui-monospace, monospace;
+}
+
+/* Text links: the bright brand gold (Primary) fails contrast on white, so render
+   MudLink text in the deeper gold. Buttons/chips that fill with gold are unaffected. */
+.mud-link.mud-primary-text { color: var(--rs-gold-deep); }
+.mud-link.mud-primary-text:hover { color: #6f5800; }
+
+/* App bar: blends with the page, separated by a hairline instead of a shadow. */
+.rs-appbar {
+    border-bottom: 1px solid var(--mud-palette-lines-default);
+}
+
+/* Brand: tilde mark + wordmark. */
+.rs-brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-weight: 900;
+    font-size: 19px;
+    letter-spacing: -.5px;
+    color: var(--mud-palette-text-primary);
+    text-decoration: none;
+}
+
+.rs-brand-logo {
+    width: 26px;
+    height: 26px;
+    display: block;
+    flex-shrink: 0;
+}
+
+/* Account pill: storage handle + avatar, links to the account page. */
+.rs-account {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    padding: 5px 6px 5px 12px;
+    border: 1px solid var(--mud-palette-lines-default);
+    border-radius: 999px;
+    background: var(--mud-palette-surface);
+    font-size: 13.5px;
+    color: var(--mud-palette-text-secondary);
+    text-decoration: none;
+    white-space: nowrap;
+}
+
+.rs-account:hover {
+    border-color: var(--rs-gold-tint-line);
+}
+
+.rs-avatar {
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    background: var(--mud-palette-secondary);
+    color: var(--mud-palette-secondary-text);
+    display: grid;
+    place-items: center;
+    font-weight: 700;
+    font-size: 12px;
+    text-transform: uppercase;
+}
+
+/* Page content width — narrower now that a sidebar carries navigation. */
+.rs-main {
+    max-width: 960px;
+    margin: 0 auto;
+}
+
+/* Decorative wave shaper: faint layered waves down the left edge, behind all
+   content (pointer-events:none, z-index:-1 so it sits above the page background
+   but under everything else). Ported from the legacy site. */
+.rs-shaper {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    overflow: hidden;
+    z-index: -1;
+}
+
+.rs-shaper svg {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+}
+
+.rs-wave-a { fill: var(--rs-gold); opacity: .07; }
+.rs-wave-b { fill: var(--mud-palette-text-secondary); opacity: .07; }
+.rs-wave-c { fill: var(--rs-gold-deep); opacity: .06; }
+
+/* Soften MudBlazor's elevation-1 to the brand's subtle two-layer shadow. */
+.mud-elevation-1 {
+    box-shadow: var(--rs-shadow) !important;
+}
+
+/* Footer: a quiet hairline-separated strip at the bottom of the page. */
+.rs-footer {
+    display: flex;
+    gap: 18px;
+    flex-wrap: wrap;
+    align-items: center;
+    padding: 20px 0 48px;
+    margin-top: 8px;
+    border-top: 1px solid var(--mud-palette-lines-default);
+    color: var(--mud-palette-text-secondary);
+    font-size: 12.5px;
+}
+
+.rs-footer a {
+    color: var(--mud-palette-text-secondary);
+    text-decoration: none;
+}
+
+.rs-footer a:hover {
+    text-decoration: underline;
+}
+
+/* ---------- dashboard ---------- */
+
+/* Cards + hero share the hairline border (MudPaper supplies surface + shadow + radius). */
+.rs-card {
+    border: 1px solid var(--mud-palette-lines-default);
+    overflow: hidden;
+}
+
+/* Hero: the storage handle is the thing that makes remoteStorage work. */
+.rs-hero {
+    border: 1px solid var(--mud-palette-lines-default);
+    border-left: 4px solid var(--rs-gold);
+    padding: 24px 26px;
+    margin-bottom: 32px;
+}
+
+.rs-hero-label {
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 1.4px;
+    color: var(--mud-palette-text-secondary);
+    font-weight: 500;
+    margin: 0 0 12px;
+}
+
+.rs-address {
+    font-family: 'Roboto Mono', monospace;
+    font-weight: 500;
+    font-size: clamp(22px, 4.4vw, 30px);
+    letter-spacing: -.5px;
+    line-height: 1.1;
+    word-break: break-all;
+}
+
+.rs-address .at { color: var(--mud-palette-text-secondary); }
+.rs-address .host { color: var(--rs-gold-deep); }
+
+.rs-hero-help {
+    margin: 16px 0 0;
+    color: var(--mud-palette-text-secondary);
+    font-size: 13.5px;
+}
+
+.rs-address-row {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
+}
+
+.rs-copy {
+    margin-left: auto;
+    background: var(--rs-confirm);
+    color: #fff;
+    border: none;
+    font: inherit;
+    font-weight: 700;
+    font-size: 14px;
+    padding: 10px 16px;
+    border-radius: 8px;
+    cursor: pointer;
+}
+
+.rs-copy:hover { background: var(--rs-confirm-deep); }
+
+/* Two-column card grid. */
+.rs-grid {
+    display: grid;
+    grid-template-columns: 1.45fr 1fr;
+    gap: 24px;
+    align-items: start;
+}
+
+/* A dashboard column that stacks multiple cards with the same gap as the grid. */
+.rs-col { display: flex; flex-direction: column; gap: 24px; min-width: 0; }
+
+@media (max-width: 760px) {
+    .rs-grid { grid-template-columns: 1fr; }
+}
+
+.rs-card-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    padding: 18px 22px;
+    border-bottom: 1px solid var(--mud-palette-lines-default);
+}
+
+.rs-card-head h2 {
+    margin: 0;
+    font-size: 15px;
+    font-weight: 700;
+    letter-spacing: -.2px;
+}
+
+.rs-count { font-size: 13px; color: var(--mud-palette-text-secondary); }
+
+/* Card-head right-side tools (search + count). */
+.rs-head-tools { display: flex; align-items: center; gap: 14px; }
+
+.rs-table-search {
+    width: 16rem;
+    max-width: 46vw;
+    padding: .5rem .8rem;
+    border: 1px solid var(--mud-palette-lines-default);
+    border-radius: 8px;
+    background: var(--mud-palette-surface);
+    color: var(--mud-palette-text-primary);
+    font: inherit;
+    font-size: .88rem;
+}
+
+.rs-table-search:focus {
+    outline: none;
+    border-color: var(--rs-gold);
+    box-shadow: 0 0 0 3px var(--rs-gold-tint);
+}
+
+/* Connected apps. */
+.rs-app {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 16px 22px;
+    border-bottom: 1px solid var(--mud-palette-lines-default);
+}
+
+.rs-app:last-child { border-bottom: none; }
+
+.rs-app-icon {
+    width: 38px;
+    height: 38px;
+    border-radius: 9px;
+    background: var(--rs-gold-tint);
+    border: 1px solid var(--rs-gold-tint-line);
+    display: grid;
+    place-items: center;
+    font-weight: 700;
+    color: var(--rs-gold-deep);
+    flex-shrink: 0;
+}
+
+.rs-app-body { flex: 1; min-width: 0; }
+
+.rs-app-name {
+    font-weight: 500;
+    font-size: 14.5px;
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    flex-wrap: wrap;
+}
+
+.rs-app-when { font-size: 12.5px; color: var(--mud-palette-text-secondary); margin-top: 3px; }
+
+.rs-scope {
+    font-family: 'Roboto Mono', monospace;
+    font-size: 11.5px;
+    font-weight: 500;
+    padding: 2px 7px;
+    border-radius: 5px;
+    border: 1px solid var(--mud-palette-lines-default);
+    color: var(--mud-palette-text-secondary);
+    background: var(--mud-palette-background);
+}
+
+.rs-scope.rw {
+    color: var(--rs-gold-deep);
+    background: var(--rs-gold-tint);
+    border-color: var(--rs-gold-tint-line);
+}
+
+/* Disconnect revokes an app's access — destructive, so styled red. */
+.rs-disconnect {
+    background: none;
+    border: 1px solid var(--rs-danger-tint-line);
+    color: var(--rs-danger);
+    font: inherit;
+    font-weight: 600;
+    font-size: 12.5px;
+    padding: 6px 12px;
+    border-radius: 7px;
+    cursor: pointer;
+    flex-shrink: 0;
+}
+
+.rs-disconnect:hover { border-color: var(--rs-danger); background: var(--rs-danger-tint); color: var(--rs-danger-deep); }
+
+/* Usage summary card: headline storage + bandwidth stats (each a value + meter). */
+.rs-usage {
+    padding: 20px 22px 22px;
+    display: grid;
+    gap: 18px;
+}
+
+.rs-stat-label {
+    display: block;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .05em;
+    color: var(--mud-palette-text-secondary);
+    margin-bottom: 5px;
+}
+
+.rs-stat-sub { font-weight: 500; opacity: .75; }
+
+.rs-stat-top { display: flex; align-items: baseline; gap: 8px; margin-bottom: 9px; }
+.rs-stat-value { font-family: 'Roboto Mono', monospace; font-weight: 700; font-size: 22px; line-height: 1; }
+.rs-stat-of { color: var(--mud-palette-text-secondary); font-size: 13px; }
+
+/* "no limit" pill on the usage meter for unlimited (e.g. admin) accounts. */
+.rs-quota-pill {
+    font-size: 11px;
+    font-weight: 600;
+    padding: 1px 7px;
+    border-radius: 999px;
+    color: var(--rs-confirm-deep);
+    background: var(--rs-confirm-tint);
+    border: 1px solid var(--rs-confirm-tint-line);
+}
+
+/* Simple track used when there is no cap to chart against MudProgressLinear. */
+.rs-meter { height: 6px; border-radius: 999px; background: var(--mud-palette-lines-default); overflow: hidden; }
+.rs-meter > span { display: block; height: 100%; border-radius: 999px; }
+.rs-meter-unlimited > span {
+    width: 100%;
+    opacity: .45;
+    background: linear-gradient(90deg, var(--rs-gold-tint-line), var(--rs-gold));
+}
+
+.rs-cat { padding: 13px 22px; border-bottom: 1px solid var(--mud-palette-lines-default); }
+.rs-cat:last-child { border-bottom: none; }
+
+.rs-cat-top {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 7px;
+    font-size: 13.5px;
+}
+
+.rs-cat-name { font-family: 'Roboto Mono', monospace; font-weight: 500; }
+.rs-cat-size { color: var(--mud-palette-text-secondary); font-family: 'Roboto Mono', monospace; font-size: 12.5px; }
+
+.rs-empty { padding: 22px; color: var(--mud-palette-text-secondary); font-size: 13.5px; }
+
+.rs-browse {
+    display: block;
+    text-align: center;
+    padding: 14px;
+    font-weight: 500;
+    font-size: 14px;
+    color: var(--rs-gold-deep);
+    text-decoration: none;
+}
+
+.rs-browse:hover { background: var(--rs-gold-tint); }
+
+/* ---------- file browser + generic data tables ---------- */
+
+/* On narrow screens these tables (many nowrap cells) would stretch the page;
+   let them scroll horizontally within their card instead. */
+.rs-table,
+.rs-files-table,
+.rs-table > .mud-table-container,
+.rs-files-table > .mud-table-container { overflow-x: auto; max-width: 100%; }
+
+.rs-files-table th,
+.rs-table th {
+    font-size: .72rem;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    font-weight: 600;
+    color: var(--mud-palette-text-secondary);
+}
+
+.rs-files-table td,
+.rs-files-table th,
+.rs-table td,
+.rs-table th {
+    vertical-align: middle;
+}
+
+/* Numeric columns (quota, counts) align right. */
+.rs-table .rs-num { text-align: right; white-space: nowrap; }
+.rs-table td.rs-actions { text-align: left; }
+
+/* Status badges (admin tables). */
+.rs-badge {
+    display: inline-block;
+    font-size: .7rem;
+    font-weight: 600;
+    padding: .12rem .55rem;
+    border-radius: 999px;
+    line-height: 1.6;
+    border: 1px solid transparent;
+    white-space: nowrap;
+}
+
+.rs-badge-admin { color: var(--rs-gold-deep); background: var(--rs-gold-tint); border-color: var(--rs-gold-tint-line); }
+.rs-badge-ok { color: #2f7d32; background: #eaf5ea; border-color: #cfe6cf; }
+.rs-badge-warn { color: #8a5a00; background: #fbf0d6; border-color: #f0dca8; }
+.rs-badge-off { color: #b23b3b; background: #fbeaea; border-color: #f0caca; }
+.rs-muted { color: var(--mud-palette-text-secondary); }
+
+/* Per-row action buttons (approve / disable / delete) — clearly distinct pills. */
+.rs-actions-cell {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    justify-content: flex-start;
+    align-items: center;
+}
+
+/* Admins are shielded from disable/delete; show why rather than dead buttons. */
+.rs-protected {
+    font-size: .72rem;
+    font-weight: 600;
+    color: var(--mud-palette-text-secondary);
+    padding: .35rem .6rem;
+    border: 1px dashed var(--mud-palette-lines-default);
+    border-radius: 7px;
+}
+
+.rs-action-form { display: inline-flex; margin: 0; }
+
+.rs-action {
+    font: inherit;
+    font-size: .8rem;
+    font-weight: 600;
+    padding: .35rem .75rem;
+    border-radius: 7px;
+    border: 1px solid var(--mud-palette-lines-default);
+    background: var(--mud-palette-surface);
+    color: var(--mud-palette-text-primary);
+    cursor: pointer;
+    white-space: nowrap;
+    transition: border-color .12s ease, background .12s ease, color .12s ease;
+}
+
+/* Neutral secondary action (e.g. Set quota) — gray hover, no gold. */
+.rs-action:hover {
+    border-color: var(--mud-palette-text-secondary);
+    background: var(--mud-palette-action-default-hover, rgba(0, 0, 0, .04));
+    color: var(--mud-palette-text-primary);
+}
+
+/* Confirm/positive action (Approve, Enable) — green. */
+.rs-action-confirm { color: var(--rs-confirm-deep); border-color: var(--rs-confirm-tint-line); }
+.rs-action-confirm:hover { border-color: var(--rs-confirm); background: var(--rs-confirm-tint); color: var(--rs-confirm-deep); }
+
+/* Destructive action (Delete, Disable) — red. */
+.rs-action-danger { color: var(--rs-danger); border-color: var(--rs-danger-tint-line); }
+.rs-action-danger:hover { border-color: var(--rs-danger); background: var(--rs-danger-tint); color: var(--rs-danger-deep); }
+
+/* Compact inline quota form on the users table (storage + egress, then Save). */
+.rs-quota-form { display: inline-flex; gap: 8px; align-items: flex-end; }
+.rs-quota-field { display: inline-flex; flex-direction: column; gap: 2px; }
+.rs-quota-field > span {
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    color: var(--mud-palette-text-secondary);
+}
+.rs-quota-input {
+    width: 6.5rem;
+    padding: .3rem .5rem;
+    border: 1px solid var(--mud-palette-lines-default);
+    border-radius: 6px;
+    background: var(--mud-palette-surface);
+    color: var(--mud-palette-text-primary);
+    font: inherit;
+    font-size: .82rem;
+}
+
+.rs-quota-input:focus { outline: none; border-color: var(--rs-gold); box-shadow: 0 0 0 2px var(--rs-gold-tint); }
+
+/* Sortable column headers (progressive enhancement). */
+.rs-sortable {
+    cursor: pointer;
+    user-select: none;
+    white-space: nowrap;
+}
+
+.rs-sortable:hover { color: var(--rs-gold-deep); }
+
+/* Sort direction arrows — generic, so every sortable table shows them. */
+th[data-sort-dir="asc"]::after { content: " \25B2"; font-size: .7em; }
+th[data-sort-dir="desc"]::after { content: " \25BC"; font-size: .7em; }
+
+.rs-files-size,
+.rs-files-actions {
+    text-align: right;
+    white-space: nowrap;
+}
+
+.rs-files-name {
+    display: inline-flex;
+    align-items: center;
+    gap: .5rem;
+    color: var(--rs-gold-deep);
+    text-decoration: none;
+    word-break: break-all;
+}
+
+.rs-files-name:hover { text-decoration: underline; }
+
+.rs-files-check { width: 1%; white-space: nowrap; text-align: center; }
+
+.rs-file-check {
+    width: 16px;
+    height: 16px;
+    accent-color: var(--rs-gold);
+    cursor: pointer;
+    vertical-align: middle;
+}
+
+/* Bulk-delete bar: revealed (pure CSS, no JS) only when a row is checked. */
+.rs-bulkbar {
+    display: none;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 14px;
+    margin-bottom: 12px;
+    border: 1px solid var(--rs-gold-tint-line);
+    background: var(--rs-gold-tint);
+    border-radius: 8px;
+    font-size: 13.5px;
+    color: var(--rs-gold-deep);
+}
+
+.rs-files-form:has(.rs-file-check:checked) .rs-bulkbar {
+    display: flex;
+}
+
+.rs-bulk-delete {
+    margin-left: auto;
+    background: var(--mud-palette-error);
+    color: #fff;
+    border: none;
+    border-radius: 7px;
+    padding: 7px 14px;
+    font: inherit;
+    font-weight: 600;
+    font-size: 13px;
+    cursor: pointer;
+}
+
+.rs-bulk-delete:hover { filter: brightness(.95); }
+
+/* ---------- form controls (settings, account) ---------- */
+.rs-field { margin-bottom: 1.5rem; }
+.rs-field:last-child { margin-bottom: 0; }
+
+.rs-label {
+    display: block;
+    font-weight: 600;
+    font-size: .9rem;
+    margin-bottom: .25rem;
+}
+
+.rs-help {
+    font-size: .82rem;
+    color: var(--mud-palette-text-secondary);
+    margin-bottom: .55rem;
+    line-height: 1.4;
+}
+
+.rs-help a { color: var(--rs-gold-deep); }
+
+/* Larger, MudBlazor-outlined-style inputs: generous height + padding. */
+.rs-control {
+    display: block;
+    width: 100%;
+    box-sizing: border-box;
+    min-height: 3.25rem;
+    padding: .85rem 1rem;
+    border: 1px solid var(--mud-palette-lines-default);
+    border-radius: 8px;
+    background: var(--mud-palette-surface);
+    color: var(--mud-palette-text-primary);
+    font: inherit;
+    font-size: 1rem;
+    transition: border-color .12s ease, box-shadow .12s ease;
+}
+
+.rs-control:hover { border-color: var(--mud-palette-text-secondary); }
+
+.rs-control:focus {
+    outline: none;
+    border-color: var(--rs-gold);
+    box-shadow: 0 0 0 3px var(--rs-gold-tint);
+}
+
+select.rs-control { cursor: pointer; }
+
+textarea.rs-control {
+    min-height: 8rem;
+    resize: vertical;
+    font-family: 'Roboto Mono', monospace;
+    font-size: .85rem;
+    line-height: 1.55;
+}
+
+/* Responsive two-column field grid for settings/account forms.
+   Short controls pair two-up; wide ones opt out with .rs-field-wide. */
+.rs-form-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1.25rem 2rem;
+}
+
+/* Only direct grid cells lose their margin (the grid's own gap spaces them).
+   Fields nested inside cards within a grid keep their normal spacing. */
+.rs-form-grid > .rs-field { margin-bottom: 0; }
+.rs-field-wide { grid-column: 1 / -1; }
+
+@media (max-width: 720px) {
+    .rs-form-grid { grid-template-columns: 1fr; }
+}
+
+.rs-field-error {
+    color: var(--mud-palette-error);
+    font-size: .8rem;
+    margin-top: .3rem;
+}
+
+.rs-badge-mod {
+    display: inline-block;
+    font-size: .62rem;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    color: var(--rs-gold-deep);
+    background: var(--rs-gold-tint);
+    border: 1px solid var(--rs-gold-tint-line);
+    border-radius: 4px;
+    padding: .05rem .35rem;
+    margin-left: .45rem;
+    vertical-align: middle;
+}
+
+.rs-settings-body { padding: 18px 22px; }
+
+/* Definition list (account profile). */
+.rs-deflist {
+    display: grid;
+    grid-template-columns: max-content 1fr;
+    gap: .5rem 1.5rem;
+    margin: 0;
+    align-items: baseline;
+}
+
+.rs-deflist dt {
+    font-size: .72rem;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    color: var(--mud-palette-text-secondary);
+}
+
+.rs-deflist dd { margin: 0; }
+
+.rs-settings-actions {
+    padding: 4px 0 8px;
+}
+
+/* ============================================================
+   App shell — gold top bar + left sidebar + gray content.
+   Static-SSR only; the sidebar is persistent (no toggle JS).
+   ============================================================ */
+
+:root {
+    /* Warm gray that cards sit on, so white surfaces lift off it. */
+    --rs-content-bg: #f1efe9;
+}
+
+.rs-shell {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
+/* --- Top bar (cream) --- */
+.rs-topbar {
+    position: sticky;
+    top: 0;
+    z-index: 30;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    height: 60px;
+    padding: 0 20px;
+    background: #fdfaf2;
+    border-bottom: 1px solid var(--rs-gold-tint-line);
+    box-shadow: 0 1px 3px rgba(42, 38, 32, .05);
+}
+
+/* On the cream bar the brand wordmark reads in deep ink. */
+.rs-topbar .rs-brand { color: #2a2007; }
+.rs-topbar .rs-brand-logo { width: 24px; height: 24px; }
+
+.rs-topbar-right {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+/* Account pill: white surface against the cream bar. */
+.rs-topbar .rs-account {
+    background: #fff;
+    border-color: var(--rs-gold-tint-line);
+    color: var(--mud-palette-text-secondary);
+}
+
+.rs-topbar .rs-account:hover { border-color: var(--rs-gold); }
+.rs-account-name { font-weight: 500; }
+
+.rs-iconbtn {
+    display: grid;
+    place-items: center;
+    width: 38px;
+    height: 38px;
+    border-radius: 8px;
+    border: 1px solid transparent;
+    background: transparent;
+    color: var(--mud-palette-text-secondary);
+    cursor: pointer;
+}
+
+.rs-iconbtn:hover { background: rgba(42, 32, 7, .07); color: #2a2007; }
+
+/* Mobile nav drawer plumbing. The checkbox is visually hidden but stays
+   focusable (keyboard: Tab + Space); the hamburger label is the touch target.
+   Both the hamburger and backdrop are revealed only at the mobile breakpoint. */
+.rs-topbar-left { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.rs-navtoggle { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+.rs-hamburger { display: none; }
+.rs-nav-close { display: none; }
+
+/* --- Body: sidebar + content --- */
+.rs-body {
+    flex: 1;
+    display: flex;
+    align-items: stretch;
+    min-height: 0;
+}
+
+.rs-sidebar {
+    flex-shrink: 0;
+    width: 240px;
+    background: var(--mud-palette-surface);
+    border-right: 1px solid var(--mud-palette-lines-default);
+    padding: 18px 12px;
+    position: sticky;
+    top: 60px;
+    align-self: flex-start;
+    height: calc(100vh - 60px);
+    overflow-y: auto;
+}
+
+.rs-nav { display: flex; flex-direction: column; gap: 2px; }
+
+.rs-nav-section {
+    margin: 18px 12px 6px;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .08em;
+    color: var(--mud-palette-text-secondary);
+}
+
+.rs-navlink {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 12px;
+    border-radius: 9px;
+    color: var(--mud-palette-text-primary);
+    text-decoration: none;
+    font-size: 14.5px;
+    font-weight: 500;
+    line-height: 1;
+}
+
+.rs-navlink .mud-icon-root { color: var(--mud-palette-text-secondary); font-size: 1.25rem; }
+.rs-navlink:hover { background: var(--mud-palette-action-default-hover, rgba(0, 0, 0, .04)); }
+
+.rs-navlink.active {
+    background: var(--rs-gold-tint);
+    color: var(--rs-gold-deep);
+    font-weight: 600;
+}
+
+.rs-navlink.active .mud-icon-root { color: var(--rs-gold-deep); }
+
+/* Collapsible nav group (native <details>, no JS). */
+.rs-navgroup { }
+.rs-navsummary { list-style: none; cursor: pointer; }
+.rs-navsummary::-webkit-details-marker { display: none; }
+
+.rs-chevron {
+    margin-left: auto;
+    transition: transform .15s ease;
+    color: var(--mud-palette-text-secondary) !important;
+}
+
+.rs-navgroup[open] > .rs-navsummary .rs-chevron { transform: rotate(90deg); }
+
+.rs-subnav-list {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    margin: 2px 0 6px;
+    padding-left: 40px;
+}
+
+.rs-subnavlink {
+    display: block;
+    padding: 7px 12px;
+    border-radius: 7px;
+    font-size: 13.5px;
+    color: var(--mud-palette-text-secondary);
+    text-decoration: none;
+}
+
+.rs-subnavlink:hover {
+    color: var(--mud-palette-text-primary);
+    background: var(--mud-palette-action-default-hover, rgba(0, 0, 0, .04));
+}
+
+.rs-subnavlink.active {
+    color: var(--rs-gold-deep);
+    background: var(--rs-gold-tint);
+    font-weight: 600;
+}
+
+/* --- Content area --- */
+.rs-content {
+    flex: 1;
+    min-width: 0;
+    background: var(--rs-content-bg);
+    padding: 30px 36px 12px;
+    display: flex;
+    flex-direction: column;
+}
+
+.rs-content .rs-main { flex: 1; width: 100%; }
+
+/* The footer rides along the bottom of the content column. */
+.rs-content .rs-footer { max-width: 960px; margin: 0 auto; width: 100%; }
+
+/* --- Signed-out (plain, centered) layout --- */
+.rs-plain {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
+.rs-topbar-plain {
+    background: transparent;
+    box-shadow: none;
+    border-bottom: 1px solid var(--mud-palette-lines-default);
+}
+
+.rs-topbar-plain .rs-brand { color: var(--mud-palette-text-primary); }
+.rs-topbar-plain .rs-iconbtn { color: var(--mud-palette-text-primary); }
+
+.rs-signin {
+    padding: 8px 18px;
+    border-radius: 8px;
+    background: var(--rs-confirm);
+    color: #fff;
+    font-weight: 600;
+    font-size: 14px;
+    text-decoration: none;
+}
+
+.rs-signin:hover { background: var(--rs-confirm-deep); }
+
+.rs-content-plain {
+    background: transparent;
+    align-items: center;
+    justify-content: flex-start;
+    padding-top: 56px;
+}
+
+/* Centered auth card (sign-in and other signed-out forms). */
+.rs-auth { width: 100%; display: flex; justify-content: center; padding: 4px 16px 56px; }
+
+.rs-auth-card {
+    width: 100%;
+    max-width: 400px;
+    background: var(--mud-palette-surface);
+    border: 1px solid var(--mud-palette-lines-default);
+    border-top: 3px solid var(--rs-gold);
+    border-radius: 14px;
+    padding: 32px 28px;
+    box-shadow: 0 14px 44px rgba(42, 38, 32, .12);
+}
+
+.rs-auth-head { text-align: center; margin-bottom: 24px; }
+.rs-auth-logo { width: 44px; height: 44px; margin-bottom: 12px; }
+.rs-auth-head h1 { margin: 0 0 4px; font-size: 1.55rem; font-weight: 700; color: var(--mud-palette-text-primary); }
+.rs-auth-head p { margin: 0; color: var(--mud-palette-text-secondary); font-size: 14px; }
+
+.rs-auth-error {
+    margin-bottom: 16px;
+    padding: 10px 12px;
+    border-radius: 8px;
+    background: var(--rs-danger-tint);
+    border: 1px solid var(--rs-danger-tint-line);
+    color: var(--rs-danger-deep);
+    font-size: 13.5px;
+}
+
+.rs-auth-card .rs-field { margin-bottom: 16px; }
+
+.rs-auth-submit {
+    width: 100%;
+    margin-top: 4px;
+    padding: 11px;
+    border: none;
+    border-radius: 9px;
+    background: var(--rs-confirm);
+    color: #fff;
+    font-weight: 600;
+    font-size: 15px;
+    cursor: pointer;
+}
+
+.rs-auth-submit:hover { background: var(--rs-confirm-deep); }
+
+.rs-auth-foot { margin-top: 18px; text-align: center; font-size: 13.5px; }
+.rs-auth-foot a { color: var(--rs-gold-deep); text-decoration: none; }
+.rs-auth-foot a:hover { text-decoration: underline; }
+
+/* Chrome-light focus layout (OAuth consent and similar standalone flows). */
+.rs-focus { min-height: 100vh; display: flex; flex-direction: column; }
+.rs-focus-bar {
+    display: flex;
+    align-items: center;
+    height: 60px;
+    padding: 0 20px;
+    background: #fdfaf2;
+    border-bottom: 1px solid var(--rs-gold-tint-line);
+}
+.rs-focus-main {
+    flex: 1;
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    padding: 40px 16px 56px;
+}
+
+/* OAuth consent card internals. */
+.rs-auth-card.rs-consent { max-width: 444px; }
+
+.rs-consent-app {
+    text-align: center;
+    padding: 14px;
+    margin-bottom: 16px;
+    border: 1px solid var(--rs-gold-tint-line);
+    border-radius: 10px;
+    background: var(--rs-gold-tint);
+}
+.rs-consent-app-host { font-weight: 700; font-size: 15px; color: var(--mud-palette-text-primary); word-break: break-all; }
+.rs-consent-app-origin { font-family: 'Roboto Mono', monospace; font-size: 12px; color: var(--mud-palette-text-secondary); word-break: break-all; }
+
+.rs-consent-as {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    margin-bottom: 16px;
+    font-size: 13.5px;
+    color: var(--mud-palette-text-secondary);
+}
+
+.rs-consent-warn {
+    margin-bottom: 16px;
+    padding: 10px 12px;
+    border-radius: 8px;
+    background: var(--rs-danger-tint);
+    border: 1px solid var(--rs-danger-tint-line);
+    color: var(--rs-danger-deep);
+    font-size: 13px;
+}
+
+.rs-consent-label {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    color: var(--mud-palette-text-secondary);
+    margin-bottom: 8px;
+}
+
+.rs-consent-perms { margin-bottom: 16px; }
+.rs-scope-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.rs-scope-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 10px;
+    border: 1px solid var(--mud-palette-lines-default);
+    border-radius: 8px;
+}
+.rs-scope-badges { display: inline-flex; gap: 4px; flex-shrink: 0; }
+.rs-scope-badge {
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .03em;
+    padding: 2px 7px;
+    border-radius: 999px;
+}
+.rs-scope-badge.read { background: var(--rs-confirm-tint); color: var(--rs-confirm-deep); border: 1px solid var(--rs-confirm-tint-line); }
+.rs-scope-badge.write { background: var(--rs-gold-tint); color: var(--rs-gold-deep); border: 1px solid var(--rs-gold-tint-line); }
+.rs-scope-module { font-family: 'Roboto Mono', monospace; font-size: 13px; font-weight: 500; word-break: break-all; }
+
+.rs-consent-redirect { margin-bottom: 20px; }
+.rs-consent-redirect-dest {
+    font-family: 'Roboto Mono', monospace;
+    font-size: 12.5px;
+    color: var(--mud-palette-text-secondary);
+    word-break: break-all;
+}
+
+.rs-consent-actions { display: flex; gap: 10px; }
+.rs-consent-deny,
+.rs-consent-allow {
+    flex: 1;
+    padding: 11px;
+    border-radius: 9px;
+    font-weight: 600;
+    font-size: 14.5px;
+    cursor: pointer;
+}
+.rs-consent-deny {
+    background: transparent;
+    border: 1px solid var(--mud-palette-lines-default);
+    color: var(--mud-palette-text-primary);
+}
+.rs-consent-deny:hover { border-color: var(--mud-palette-text-secondary); background: var(--mud-palette-action-default-hover, rgba(0, 0, 0, .04)); }
+.rs-consent-allow { background: var(--rs-confirm); border: none; color: #fff; }
+.rs-consent-allow:hover { background: var(--rs-confirm-deep); }
+
+.rs-consent-note { margin: 18px 0 0; text-align: center; font-size: 12px; color: var(--mud-palette-text-secondary); }
+
+/* --- Settings group tab strip --- */
+.rs-subnav {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-bottom: 24px;
+    border-bottom: 1px solid var(--mud-palette-lines-default);
+}
+
+.rs-subnav a {
+    padding: 9px 15px;
+    border-radius: 8px 8px 0 0;
+    margin-bottom: -1px;
+    text-decoration: none;
+    color: var(--mud-palette-text-secondary);
+    font-size: 14px;
+    font-weight: 500;
+    border-bottom: 2px solid transparent;
+}
+
+.rs-subnav a:hover { color: var(--mud-palette-text-primary); }
+
+.rs-subnav a.active {
+    color: var(--rs-gold-deep);
+    border-bottom-color: var(--rs-gold);
+    font-weight: 600;
+}
+
+/* --- Bigger card chrome to match the larger inputs --- */
+.rs-card-head { padding: 20px 26px; }
+.rs-settings-body { padding: 24px 26px; }
+
+/* Action buttons (MudButton picks up theme color; we just tune the chrome).
+   Keep horizontal breathing room but trim the vertical padding so they don't
+   tower over the inputs. */
+.rs-form-actions { display: flex; gap: 12px; margin-top: 12px; }
+.rs-form-actions .mud-button-root,
+.rs-settings-actions .mud-button-root { padding: 6px 16px; font-size: .9rem; }
+
+@media (max-width: 860px) {
+    .rs-hamburger {
+        display: grid;
+        place-items: center;
+        width: 38px;
+        height: 38px;
+        border-radius: 8px;
+        border: 1px solid transparent;
+        background: transparent;
+        color: var(--mud-palette-text-secondary);
+        cursor: pointer;
+        flex-shrink: 0;
+    }
+    .rs-hamburger:hover { background: rgba(42, 32, 7, .07); color: #2a2007; }
+
+    /* Sidebar becomes a full-screen overlay menu covering the entire viewport
+       (above the top bar). Its own close button dismisses it. */
+    .rs-sidebar {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        max-width: none;
+        height: 100dvh;
+        z-index: 50;
+        border-right: none;
+        padding: 12px 14px 24px;
+        transform: translateX(-100%);
+        transition: transform .22s ease;
+    }
+    #rs-navtoggle:checked ~ .rs-body .rs-sidebar { transform: translateX(0); }
+
+    .rs-nav-close {
+        display: grid;
+        place-items: center;
+        width: 40px;
+        height: 40px;
+        margin: 0 0 6px auto;
+        border-radius: 8px;
+        color: var(--mud-palette-text-secondary);
+        cursor: pointer;
+    }
+    .rs-nav-close:hover { background: rgba(42, 32, 7, .07); color: #2a2007; }
+
+    /* The in-content settings tab strip is redundant on mobile — the drawer
+       already links every admin subpage. */
+    .rs-subnav { display: none; }
+
+    .rs-content { padding: 22px 18px 12px; }
+}

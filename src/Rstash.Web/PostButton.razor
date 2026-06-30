@@ -1,0 +1,22 @@
+@* A minimal antiforgery-protected POST button carrying a single id field. *@
+<form action="@Action" method="post" class="rs-action-form">
+    <AntiforgeryToken />
+    <input type="hidden" name="id" value="@Id" />
+    <button type="submit" class="rs-action @KindClass">@Label</button>
+</form>
+
+@code {
+    [Parameter] public string Action { get; set; } = "";
+    [Parameter] public long Id { get; set; }
+    [Parameter] public string Label { get; set; } = "";
+
+    /// <summary>Semantic style: "neutral" (default), "confirm" (green), or "danger" (red).</summary>
+    [Parameter] public string Kind { get; set; } = "neutral";
+
+    private string KindClass => Kind switch
+    {
+        "confirm" => "rs-action-confirm",
+        "danger" => "rs-action-danger",
+        _ => "",
+    };
+}
