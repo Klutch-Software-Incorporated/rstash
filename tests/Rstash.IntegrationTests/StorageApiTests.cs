@@ -142,6 +142,39 @@ public sealed class StorageApiTests(RstashAppFactory factory) : IClassFixture<Rs
     }
 
     [Fact]
+    public async Task ExceedingEgressQuota_Returns429WithRetryAfter()
+    {
+        var (user, token) = await SeedUserWithTokenAsync("egressuser", "*:rw");
+
+        using (var scope = factory.Services.CreateScope())
+        {
+            var users = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
+            var account = await users.FindByNameAsync(user);
+            account!.EgressQuota = 10; // bytes for the current period
+            await users.UpdateAsync(account);
+        }
+
+        var client = factory.CreateClient();
+
+        var put = await client.SendAsync(
+            Authed(HttpMethod.Put, $"/storage/{user}/notes/a.txt", token, new StringContent("12345678")));
+        Assert.Equal(HttpStatusCode.Created, put.StatusCode);
+
+        // First 8-byte read fits within the 10-byte quota.
+        var first = await client.SendAsync(Authed(HttpMethod.Get, $"/storage/{user}/notes/a.txt", token));
+        Assert.Equal(HttpStatusCode.OK, first.StatusCode);
+
+        // A second read would total 16 bytes > 10 — refused with 429 + Retry-After.
+        var second = await client.SendAsync(Authed(HttpMethod.Get, $"/storage/{user}/notes/a.txt", token));
+        Assert.Equal(HttpStatusCode.TooManyRequests, second.StatusCode);
+        Assert.NotNull(second.Headers.RetryAfter);
+
+        // HEAD never charges egress, so it still succeeds even when the quota is spent.
+        var head = await client.SendAsync(Authed(HttpMethod.Head, $"/storage/{user}/notes/a.txt", token));
+        Assert.Equal(HttpStatusCode.OK, head.StatusCode);
+    }
+
+    [Fact]
     public async Task Put_RecordsAuditEntry()
     {
         var (user, token) = await SeedUserWithTokenAsync("audituser", "*:rw");

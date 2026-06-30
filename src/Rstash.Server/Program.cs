@@ -53,6 +53,8 @@ builder.Services.AddDbContextFactory<RstashDbContext>(options => options.UseRsta
 builder.Services.AddSingleton<IStorage>(_ => StorageFactory.Open(blobDsn));
 builder.Services.AddSingleton<SettingsService>();
 builder.Services.AddSingleton<RemoteStorageService>();
+builder.Services.AddSingleton<EgressTracker>();
+builder.Services.AddHostedService(sp => sp.GetRequiredService<EgressTracker>());
 builder.Services.AddSingleton<SetupState>();
 builder.Services.AddSingleton<TokenStore>();
 builder.Services.AddSingleton<AuditService>();

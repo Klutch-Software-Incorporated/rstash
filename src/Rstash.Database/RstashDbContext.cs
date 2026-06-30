@@ -22,6 +22,8 @@ public class RstashDbContext(DbContextOptions<RstashDbContext> options)
 
     public DbSet<AuthorizationCode> AuthorizationCodes => Set<AuthorizationCode>();
 
+    public DbSet<EgressUsage> EgressUsage => Set<EgressUsage>();
+
     protected override void OnModelCreating(ModelBuilder builder)
     {
         base.OnModelCreating(builder);

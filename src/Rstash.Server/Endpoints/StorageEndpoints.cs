@@ -1,4 +1,5 @@
 using System.Buffers;
+using System.Globalization;
 using System.Text.Json;
 using Microsoft.AspNetCore.Identity;
 using Rstash.Database;
@@ -27,6 +28,7 @@ internal static class StorageEndpoints
         string user,
         string? path,
         RemoteStorageService storage,
+        EgressTracker egress,
         TokenStore tokens,
         UserManager<ApplicationUser> users,
         SettingsService settings,
@@ -117,7 +119,8 @@ internal static class StorageEndpoints
                     await GetFolderAsync(ctx, storage, owner.Id, storagePath, isPublic, conditions, writeBody: false);
                     break;
                 case "GET":
-                    await GetDocumentAsync(ctx, storage, owner.Id, storagePath, isPublic, conditions);
+                    await GetDocumentAsync(
+                        ctx, storage, egress, owner.Id, owner.EgressQuota, storagePath, isPublic, conditions);
                     break;
                 case "HEAD":
                     await HeadDocumentAsync(ctx, storage, owner.Id, storagePath, isPublic, conditions);
@@ -148,10 +151,21 @@ internal static class StorageEndpoints
     }
 
     private static async Task GetDocumentAsync(
-        HttpContext ctx, RemoteStorageService storage, long userId, string path, bool isPublic, StorageConditions cond)
+        HttpContext ctx, RemoteStorageService storage, EgressTracker egress, long userId, long userEgressQuota,
+        string path, bool isPublic, StorageConditions cond)
     {
         var result = await storage.GetDocumentAsync(userId, path, cond, ctx.RequestAborted);
         await using var content = result.Content;
+
+        // Egress metering: refuse the whole download if it would blow the per-user or global
+        // monthly cap. Charged to the storage owner, so anonymous /public/ reads count too.
+        if (!await egress.CanServeAsync(userId, result.ContentLength, userEgressQuota, ctx.RequestAborted))
+        {
+            await WriteEgressExceededAsync(ctx);
+            return;
+        }
+
+        egress.Record(userId, result.ContentLength);
 
         ctx.Response.StatusCode = StatusCodes.Status200OK;
         ctx.Response.Headers.ETag = ETag.Quote(result.ETag);
@@ -160,6 +174,18 @@ internal static class StorageEndpoints
         ctx.Response.Headers.CacheControl = CacheControl(isPublic);
 
         await content.CopyToAsync(ctx.Response.Body, ctx.RequestAborted);
+    }
+
+    // 429, not 507: egress is transfer (not "storage full"), and the limit clears when the
+    // monthly period rolls over. Retry-After points at the next UTC month boundary so clients
+    // and HTTP libraries back off until then. (draft-dejong-remotestorage-26 §5 / RFC 6585.)
+    private static Task WriteEgressExceededAsync(HttpContext ctx)
+    {
+        var now = DateTimeOffset.UtcNow;
+        var nextMonth = new DateTimeOffset(now.Year, now.Month, 1, 0, 0, 0, TimeSpan.Zero).AddMonths(1);
+        var seconds = Math.Max(1, (int)Math.Ceiling((nextMonth - now).TotalSeconds));
+        ctx.Response.Headers["Retry-After"] = seconds.ToString(CultureInfo.InvariantCulture);
+        return TextAsync(ctx, StatusCodes.Status429TooManyRequests, "egress exceeded");
     }
 
     private static async Task HeadDocumentAsync(
