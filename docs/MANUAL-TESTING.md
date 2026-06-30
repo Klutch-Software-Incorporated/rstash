@@ -257,8 +257,9 @@ approve, then `POST /oauth/token` with `grant_type=authorization_code&code=…&c
 ## Notes / known gaps (deferred, not bugs)
 
 - Egress/bandwidth limits and the public-write operator toggle are now implemented (see §7f, §8b).
-- Runtime rate limiting, abuse reports, refresh-token grant, and the OAuthClient registry are not
-  yet ported.
+- Remaining Go→C# parity gaps (encryption at rest, rate-limit enforcement, refresh-token grant,
+  admin JSON API, metrics, email verification, abuse reports, …) are tracked in
+  [PARITY-GAPS.md](PARITY-GAPS.md).
 - Postgres/MySQL/SQL Server DB providers and S3/Azure blob backends are stubbed (factories throw)
   pending their NuGet packages — SQLite + filesystem + database blobs work today.
 - The original Go server lives in `legacy/` for reference; it is not built.
