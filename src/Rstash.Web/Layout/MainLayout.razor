@@ -11,11 +11,19 @@
 <AuthorizeView>
     <Authorized>
         <div class="rs-shell">
+            @* CSS-only mobile nav drawer: this hidden checkbox toggles the off-canvas
+               sidebar; a full-page SSR navigation resets it, so it auto-closes on click. *@
+            <input type="checkbox" id="rs-navtoggle" class="rs-navtoggle" aria-label="Toggle navigation menu" />
             <header class="rs-topbar">
-                <a href="/" class="rs-brand">
-                    <img src="/favicon.svg" class="rs-brand-logo" alt="" />
-                    <span>@_siteName</span>
-                </a>
+                <div class="rs-topbar-left">
+                    <label for="rs-navtoggle" class="rs-hamburger" aria-hidden="true">
+                        <MudIcon Icon="@Icons.Material.Filled.Menu" Size="Size.Small" />
+                    </label>
+                    <a href="/" class="rs-brand">
+                        <img src="/favicon.svg" class="rs-brand-logo" alt="" />
+                        <span>@_siteName</span>
+                    </a>
+                </div>
                 <div class="rs-topbar-right">
                     <a href="/account" class="rs-account">
                         <span class="rs-avatar">@_initial</span>
@@ -29,6 +37,7 @@
                 </div>
             </header>
             <div class="rs-body">
+                <label for="rs-navtoggle" class="rs-nav-backdrop" aria-hidden="true"></label>
                 <aside class="rs-sidebar">
                     <nav class="rs-nav">
                         <a href="/" class="rs-navlink @Active("/", exact: true)">
