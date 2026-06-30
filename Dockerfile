@@ -4,6 +4,10 @@
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 WORKDIR /src
 COPY . .
+# The ADO image pipeline passes --build-arg VERSION=<git describe> (e.g. v0.4.1).
+# Declared here so it's consumed cleanly; baking it into the assembly
+# (InformationalVersion) is a follow-up — the C# app has no --version reader yet.
+ARG VERSION=
 RUN dotnet publish src/Rstash.Server/Rstash.Server.csproj -c Release -o /app
 
 # ── Runtime ──

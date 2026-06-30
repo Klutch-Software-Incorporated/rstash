@@ -1,8 +1,9 @@
 name: Release
 
 # Publishes self-contained, single-file binaries and attaches them to a GitHub
-# Release. Triggered by pushing a CalVer tag, e.g. v2026.0610.1. The version
-# (tag without the leading "v") is baked into the assembly.
+# Release. Triggered by pushing a SemVer tag, e.g. v0.4.1 (see CONTRIBUTING.md
+# for the bump rules). The numeric version is baked as the assembly Version and
+# the full tag (with leading "v") as InformationalVersion.
 
 on:
   push:
@@ -33,6 +34,7 @@ jobs:
               -p:PublishSingleFile=true \
               -p:IncludeNativeLibrariesForSelfExtract=true \
               -p:Version="$VERSION" \
+              -p:InformationalVersion="$GITHUB_REF_NAME" \
               -o "publish/$rid"
             if [ -f "publish/$rid/Rstash.Server.exe" ]; then
               cp "publish/$rid/Rstash.Server.exe" "dist/rstash-$rid.exe"

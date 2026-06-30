@@ -19,6 +19,30 @@ rstash is developed on [GitHub](https://github.com/Klutch-Software-Incorporated/
 
 A maintainer will review; once CI is green and the change is approved, it'll be merged.
 
+## Versioning & releases
+
+rstash uses [Semantic Versioning](https://semver.org/). It's pre-1.0, so the
+`0.` prefix is itself the signal that the config, database schema, and protocol
+surfaces are still stabilizing.
+
+Categorize a change by the worst thing it does to an **existing deployment on
+upgrade**:
+
+| Bump (pre-1.0)  | When | Examples |
+|---|---|---|
+| **breaking** → `0.(y+1).0` | Not backward-compatible | a non-reversible EF Core migration (column drop/rename); removing/renaming an `RSTASH_*` var or changing a default's behavior; breaking the remoteStorage protocol or admin API; dropping a DSN/config format |
+| **feature** → `0.y.(z+1)` | Backward-compatible addition | new blob backend, new endpoint, new *optional* setting, new CLI subcommand |
+| **fix** → `0.y.(z+1)` | Backward-compatible fix | bugfix, security patch, dependency bump, docs, perf, internal refactor |
+
+Label each PR `breaking` / `feature` / `fix` so the highest label across the
+merged-since-last-release set dictates the next bump.
+
+**Who cuts a release:** maintainers, not contributors. Merging a PR does not cut
+a release — pushing a `vX.Y.Z` tag does, and that (and only that) triggers the
+release workflow, which publishes the binaries. Tagging is **decoupled from
+deploys**: rstash.cloud continuously deploys every approved merge to `main`
+regardless of tags — a release tag only governs the downloadable binaries.
+
 ## Getting started
 
 ```sh
