@@ -92,6 +92,8 @@ else
             return;
         }
 
+        await UserProvisioning.ApplyDefaultLimitsAsync(UserManager, user, Settings.Current);
+
         if (approved)
         {
             await SignInManager.SignInAsync(user, isPersistent: true);

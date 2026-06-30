@@ -3,6 +3,7 @@
 @inject SignInManager<ApplicationUser> SignInManager
 @inject NavigationManager Navigation
 @inject SetupState SetupStatus
+@inject SettingsService Settings
 
 <PageTitle>Setup</PageTitle>
 
@@ -53,6 +54,8 @@
             _error = string.Join(" ", result.Errors.Select(e => e.Description));
             return;
         }
+
+        await UserProvisioning.ApplyDefaultLimitsAsync(UserManager, user, Settings.Current);
 
         SetupStatus.MarkComplete();
         await SignInManager.SignInAsync(user, isPersistent: true);
