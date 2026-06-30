@@ -1,8 +1,7 @@
 name: CI
 
-# Build, vet, and test on every push to main and every pull request
-# (including PRs from forks — this workflow needs no secrets). Mirrors the
-# BuildTest stage of the old Azure DevOps pipeline.
+# Build and test on every push to main and every pull request (including PRs
+# from forks — this workflow needs no secrets).
 
 on:
   push:
@@ -19,35 +18,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-dotnet@v4
         with:
-          go-version: '1.24.0'
-          cache: true
+          dotnet-version: '10.0.x'
 
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: npm
-          cache-dependency-path: site/package-lock.json
+      - run: dotnet restore Rstash.slnx
 
-      - uses: arduino/setup-task@v2
-        with:
-          version: 3.x
-          repo-token: ${{ secrets.GITHUB_TOKEN }}
+      - run: dotnet build Rstash.slnx --no-restore -c Release
 
-      - run: go mod download
-
-      - name: Install site dependencies
-        run: npm ci
-        working-directory: site
-
-      - run: task vet
-
-      - run: task test
-
-      # Host-only compile — confirms everything builds. The release
-      # cross-compile happens in release.yml on a tag.
-      - run: go build ./...
+      - run: dotnet test Rstash.slnx --no-build -c Release --verbosity normal
 
   secret-scan:
     name: Secret scan (gitleaks)
@@ -57,14 +36,7 @@ jobs:
         with:
           fetch-depth: 0 # full history so gitleaks scans every commit
 
-      - uses: actions/setup-go@v5
-        with:
-          go-version: '1.24.0'
-          cache: true
-
-      # Reuse the Go toolchain rather than pinning a release asset URL.
       # Reads .gitleaksignore automatically; fails the job on any new leak.
+      # Run via the container image to avoid pinning a toolchain.
       - name: Run gitleaks
-        run: |
-          go install github.com/zricethezav/gitleaks/v8@latest
-          "$(go env GOPATH)/bin/gitleaks" detect --source . --redact --no-banner
+        run: docker run --rm -v "$PWD:/repo" ghcr.io/gitleaks/gitleaks:latest detect --source /repo --redact --no-banner
