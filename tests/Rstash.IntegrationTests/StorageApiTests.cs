@@ -80,6 +80,44 @@ public sealed class StorageApiTests(RstashAppFactory factory) : IClassFixture<Rs
     }
 
     [Fact]
+    public async Task PublicWritesDisabled_RefusesProtocolWritesButKeepsReads()
+    {
+        var (user, token) = await SeedUserWithTokenAsync("frank", "*:rw");
+        var client = factory.CreateClient();
+
+        // Seed a public document while writes are still allowed.
+        var seed = await client.SendAsync(Authed(HttpMethod.Put, $"/storage/{user}/public/site/index.html", token,
+            new StringContent("<h1>hi</h1>", Encoding.UTF8, "text/html")));
+        Assert.Equal(HttpStatusCode.Created, seed.StatusCode);
+
+        var settings = factory.Services.GetRequiredService<SettingsService>();
+        await settings.SetAsync("allow_public_writes", "disabled");
+        try
+        {
+            // Writes and deletes under /public/ are refused...
+            var put = await client.SendAsync(Authed(HttpMethod.Put, $"/storage/{user}/public/site/new.html", token,
+                new StringContent("nope")));
+            Assert.Equal(HttpStatusCode.Forbidden, put.StatusCode);
+
+            var del = await client.SendAsync(
+                Authed(HttpMethod.Delete, $"/storage/{user}/public/site/index.html", token));
+            Assert.Equal(HttpStatusCode.Forbidden, del.StatusCode);
+
+            // ...but public reads still work, and non-public writes are unaffected.
+            var read = await client.GetAsync($"/storage/{user}/public/site/index.html");
+            Assert.Equal(HttpStatusCode.OK, read.StatusCode);
+
+            var privatePut = await client.SendAsync(Authed(HttpMethod.Put, $"/storage/{user}/notes/p.txt", token,
+                new StringContent("ok")));
+            Assert.Equal(HttpStatusCode.Created, privatePut.StatusCode);
+        }
+        finally
+        {
+            await settings.DeleteAsync("allow_public_writes");
+        }
+    }
+
+    [Fact]
     public async Task ExceedingUserQuota_Returns507()
     {
         var (user, token) = await SeedUserWithTokenAsync("quotauser", "*:rw");

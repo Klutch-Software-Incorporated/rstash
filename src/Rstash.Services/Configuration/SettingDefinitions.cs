@@ -280,6 +280,20 @@ public static class SettingDefinitions
             InputType = SettingInputType.Text,
             RuntimeEditable = true,
         },
+        new()
+        {
+            Key = "allow_public_writes",
+            Group = "Storage",
+            Label = "Public writes",
+            Description = "Whether the storage API may write or delete under <code>/public/</code>. "
+                + "When disabled, public documents stay readable but apps can't add or change them — "
+                + "users manage existing public files from the in-app file browser. "
+                + "Limits anonymous mass-distribution of large files.",
+            Default = "enabled",
+            ValidValues = ["enabled", "disabled"],
+            InputType = SettingInputType.Select,
+            RuntimeEditable = true,
+        },
 
         // ── Egress (runtime-editable) ──
         new()

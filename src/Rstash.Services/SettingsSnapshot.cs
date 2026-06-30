@@ -19,6 +19,7 @@ public sealed record SettingsSnapshot
     public required long TotalStorageLimit { get; init; }
     public required long DefaultUserStorageLimit { get; init; }
     public required long MaxUploadSize { get; init; }
+    public required bool AllowPublicWrites { get; init; }
     public required long TotalEgressLimit { get; init; }
     public required long DefaultUserEgressLimit { get; init; }
     public required string TokenLifetime { get; init; }
@@ -88,6 +89,7 @@ public sealed record SettingsSnapshot
             TotalStorageLimit = Bytes("total_storage_limit"),
             DefaultUserStorageLimit = Bytes("default_user_storage_limit"),
             MaxUploadSize = Bytes("max_upload_size"),
+            AllowPublicWrites = Val("allow_public_writes") != "disabled",
             TotalEgressLimit = Bytes("total_egress_limit"),
             DefaultUserEgressLimit = Bytes("default_user_egress_limit"),
             TokenLifetime = Val("token_lifetime"),

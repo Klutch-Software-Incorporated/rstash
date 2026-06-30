@@ -96,6 +96,14 @@ internal static class StorageEndpoints
             return;
         }
 
+        // Operator policy: writes/deletes under /public/ can be disabled server-wide.
+        // Public documents stay readable; owners manage existing ones via the web UI.
+        if (isPublic && isWrite && !settings.Current.AllowPublicWrites)
+        {
+            await TextAsync(ctx, StatusCodes.Status403Forbidden, "public writes are disabled");
+            return;
+        }
+
         var conditions = ParseConditions(ctx.Request);
 
         try
