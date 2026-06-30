@@ -80,28 +80,23 @@ Additional settings (registration mode, rate limits, quotas, OAuth token lifetim
 | Azure Blob Storage | `azureblob:container?params` | `azureblob:rstash?account=mystorage` |
 | Database | Any database DSN | `postgres:host=localhost dbname=blobs` |
 
-The S3 backend works with AWS S3, MinIO, DigitalOcean Spaces, Backblaze B2, Cloudflare R2, and any S3-compatible service. The bucket must exist before starting the server.
-
-The Azure Blob Storage backend talks natively to Azure. On Azure App Service / VM / Functions with a managed identity granted the `Storage Blob Data Contributor` role, set only `account=NAME` in the DSN — no secrets needed. For other environments, pass an explicit `key=` (shared key) or `sas=` (SAS token). See the `blob_dsn` setting's help text for full details.
+> **Current support:** SQLite, filesystem, and database blob stores are wired
+> today. The **S3** and **Azure Blob** backends, and the **PostgreSQL / MySQL /
+> SQL Server** database providers, are stubbed pending their packages — the DSN
+> formats above document the intended configuration. See
+> [docs/PARITY-GAPS.md](docs/PARITY-GAPS.md).
 
 ## Development
 
-Requires Go 1.24+. [Task](https://taskfile.dev/) is used as the task runner:
+Requires the [.NET 10 SDK](https://dotnet.microsoft.com/download):
 
 ```sh
-task build    # Build the binary
-task run      # Run via go run
-task test     # Run all tests
-task fmt      # Format code
-task vet      # Run go vet
-task clean    # Remove build artifacts
+dotnet build Rstash.slnx                 # Build the solution
+dotnet run --project src/Rstash.Server    # Run the server (http://localhost:8080)
+dotnet test Rstash.slnx                   # Run all tests
 ```
 
-Build with `-tags dev` to serve templates and assets from disk for hot reload during development:
-
-```sh
-go run -tags dev .
-```
+Use `dotnet watch --project src/Rstash.Server` for hot reload during development.
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for details.
 
@@ -109,22 +104,25 @@ Source is hosted on GitHub: [Klutch-Software-Incorporated/rstash](https://github
 
 ## Architecture
 
+rstash is a C#/.NET 10 solution (`Rstash.slnx`); dependency arrows point inward.
+
 ```
-main.go                 Entry point — delegates to internal/cli
-internal/
-  cli/                  Cobra CLI (serve, env, check)
-  config/               Environment variable loading and validation
-  settings/             Runtime settings (DB overrides + env defaults)
-  db/                   GORM database layer, Repository pattern, migrations
-  model/                Domain types (User, OAuthClient, OAuthToken, Node, Session, AuditEntry)
-  blob/                 Pluggable blob storage (SQLite, filesystem, S3, GORM)
-  storage/              Storage service (document/folder CRUD, ETags, quotas)
-  auth/                 Authentication (sessions, passwords)
-  email/                Email delivery (Resend backend)
-  api/                  Protocol handlers (storage API, WebFinger, OAuth, CORS, rate limiting)
-  web/                  Web UI (setup, login, admin, OAuth, file browser, registration, account)
-  ui/                   Embedded templates and static assets
+src/
+  Rstash.Model          Protocol domain + pure rules (Node, ETag, Scope, StoragePath) — no IO
+  Rstash.Services       Use cases: RemoteStorageService, SettingsService, TokenStore, EgressTracker, AuditService
+  Rstash.Storage        Blob backends + IStorage (filesystem, database; S3/Azure stubbed)
+  Rstash.Database       EF Core: RstashDbContext (Identity), NodeStore, entity configs, migrations
+  Rstash.Notifications  Outbound email + IEmailSender (Resend, no-op)
+  Rstash.Web            Blazor (RCL) + MudBlazor: setup/login/account/browser/admin/OAuth consent
+  Rstash.Server         Executable host: minimal-API endpoints, Blazor root, DI/middleware/auth, CLI
+tests/
+  Rstash.Core.Tests         Unit tests over Model/Services/Storage/Database
+  Rstash.IntegrationTests   End-to-end over the host (WebApplicationFactory)
 ```
+
+See [CLAUDE.md](CLAUDE.md) for the full Solution Layout and conventions, and
+[docs/PARITY-GAPS.md](docs/PARITY-GAPS.md) for features not yet ported from the
+original Go implementation (preserved under `legacy/`).
 
 ## License
 

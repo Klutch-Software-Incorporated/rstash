@@ -2,9 +2,11 @@
 
 ## Prerequisites
 
-- Go 1.24+
-- [Task](https://taskfile.dev/) (task runner)
+- [.NET 10 SDK](https://dotnet.microsoft.com/download)
 - Git
+
+rstash is a C#/.NET 10 application. (The original Go implementation is preserved
+under `legacy/` as a behavioral reference; it is not built or shipped.)
 
 ## Contribution workflow
 
@@ -12,141 +14,75 @@ rstash is developed on [GitHub](https://github.com/Klutch-Software-Incorporated/
 
 1. Fork the repository and clone your fork.
 2. Create a branch off `main` for your change.
-3. Make your change; run `task fmt`, `task vet`, and `task test` before pushing.
-4. Open a pull request against `main`. CI (build, vet, test, secret scan) runs automatically on every PR.
+3. Make your change; run `dotnet build` and `dotnet test` before pushing.
+4. Open a pull request against `main`. CI (build, test, secret scan) runs automatically on every PR.
 
 A maintainer will review; once CI is green and the change is approved, it'll be merged.
 
-## Getting Started
+## Getting started
 
 ```sh
-task build    # Build the binary
-task run      # Run the server via go run
-task test     # Run all tests
-task fmt      # Format source code
-task vet      # Run go vet
-task clean    # Remove build artifacts and local database
+dotnet build Rstash.slnx                    # Build the solution
+dotnet run --project src/Rstash.Server       # Run the server (default: http://localhost:8080)
+dotnet test Rstash.slnx                      # Run all tests
 ```
 
-## Running Tests
+The server's CLI subcommands short-circuit before the web host:
+
+```sh
+dotnet run --project src/Rstash.Server -- env     # Print an env-var template
+dotnet run --project src/Rstash.Server -- check   # Validate config + DB/blob connectivity
+dotnet run --project src/Rstash.Server -- seed    # Populate an account with sample data
+```
+
+## Running tests
 
 ```sh
 # All tests
-task test
+dotnet test Rstash.slnx
 
-# Single package
-go test ./internal/blob/
+# A single test project
+dotnet test tests/Rstash.Core.Tests
+dotnet test tests/Rstash.IntegrationTests
 
-# Single test
-go test -run TestName ./internal/package/
+# A single test by name
+dotnet test --filter "FullyQualifiedName~TestName"
 ```
 
-### Integration Tests
+`Rstash.Core.Tests` are unit tests over Model/Services/Storage/Database;
+`Rstash.IntegrationTests` exercise the host end-to-end via `WebApplicationFactory`.
 
-Some tests require external services and are skipped by default. Set the corresponding environment variable to enable them.
+## Database migrations
 
-#### S3 Blob Storage
-
-S3 integration tests require an S3-compatible service. The easiest way is to run MinIO locally:
+Schema is managed with EF Core code-first migrations compiled into the assembly
+and applied at startup. To add one:
 
 ```sh
-# Start MinIO (use docker.io/ prefix for Podman)
-podman run -d --name minio -p 9000:9000 -p 9001:9001 \
-  -e MINIO_ROOT_USER=minioadmin -e MINIO_ROOT_PASSWORD=minioadmin \
-  docker.io/minio/minio server /data --console-address ":9001"
-
-# Create the test bucket
-podman exec minio mc alias set local http://localhost:9000 minioadmin minioadmin
-podman exec minio mc mb local/rstash-test
+dotnet dotnet-ef migrations add <Name> -p src/Rstash.Database -s src/Rstash.Database -o Migrations
 ```
 
-Then run the tests:
+(`dotnet-ef` is pinned as a local tool in `.config/dotnet-tools.json`; run
+`dotnet tool restore` first if needed.)
+
+## Hot reload
 
 ```sh
-export RSTASH_TEST_S3_DSN="rstash-test?endpoint=localhost:9000&tls=false&access_key=minioadmin&secret_key=minioadmin"
-go test ./internal/blob/ -run TestS3_Integration -v
+dotnet watch --project src/Rstash.Server
 ```
 
-Cleanup:
+Recompiles and reloads on source/Razor/CSS changes during development.
+
+## Single-file publish
 
 ```sh
-podman stop minio && podman rm minio
+dotnet publish src/Rstash.Server -c Release -r <rid> --self-contained true \
+  -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true
 ```
 
-#### Azure Blob Storage
+where `<rid>` is e.g. `linux-x64`, `win-x64`, or `osx-arm64`. A container image
+is also provided via the root `Dockerfile`.
 
-Azure Blob integration tests run against [Azurite](https://github.com/Azure/Azurite), the official local emulator. The fastest way is Docker/Podman:
+## Project structure & conventions
 
-```sh
-# Start Azurite (blob service only, on port 10000)
-podman run -d --name azurite -p 10000:10000 \
-  mcr.microsoft.com/azure-storage/azurite \
-  azurite-blob --blobHost 0.0.0.0
-
-# Create the test container. The key below is Azurite's well-known
-# default credential — it's public and safe to paste.
-az storage container create --name rstash-test \
-  --connection-string "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://127.0.0.1:10000/devstoreaccount1;"
-```
-
-Then run the tests:
-
-```sh
-export RSTASH_TEST_AZURE_BLOB_DSN="rstash-test?account=devstoreaccount1&key=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==&endpoint=127.0.0.1:10000&tls=false"
-go test ./internal/blob/ -run TestAzureBlob_Integration -v
-```
-
-Cleanup:
-
-```sh
-podman stop azurite && podman rm azurite
-```
-
-## Manual Smoke Testing with S3
-
-To test the full server with S3-backed blob storage:
-
-```sh
-# Start MinIO as above, then create a bucket
-podman exec minio mc mb local/rstash
-
-# Start rstash with S3 blob storage
-export RSTASH_DB="sqlite:rstash.sqlite"
-export RSTASH_BLOB="s3:rstash?endpoint=localhost:9000&tls=false&access_key=minioadmin&secret_key=minioadmin"
-go run . serve
-```
-
-You can browse objects in the MinIO console at `http://localhost:9001` (login: minioadmin/minioadmin).
-
-**Note:** The S3 bucket must exist before starting the server. rstash checks for the bucket at startup and will exit with a clear error if it's missing.
-
-## Project Structure
-
-See the Architecture section in [README.md](README.md) and the conventions in [CLAUDE.md](CLAUDE.md).
-
-## Dev Mode (Hot Reload)
-
-Build with the `dev` tag to serve templates, static assets, and the Astro site from disk instead of the embedded binary. This gives you hot reload on browser refresh — no Go recompile needed.
-
-```sh
-go run -tags dev .
-```
-
-What this changes:
-
-- **Go templates** (`internal/ui/templates/`) — re-parsed on every request, so edits show up on refresh
-- **Static assets** (`internal/ui/static/`) — served from disk via `os.DirFS`, changes are immediate
-- **Astro site** (`internal/ui/site/`) — served from disk, so `astro build --watch` output is picked up on refresh
-
-Without the `dev` tag (default), everything is embedded via `go:embed` as usual for single-binary deployment.
-
-## Key Conventions
-
-- Standard library `net/http` for routing (Go 1.22+ enhanced patterns)
-- GORM ORM with multi-dialect support
-- All database access goes through `*db.Repository`
-- Transactions use `repo.Transaction(func(txRepo *db.Repository) error { ... })`
-- `log/slog` for structured logging
-- Interfaces for pluggable backends (`blob.Store`, `auth.Service`)
-- Server-rendered Go HTML templates for web UI
-- All assets embedded via `go:embed` for single-binary deployment
+See the Solution Layout and Key Conventions in [CLAUDE.md](CLAUDE.md), and the
+parity backlog in [docs/PARITY-GAPS.md](docs/PARITY-GAPS.md).

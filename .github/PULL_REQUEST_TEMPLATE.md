@@ -6,9 +6,8 @@
 
 ## Checklist
 
-- [ ] `task test` passes locally
-- [ ] `task vet` is clean
-- [ ] `task fmt` has been run
+- [ ] `dotnet build Rstash.slnx` is clean (0 warnings)
+- [ ] `dotnet test Rstash.slnx` passes locally
 - [ ] Docs/comments updated if behavior changed
 
 ## Related issues
