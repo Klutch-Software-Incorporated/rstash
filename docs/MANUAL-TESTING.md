@@ -14,7 +14,7 @@ Throughout, the server runs at **http://localhost:8080** unless you set `ASPNETC
 - [ ] **Do:** `dotnet build Rstash.slnx`
       **Expect:** builds with 0 errors, 0 warnings.
 - [ ] **Do:** `dotnet test Rstash.slnx`
-      **Expect:** all tests pass (159 unit + 32 integration).
+      **Expect:** all tests pass (159 unit + 33 integration).
 
 ## 1. CLI
 

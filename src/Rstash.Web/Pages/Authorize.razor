@@ -1,47 +1,98 @@
 @page "/oauth/authorize"
+@layout FocusLayout
+@inject SettingsService Settings
 @inject NavigationManager Navigation
 
-<PageTitle>Authorize</PageTitle>
+<PageTitle>Authorize access · @Settings.Current.SiteName</PageTitle>
 
-@if (_error is not null)
-{
-    <MudText Typo="Typo.h5" GutterBottom="true">Authorization error</MudText>
-    <MudAlert Severity="Severity.Error">@_error</MudAlert>
-}
-else
-{
-    <MudText Typo="Typo.h5" GutterBottom="true">Authorize access</MudText>
-    <MudText Class="mb-2">
-        The application at <strong>@_origin</strong> is requesting access to your storage:
-    </MudText>
-    <ul>
-        @foreach (var scope in _scopes)
-        {
-            <li>@DescribeScope(scope)</li>
-        }
-    </ul>
+<div class="rs-auth">
+    @if (_error is not null)
+    {
+        <div class="rs-auth-card">
+            <div class="rs-auth-head">
+                <img src="/favicon.svg" class="rs-auth-logo" alt="" />
+                <h1>Authorization error</h1>
+            </div>
+            <div class="rs-auth-error">@_error</div>
+            <div class="rs-auth-foot"><a href="/">Return home</a></div>
+        </div>
+    }
+    else
+    {
+        <div class="rs-auth-card rs-consent">
+            <div class="rs-auth-head">
+                <img src="/favicon.svg" class="rs-auth-logo" alt="" />
+                <h1>Authorize access</h1>
+                <p>An application is requesting access to your storage.</p>
+            </div>
 
-    <form action="/oauth/authorize" method="post">
-        <AntiforgeryToken />
-        <input type="hidden" name="redirect_uri" value="@RedirectUri" />
-        <input type="hidden" name="state" value="@State" />
-        <input type="hidden" name="response_type" value="@ResponseType" />
-        @foreach (var scope in _scopes)
-        {
-            <input type="hidden" name="scope" value="@scope" />
-        }
-        <input type="hidden" name="code_challenge" value="@CodeChallenge" />
-        <input type="hidden" name="code_challenge_method" value="@CodeChallengeMethod" />
+            <div class="rs-consent-app">
+                <div class="rs-consent-app-host">@_host</div>
+                <div class="rs-consent-app-origin">@_origin</div>
+            </div>
 
-        <MudButton ButtonType="ButtonType.Submit" Variant="Variant.Filled" Color="Color.Success"
-                   Class="mr-2" name="action" value="approve">
-            Authorize
-        </MudButton>
-        <MudButton ButtonType="ButtonType.Submit" Variant="Variant.Outlined" name="action" value="deny">
-            Deny
-        </MudButton>
-    </form>
-}
+            <div class="rs-consent-as">
+                <span class="rs-avatar">@_initial</span>
+                <span>Signed in as <strong>@_username</strong></span>
+            </div>
+
+            @if (_hasRoot)
+            {
+                <div class="rs-consent-warn">
+                    This application is requesting <strong>full access</strong> to all your data.
+                    Only continue if you trust it.
+                </div>
+            }
+
+            <div class="rs-consent-perms">
+                <div class="rs-consent-label">Permissions requested</div>
+                <ul class="rs-scope-list">
+                    @foreach (var scope in _scopes)
+                    {
+                        var (module, isWrite) = ScopeParts(scope);
+                        <li class="rs-scope-row">
+                            <span class="rs-scope-badges">
+                                <span class="rs-scope-badge read">Read</span>
+                                @if (isWrite)
+                                {
+                                    <span class="rs-scope-badge write">Write</span>
+                                }
+                            </span>
+                            <span class="rs-scope-module">@module</span>
+                        </li>
+                    }
+                </ul>
+            </div>
+
+            <div class="rs-consent-redirect">
+                <div class="rs-consent-label">After you allow, you'll return to</div>
+                <div class="rs-consent-redirect-dest">@RedirectUri</div>
+            </div>
+
+            <form action="/oauth/authorize/decision" method="post" class="rs-consent-form">
+                <AntiforgeryToken />
+                <input type="hidden" name="redirect_uri" value="@RedirectUri" />
+                <input type="hidden" name="state" value="@State" />
+                <input type="hidden" name="response_type" value="@ResponseType" />
+                @foreach (var scope in _scopes)
+                {
+                    <input type="hidden" name="scope" value="@scope" />
+                }
+                <input type="hidden" name="code_challenge" value="@CodeChallenge" />
+                <input type="hidden" name="code_challenge_method" value="@CodeChallengeMethod" />
+
+                <div class="rs-consent-actions">
+                    <button type="submit" name="action" value="deny" class="rs-consent-deny">Deny</button>
+                    <button type="submit" name="action" value="approve" class="rs-consent-allow">Allow access</button>
+                </div>
+            </form>
+
+            <p class="rs-consent-note">
+                Only authorize applications you trust — this application is not affiliated with @Settings.Current.SiteName.
+            </p>
+        </div>
+    }
+</div>
 
 @code {
     [SupplyParameterFromQuery(Name = "response_type")] public string? ResponseType { get; set; }
@@ -55,6 +106,10 @@ else
 
     private string? _error;
     private string _origin = "";
+    private string _host = "";
+    private string _username = "";
+    private string _initial = "?";
+    private bool _hasRoot;
     private IReadOnlyList<string> _scopes = [];
 
     protected override void OnInitialized()
@@ -74,6 +129,7 @@ else
         }
 
         _origin = $"{redirect.Scheme}://{redirect.Authority}";
+        _host = redirect.Host;
 
         if (!Scope.TryParse(ScopeParam ?? "", out var scopes))
         {
@@ -82,6 +138,7 @@ else
         }
 
         _scopes = scopes;
+        _hasRoot = scopes.Any(s => s.StartsWith('*'));
 
         if (ResponseType == "code" && (string.IsNullOrEmpty(CodeChallenge) || CodeChallengeMethod != "S256"))
         {
@@ -94,14 +151,19 @@ else
         {
             var returnUrl = "/oauth/authorize" + (HttpContext?.Request.QueryString.Value ?? "");
             Navigation.NavigateTo($"/login?redirect={Uri.EscapeDataString(returnUrl)}", forceLoad: true);
+            return;
         }
+
+        _username = HttpContext.User.Identity.Name ?? "";
+        _initial = string.IsNullOrEmpty(_username) ? "?" : _username[..1];
     }
 
-    private static string DescribeScope(string scope)
+    // Splits "module:rw" into a display module and a write flag.
+    private static (string Module, bool IsWrite) ScopeParts(string scope)
     {
         var parts = scope.Split(':', 2);
-        var target = parts[0] == "*" ? "all your data" : $"your /{parts[0]} data";
-        var permission = parts.Length > 1 && parts[1] == "rw" ? "Read and write" : "Read";
-        return $"{permission} {target}";
+        var module = parts[0] == "*" ? "All your data" : "/" + parts[0];
+        var isWrite = parts.Length > 1 && parts[1] == "rw";
+        return (module, isWrite);
     }
 }

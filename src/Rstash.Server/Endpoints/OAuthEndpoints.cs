@@ -19,7 +19,9 @@ internal static class OAuthEndpoints
 {
     public static void MapOAuthEndpoints(this IEndpointRouteBuilder endpoints)
     {
-        endpoints.MapPost("/oauth/authorize", AuthorizeAsync);
+        // Distinct from the GET consent page (the Blazor @page "/oauth/authorize"):
+        // a minimal-API POST on the same path would collide with the page endpoint.
+        endpoints.MapPost("/oauth/authorize/decision", AuthorizeAsync);
         endpoints.MapPost("/oauth/token", TokenAsync).DisableAntiforgery().RequireCors("rstash-storage");
         endpoints.MapPost("/oauth/revoke", RevokeAsync).DisableAntiforgery().RequireCors("rstash-storage");
     }

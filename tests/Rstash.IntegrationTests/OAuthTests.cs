@@ -71,6 +71,18 @@ public sealed class OAuthTests(RstashAppFactory factory) : IClassFixture<RstashA
     }
 
     [Fact]
+    public async Task AuthorizeDecision_PostResolvesToSingleEndpoint()
+    {
+        // Regression: the consent POST must not share a path with the GET consent
+        // page (Blazor @page "/oauth/authorize"), or POST is an AmbiguousMatch (500).
+        // A bare POST trips antiforgery -> 400, proving the route resolves uniquely.
+        var response = await factory.CreateClient().PostAsync(
+            "/oauth/authorize/decision", new FormUrlEncodedContent(new Dictionary<string, string>()));
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
     public async Task Revoke_InvalidatesToken()
     {
         var token = await SeedTokenAsync("revokeuser", "*:rw");
