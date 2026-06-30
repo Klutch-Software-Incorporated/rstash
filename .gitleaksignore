@@ -9,3 +9,8 @@
 # Placeholder example value in the OpenAPI spec ("a1b2c3d4e5f6..."), not a
 # real token.
 0990c8c59fd45a40f6a677cd23088d5ada8b038b:api/openapi.yaml:generic-api-key:213
+
+# UI example in the admin OAuth test page: a `curl -H "Authorization: Bearer
+# <token>"` snippet where the token is the Razor expression @_accessToken (not a
+# real credential). Triggers the curl-auth-header rule.
+8abeb0f7ecf0218072f134a9375dd8ebbaf6c89c:src/Rstash.Web/Pages/AdminOAuthTest.razor:curl-auth-header:33
