@@ -84,8 +84,10 @@ internal static class AdminUserEndpoints
 
         if (target is not null)
         {
-            var raw = ctx.Request.Form["storageQuota"].ToString();
-            target.StorageQuota = ByteSize.TryParse(raw, out var bytes) ? bytes : 0;
+            var storageRaw = ctx.Request.Form["storageQuota"].ToString();
+            var egressRaw = ctx.Request.Form["egressQuota"].ToString();
+            target.StorageQuota = ByteSize.TryParse(storageRaw, out var storage) ? storage : 0;
+            target.EgressQuota = ByteSize.TryParse(egressRaw, out var egress) ? egress : 0;
             await users.UpdateAsync(target);
         }
 

@@ -499,10 +499,18 @@
 .rs-action-danger { color: var(--rs-danger); border-color: var(--rs-danger-tint-line); }
 .rs-action-danger:hover { border-color: var(--rs-danger); background: var(--rs-danger-tint); color: var(--rs-danger-deep); }
 
-/* Compact inline quota form on the users table. */
-.rs-quota-form { display: inline-flex; gap: 6px; align-items: center; }
+/* Compact inline quota form on the users table (storage + egress, then Save). */
+.rs-quota-form { display: inline-flex; gap: 8px; align-items: flex-end; }
+.rs-quota-field { display: inline-flex; flex-direction: column; gap: 2px; }
+.rs-quota-field > span {
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    color: var(--mud-palette-text-secondary);
+}
 .rs-quota-input {
-    width: 7rem;
+    width: 6.5rem;
     padding: .3rem .5rem;
     border: 1px solid var(--mud-palette-lines-default);
     border-radius: 6px;
@@ -774,7 +782,6 @@ textarea.rs-control {
 .rs-topbar-left { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .rs-navtoggle { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
 .rs-hamburger { display: none; }
-.rs-nav-backdrop { display: none; }
 
 /* --- Body: sidebar + content --- */
 .rs-body {
@@ -977,33 +984,25 @@ textarea.rs-control {
     }
     .rs-hamburger:hover { background: rgba(42, 32, 7, .07); color: #2a2007; }
 
-    /* Sidebar becomes an off-canvas drawer sliding in from the left, below the
-       sticky top bar. It is out of flow, so content spans the full width. */
+    /* Sidebar becomes a full-screen overlay menu below the sticky top bar; the
+       hamburger stays visible in the bar to close it. Out of flow, so content
+       spans the full width underneath. */
     .rs-sidebar {
         position: fixed;
         top: 60px;
         left: 0;
+        right: 0;
         bottom: 0;
         height: auto;
-        width: 264px;
-        max-width: 82vw;
+        width: 100%;
+        max-width: none;
         z-index: 40;
+        border-right: none;
+        padding: 14px;
         transform: translateX(-100%);
         transition: transform .22s ease;
     }
-    #rs-navtoggle:checked ~ .rs-body .rs-sidebar {
-        transform: translateX(0);
-        box-shadow: 0 10px 34px rgba(20, 16, 8, .22);
-    }
-
-    /* Dim + tap-to-close backdrop, present only while the drawer is open. */
-    #rs-navtoggle:checked ~ .rs-body .rs-nav-backdrop {
-        display: block;
-        position: fixed;
-        inset: 60px 0 0 0;
-        z-index: 39;
-        background: rgba(20, 16, 8, .38);
-    }
+    #rs-navtoggle:checked ~ .rs-body .rs-sidebar { transform: translateX(0); }
 
     /* The in-content settings tab strip is redundant on mobile — the drawer
        already links every admin subpage. */
