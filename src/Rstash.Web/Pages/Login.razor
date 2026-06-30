@@ -1,31 +1,43 @@
 @page "/login"
 @inject SignInManager<ApplicationUser> SignInManager
 @inject UserManager<ApplicationUser> UserManager
+@inject SettingsService Settings
 @inject NavigationManager Navigation
 
-<PageTitle>Sign in</PageTitle>
+<PageTitle>Sign in · @Settings.Current.SiteName</PageTitle>
 
-<MudText Typo="Typo.h4" GutterBottom="true">Sign in</MudText>
+<div class="rs-auth">
+    <div class="rs-auth-card">
+        <div class="rs-auth-head">
+            <img src="/favicon.svg" class="rs-auth-logo" alt="" />
+            <h1>Sign in</h1>
+            <p>Access your @Settings.Current.SiteName storage.</p>
+        </div>
 
-@if (_error is not null)
-{
-    <MudAlert Severity="Severity.Error" Class="mb-4">@_error</MudAlert>
-}
+        @if (_error is not null)
+        {
+            <div class="rs-auth-error">@_error</div>
+        }
 
-<EditForm Model="Input" method="post" OnValidSubmit="SignInAsync" FormName="login">
-    <DataAnnotationsValidator />
-    <div class="mb-3">
-        <label>Username<br /><InputText @bind-Value="Input.Username" autocomplete="username" /></label>
+        <EditForm Model="Input" method="post" OnValidSubmit="SignInAsync" FormName="login">
+            <DataAnnotationsValidator />
+            <div class="rs-field">
+                <label class="rs-label" for="login-username">Username</label>
+                <InputText id="login-username" class="rs-control" @bind-Value="Input.Username" autocomplete="username" />
+            </div>
+            <div class="rs-field">
+                <label class="rs-label" for="login-password">Password</label>
+                <InputText id="login-password" type="password" class="rs-control"
+                           @bind-Value="Input.Password" autocomplete="current-password" />
+            </div>
+            <button type="submit" class="rs-auth-submit">Sign in</button>
+        </EditForm>
+
+        <div class="rs-auth-foot">
+            <a href="/forgot-password">Forgot your password?</a>
+        </div>
     </div>
-    <div class="mb-3">
-        <label>Password<br /><InputText type="password" @bind-Value="Input.Password" autocomplete="current-password" /></label>
-    </div>
-    <MudButton ButtonType="ButtonType.Submit" Variant="Variant.Filled" Color="Color.Success">
-        Sign in
-    </MudButton>
-</EditForm>
-
-<MudText Class="mt-3"><MudLink Href="/forgot-password">Forgot your password?</MudLink></MudText>
+</div>
 
 @code {
     [SupplyParameterFromForm]

@@ -8,13 +8,7 @@
 
 <PageTitle>@Settings.Current.SiteName</PageTitle>
 
-@if (_user is null)
-{
-    <MudText Typo="Typo.h4" GutterBottom="true">Welcome to @Settings.Current.SiteName</MudText>
-    <MudText Class="mb-4">@Settings.Current.HomeSubtitle</MudText>
-    <MudButton Href="/login" Variant="Variant.Filled" Color="Color.Success">Sign in</MudButton>
-}
-else
+@if (_user is not null)
 {
     <MudPaper Class="rs-hero" Elevation="1">
         <p class="rs-hero-label">Your storage address</p>
@@ -163,6 +157,8 @@ else
     {
         if (HttpContext?.User.Identity?.IsAuthenticated != true)
         {
+            // Signed-out visitors get the sign-in page, not an empty dashboard.
+            Navigation.NavigateTo("/login", forceLoad: true);
             return;
         }
 
