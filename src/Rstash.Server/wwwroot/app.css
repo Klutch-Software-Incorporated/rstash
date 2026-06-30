@@ -403,6 +403,14 @@
 .rs-browse:hover { background: var(--rs-gold-tint); }
 
 /* ---------- file browser + generic data tables ---------- */
+
+/* On narrow screens these tables (many nowrap cells) would stretch the page;
+   let them scroll horizontally within their card instead. */
+.rs-table,
+.rs-files-table,
+.rs-table > .mud-table-container,
+.rs-files-table > .mud-table-container { overflow-x: auto; max-width: 100%; }
+
 .rs-files-table th,
 .rs-table th {
     font-size: .72rem;
