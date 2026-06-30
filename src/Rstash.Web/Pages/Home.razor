@@ -32,33 +32,12 @@ else
     </MudPaper>
 
     <div class="rs-grid">
-        <MudPaper Class="rs-card" Elevation="1">
-            <div class="rs-card-head">
-                <h2>Connected apps</h2>
-                <span class="rs-count">@_tokens.Count connected</span>
-            </div>
-            @if (_tokens.Count == 0)
-            {
-                <div class="rs-empty">No apps connected yet. Authorize one from its connect screen.</div>
-            }
-            else
-            {
-                @foreach (var token in _tokens.Take(MaxApps))
-                {
-                    <ConnectedApp Token="token" />
-                }
-                @if (_tokens.Count > MaxApps)
-                {
-                    <a class="rs-browse" href="/account/apps">Manage all @_tokens.Count apps →</a>
-                }
-            }
-        </MudPaper>
-
-        <MudPaper Class="rs-card" Elevation="1">
-            <div class="rs-card-head">
-                <h2>Usage</h2>
-            </div>
-            <div class="rs-usage">
+        <div class="rs-col">
+            <MudPaper Class="rs-card" Elevation="1">
+                <div class="rs-card-head">
+                    <h2>Usage</h2>
+                </div>
+                <div class="rs-usage">
                 <div class="rs-stat">
                     <span class="rs-stat-label">On disk</span>
                     <div class="rs-stat-top">
@@ -103,34 +82,67 @@ else
                         <div class="rs-meter rs-meter-unlimited" aria-hidden="true"><span></span></div>
                     }
                 </div>
-            </div>
-            @if (_usage.Folders.Count == 0)
-            {
-                <div class="rs-empty">No files yet — connect an app, or run <code>rstash seed</code>.</div>
-            }
-            else
-            {
-                <div class="rs-breakdown-head">What's using space</div>
-                @foreach (var folder in _usage.Folders)
+                </div>
+            </MudPaper>
+
+            <MudPaper Class="rs-card" Elevation="1">
+                <div class="rs-card-head">
+                    <h2>Connected apps</h2>
+                    <span class="rs-count">@_tokens.Count connected</span>
+                </div>
+                @if (_tokens.Count == 0)
                 {
-                    <div class="rs-cat">
-                        <div class="rs-cat-top">
-                            <span class="rs-cat-name">@folder.Folder</span>
-                            <span class="rs-cat-size">@Format(folder.Bytes)</span>
-                        </div>
-                        <MudProgressLinear Color="Color.Primary" Size="Size.Small" Rounded="true"
-                                           Value="@(_maxFolderBytes > 0 ? folder.Bytes * 100.0 / _maxFolderBytes : 0)" />
-                    </div>
+                    <div class="rs-empty">No apps connected yet. Authorize one from its connect screen.</div>
                 }
-                <a class="rs-browse" href="/files">Browse all files →</a>
-            }
-        </MudPaper>
+                else
+                {
+                    @foreach (var token in _tokens.Take(MaxApps))
+                    {
+                        <ConnectedApp Token="token" />
+                    }
+                    @if (_tokens.Count > MaxApps)
+                    {
+                        <a class="rs-browse" href="/account/apps">Manage all @_tokens.Count apps →</a>
+                    }
+                }
+            </MudPaper>
+        </div>
+
+        <div class="rs-col">
+            <MudPaper Class="rs-card" Elevation="1">
+                <div class="rs-card-head">
+                    <h2>What's using space</h2>
+                </div>
+                @if (_usage.Folders.Count == 0)
+                {
+                    <div class="rs-empty">No files yet — connect an app, or run <code>rstash seed</code>.</div>
+                }
+                else
+                {
+                    @foreach (var folder in _usage.Folders.Take(MaxFolders))
+                    {
+                        <div class="rs-cat">
+                            <div class="rs-cat-top">
+                                <span class="rs-cat-name">@folder.Folder</span>
+                                <span class="rs-cat-size">@Format(folder.Bytes)</span>
+                            </div>
+                            <MudProgressLinear Color="Color.Primary" Size="Size.Small" Rounded="true"
+                                               Value="@(_maxFolderBytes > 0 ? folder.Bytes * 100.0 / _maxFolderBytes : 0)" />
+                        </div>
+                    }
+                    <a class="rs-browse" href="/files">Browse all files →</a>
+                }
+            </MudPaper>
+        </div>
     </div>
 }
 
 @code {
     // Show only the most recent apps on the dashboard; the rest live on /account/apps.
     private const int MaxApps = 5;
+
+    // Show only the largest modules; the rest are reachable via the file browser.
+    private const int MaxFolders = 5;
 
     [CascadingParameter] private HttpContext? HttpContext { get; set; }
 
