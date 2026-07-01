@@ -242,6 +242,29 @@ approve, then `POST /oauth/token` with `grant_type=authorization_code&code=…&c
 - [ ] **Do:** view `/login` and the dashboard at phone width.
       **Expect:** the sign-in card and the Usage/Connected-apps cards stack and stay readable.
 
+## 10z. Azure Blob storage (`azureblob:`)
+
+DSN: `azureblob://{account}/{container}[/{prefix}][?tls=false&endpoint=host:port&key=…&sas=…]`.
+Auth is chosen by the DSN: `key=` → shared key, `sas=` → SAS token, neither →
+`DefaultAzureCredential` (managed identity in production).
+
+> ⚠️ **`az` CLI caution.** The no-credential form (`azureblob://acct/container`)
+> uses `DefaultAzureCredential`, whose chain can fall through to the **Azure CLI
+> credential** — i.e. whatever account `az login` last used. For local testing
+> always use a **key-based** DSN against Azurite (below) so no real Azure account
+> is touched.
+
+- [ ] **Do (needs Docker):** start the emulator —
+      `docker run -d --name rstash-azurite -p 10000:10000 mcr.microsoft.com/azure-storage/azurite azurite-blob --blobHost 0.0.0.0`,
+      create a container named `rstash`, then run with
+      `RSTASH_BLOB='azureblob://devstoreaccount1/rstash?endpoint=127.0.0.1:10000&tls=false&key=<azurite-key>'`
+      and `dotnet run --project src/Rstash.Server -- check`.
+      **Expect:** `[ok] blob store`. Point `endpoint` at a dead port → `[FAIL]`.
+- [ ] **Do:** PUT/GET/DELETE a document via `/storage/...`.
+      **Expect:** blobs land in the container under `{userId}/{path}`.
+- The Azure round-trip xUnit tests (`AzureBlobStorageTests`) auto-run when Azurite
+  is reachable and self-skip otherwise.
+
 ## 11. Single-file & container
 
 - [ ] **Do:**
@@ -260,6 +283,9 @@ approve, then `POST /oauth/token` with `grant_type=authorization_code&code=…&c
 - Remaining Go→C# parity gaps (encryption at rest, rate-limit enforcement, refresh-token grant,
   admin JSON API, metrics, email verification, abuse reports, …) are tracked in
   [PARITY-GAPS.md](PARITY-GAPS.md).
-- Postgres/MySQL/SQL Server DB providers and S3/Azure blob backends are stubbed (factories throw)
-  pending their NuGet packages — SQLite + filesystem + database blobs work today.
+- Postgres/MySQL/SQL Server DB providers and the S3 blob backend are stubbed (factories throw)
+  pending their NuGet packages — SQLite + filesystem + database blobs work today. Azure Blob
+  (`azureblob://{account}/{container}`) is wired.
+- `/healthz` returns JSON (`{status, checks[]}`) with per-dependency status and probes
+  live **database** + **storage** connectivity; it returns 503 when either is unreachable.
 - The original Go server lives in `legacy/` for reference; it is not built.

@@ -51,6 +51,13 @@ internal static class Cli
         try
         {
             await using var store = StorageFactory.Open(blobDsn);
+            // Remote backends (e.g. Azure Blob) validate connectivity/credentials
+            // on demand; local ones validate on open and skip this.
+            if (store is IStorageProbe probe)
+            {
+                await probe.ProbeAsync();
+            }
+
             Console.WriteLine($"[ok]   blob store: {blobDsn}");
         }
         catch (Exception ex)
