@@ -33,4 +33,15 @@ public class DatabaseDsnTests
         Assert.Equal(Dialect.Postgres, parsed.Dialect);
         Assert.Equal("host=localhost dbname=rstash", parsed.ConnectionString);
     }
+
+    [Fact]
+    public void Parse_PostgresNativeString_IsDialectAgnostic()
+    {
+        // Parse stays dialect-agnostic: it just strips the scheme. The Npgsql-specific
+        // reshaping (and Auth=Entra stripping) happens later in PostgresDsn.
+        var parsed = DatabaseDsn.Parse("postgres:Host=localhost;Database=rstash;Auth=Entra");
+
+        Assert.Equal(Dialect.Postgres, parsed.Dialect);
+        Assert.Equal("Host=localhost;Database=rstash;Auth=Entra", parsed.ConnectionString);
+    }
 }

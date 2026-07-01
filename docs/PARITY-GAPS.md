@@ -26,10 +26,11 @@ stubbed** in the C# rewrite, to be tackled as individual features after the
 
 - **Admin JSON API + API-key auth.** Go: `/api/admin/*` (`legacy/internal/api/admin.go`,
   `apikey.go`). C# has cookie-UI admin only. (Roadmap: "Admin API — next up.")
-- **Multi-provider databases** (Postgres/MySQL/SQL Server) and the **S3 blob
-  backend** — stubbed in C# (factories throw); SQLite + filesystem/database work.
-  (**Azure Blob** is now wired — `azureblob://{account}/{container}` with
-  shared-key/SAS/`DefaultAzureCredential` auth.)
+- **MySQL / SQL Server database providers** and the **S3 blob backend** — stubbed in
+  C# (factories throw); the wiring seams are in place. (**Postgres** is now wired —
+  native Npgsql DSN + Azure Entra ID auth; see below. **Azure Blob** is wired —
+  `azureblob://{account}/{container}` with shared-key/SAS/`DefaultAzureCredential` auth.
+  SQLite + filesystem/database work.)
 - **`/metrics` + observability.** The `metrics_mode` setting references a
   `/metrics` endpoint that isn't wired; no OpenTelemetry.
 - **Email verification** (verify-email token + AccountGuard). Forgot/reset
@@ -38,8 +39,9 @@ stubbed** in the C# rewrite, to be tackled as individual features after the
 
 ## Tier 3 — niche / Azure-specific
 
-- **Entra ID Postgres auth** (`legacy/internal/db/entra_postgres.go`) — moot until
-  Postgres is wired.
+- **Entra ID Postgres auth** (`legacy/internal/db/entra_postgres.go`) — ported: append
+  `Auth=Entra` to a native `postgres:` DSN; the password is a `DefaultAzureCredential`
+  access token (periodic-refresh data source at runtime, one-shot token for migrations).
 - **`encrypt-existing` CLI** and the `rs-upload` helper tools — auxiliary;
   `encrypt-existing` only matters once encryption at rest lands.
 - **Bundled Swagger UI page.** C# serves the OpenAPI spec at `/openapi/v1.json`

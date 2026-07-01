@@ -50,7 +50,9 @@ public static class SettingDefinitions
             EnvVar = EnvVars.Database,
             Group = "Server",
             Label = "Database DSN",
-            Description = "Metadata database DSN. Supported: sqlite:, postgres:, mysql:, mssql:.",
+            Description = "Metadata database DSN. sqlite:PATH, or postgres: + a native Npgsql " +
+                "connection string (e.g. postgres:Host=…;Database=…;Username=…;Ssl Mode=Require; " +
+                "append ;Auth=Entra for Azure managed-identity auth). mysql:/mssql: not yet wired.",
             Default = "sqlite:rstash.sqlite",
             InputType = SettingInputType.Text,
         },
