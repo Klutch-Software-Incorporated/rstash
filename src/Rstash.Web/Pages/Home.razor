@@ -1,6 +1,6 @@
 @page "/"
 @inject Rstash.Services.SettingsService Settings
-@inject UserManager<ApplicationUser> Users
+@inject CurrentUserAccessor CurrentUser
 @inject RemoteStorageService Storage
 @inject TokenStore Tokens
 @inject Rstash.Services.Storage.EgressTracker Egress
@@ -162,7 +162,7 @@
             return;
         }
 
-        _user = await Users.GetUserAsync(HttpContext.User);
+        _user = await CurrentUser.GetAsync(HttpContext.User);
         if (_user is null)
         {
             return;

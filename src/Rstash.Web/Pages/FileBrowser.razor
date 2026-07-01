@@ -2,7 +2,7 @@
 @page "/files/{**Path}"
 @attribute [Authorize]
 @inject RemoteStorageService Storage
-@inject UserManager<ApplicationUser> Users
+@inject CurrentUserAccessor CurrentUser
 
 <PageTitle>Files</PageTitle>
 
@@ -87,7 +87,7 @@
         _folderPath = "/" + _relativePath;
         BuildCrumbs();
 
-        var user = HttpContext is null ? null : await Users.GetUserAsync(HttpContext.User);
+        var user = await CurrentUser.GetAsync(HttpContext?.User);
         if (user is null)
         {
             return;

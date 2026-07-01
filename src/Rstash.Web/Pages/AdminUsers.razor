@@ -2,6 +2,7 @@
 @attribute [Authorize]
 @using Microsoft.EntityFrameworkCore
 @inject UserManager<ApplicationUser> Users
+@inject CurrentUserAccessor CurrentUser
 @inject NavigationManager Navigation
 
 <PageTitle>Users — admin</PageTitle>
@@ -111,7 +112,7 @@
 
     protected override async Task OnInitializedAsync()
     {
-        var actor = HttpContext is null ? null : await Users.GetUserAsync(HttpContext.User);
+        var actor = await CurrentUser.GetAsync(HttpContext?.User);
         if (actor is null || !actor.IsAdmin)
         {
             Navigation.NavigateTo("/", forceLoad: true);

@@ -1,6 +1,7 @@
 @page "/account"
 @attribute [Authorize]
 @inject UserManager<ApplicationUser> Users
+@inject CurrentUserAccessor CurrentUser
 @inject SignInManager<ApplicationUser> SignInManager
 
 <PageTitle>Account</PageTitle>
@@ -162,8 +163,7 @@
         }
     }
 
-    private Task<ApplicationUser?> CurrentUserAsync() =>
-        HttpContext is null ? Task.FromResult<ApplicationUser?>(null) : Users.GetUserAsync(HttpContext.User);
+    private Task<ApplicationUser?> CurrentUserAsync() => CurrentUser.GetAsync(HttpContext?.User);
 
     public sealed class PasswordInput
     {
