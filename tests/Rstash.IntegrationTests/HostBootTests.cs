@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Microsoft.Extensions.DependencyInjection;
 using Rstash.Services;
 using Rstash.Services.Storage;
@@ -7,14 +8,22 @@ namespace Rstash.IntegrationTests;
 public sealed class HostBootTests(RstashAppFactory factory) : IClassFixture<RstashAppFactory>
 {
     [Fact]
-    public async Task Healthz_ReturnsHealthy()
+    public async Task Healthz_ReturnsHealthy_WithPerDependencyBreakdown()
     {
         var client = factory.CreateClient();
 
         var response = await client.GetAsync("/healthz");
 
         response.EnsureSuccessStatusCode();
-        Assert.Equal("Healthy", await response.Content.ReadAsStringAsync());
+
+        using var doc = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        Assert.Equal("Healthy", doc.RootElement.GetProperty("status").GetString());
+
+        // The database and storage connectivity checks are both reported by name.
+        var checks = doc.RootElement.GetProperty("checks").EnumerateArray()
+            .ToDictionary(c => c.GetProperty("name").GetString()!, c => c.GetProperty("status").GetString());
+        Assert.Equal("Healthy", checks["database"]);
+        Assert.Equal("Healthy", checks["storage"]);
     }
 
     [Fact]

@@ -5,6 +5,7 @@ using Rstash.Database;
 using Rstash.Notifications;
 using Rstash.Server.Components;
 using Rstash.Server.Endpoints;
+using Rstash.Server.Health;
 using Rstash.Services;
 using Rstash.Services.Storage;
 using Rstash.Storage;
@@ -47,7 +48,19 @@ var listenAddr = builder.Configuration["RSTASH_ADDR"] ?? ":8080";
 builder.WebHost.UseUrls(listenAddr.StartsWith(':') ? $"http://0.0.0.0{listenAddr}" : $"http://{listenAddr}");
 
 // Core services.
-builder.Services.AddHealthChecks();
+// Connectivity checks are bounded so /healthz fails fast instead of blocking on
+// SDK retries when a dependency is down (load balancers poll this).
+builder.Services.AddHealthChecks()
+    .AddCheck<DatabaseHealthCheck>(
+        "database",
+        failureStatus: Microsoft.Extensions.Diagnostics.HealthChecks.HealthStatus.Unhealthy,
+        tags: null,
+        timeout: TimeSpan.FromSeconds(5))
+    .AddCheck<StorageHealthCheck>(
+        "storage",
+        failureStatus: Microsoft.Extensions.Diagnostics.HealthChecks.HealthStatus.Unhealthy,
+        tags: null,
+        timeout: TimeSpan.FromSeconds(5));
 builder.Services.AddOpenApi();
 builder.Services.AddDbContextFactory<RstashDbContext>(options => options.UseRstashDatabase(databaseDsn));
 builder.Services.AddSingleton<IStorage>(_ => StorageFactory.Open(blobDsn));
@@ -172,7 +185,10 @@ app.Use(async (context, next) =>
     await next(context);
 });
 
-app.MapHealthChecks("/healthz");
+app.MapHealthChecks("/healthz", new Microsoft.AspNetCore.Diagnostics.HealthChecks.HealthCheckOptions
+{
+    ResponseWriter = HealthResponse.WriteAsync,
+});
 app.MapOpenApi();
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode()

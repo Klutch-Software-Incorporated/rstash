@@ -38,7 +38,8 @@ Ranked; details in [docs/PARITY-GAPS.md](docs/PARITY-GAPS.md).
 ## 3. Backends & deployment (as needed)
 
 - [ ] Wire the stubbed **Postgres / MySQL / SQL Server** providers (incl. Entra ID auth).
-- [ ] Wire the stubbed **S3 / Azure Blob** backends.
+- [x] Wire the **Azure Blob** backend (`azureblob://{account}/{container}`; shared-key / SAS / `DefaultAzureCredential`).
+- [ ] Wire the stubbed **S3** backend.
 - [ ] Hosting: the rstash.cloud deploy pipeline (`rstash-infra`) / Azure pivot.
 
 ## 4. Platform direction (sequenced after parity)

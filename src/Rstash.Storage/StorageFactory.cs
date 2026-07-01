@@ -3,7 +3,7 @@ namespace Rstash.Storage;
 /// <summary>
 /// Opens a blob store from a DSN. The supported scheme list is the source of
 /// truth shared with config validation. Encryption wrapping (RSTASH_BLOB_KEY)
-/// and the S3/Azure/database backends are layered on in later chunks.
+/// and the S3/database backends are layered on in later chunks.
 /// </summary>
 public static class StorageFactory
 {
@@ -23,8 +23,9 @@ public static class StorageFactory
             // pick a provider). SQLite is wired; other providers throw until
             // their packages land.
             "sqlite" or "postgres" or "mysql" or "mssql" => new DatabaseStorage(dsn),
+            // Object stores take the full DSN and parse it themselves.
+            "azureblob" => new AzureBlobStorage(dsn),
             "s3" => throw new NotSupportedException("s3 blob backend deferred (needs the AWS SDK)."),
-            "azureblob" => throw new NotSupportedException("azureblob backend deferred (needs the Azure SDK)."),
             _ => throw new NotSupportedException(
                 $"unsupported blob scheme \"{scheme}\" (supported: {string.Join(", ", SupportedSchemes)})"),
         };

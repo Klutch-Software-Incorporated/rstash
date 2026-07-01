@@ -27,3 +27,14 @@ public interface IStorageCounter
 {
     Task<long> CountAsync(CancellationToken cancellationToken = default);
 }
+
+/// <summary>
+/// Optional capability: verify the backend is reachable and the credentials
+/// work. Backends that talk to a remote service (e.g. Azure Blob) implement
+/// this so <c>rstash check</c> can fail fast on bad config; local backends that
+/// validate on open don't need it.
+/// </summary>
+public interface IStorageProbe
+{
+    Task ProbeAsync(CancellationToken cancellationToken = default);
+}

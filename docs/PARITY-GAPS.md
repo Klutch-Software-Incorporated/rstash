@@ -26,8 +26,10 @@ stubbed** in the C# rewrite, to be tackled as individual features after the
 
 - **Admin JSON API + API-key auth.** Go: `/api/admin/*` (`legacy/internal/api/admin.go`,
   `apikey.go`). C# has cookie-UI admin only. (Roadmap: "Admin API — next up.")
-- **Multi-provider databases** (Postgres/MySQL/SQL Server) and **S3/Azure blob
-  backends** — stubbed in C# (factories throw); SQLite + filesystem/database work.
+- **Multi-provider databases** (Postgres/MySQL/SQL Server) and the **S3 blob
+  backend** — stubbed in C# (factories throw); SQLite + filesystem/database work.
+  (**Azure Blob** is now wired — `azureblob://{account}/{container}` with
+  shared-key/SAS/`DefaultAzureCredential` auth.)
 - **`/metrics` + observability.** The `metrics_mode` setting references a
   `/metrics` endpoint that isn't wired; no OpenTelemetry.
 - **Email verification** (verify-email token + AccountGuard). Forgot/reset
