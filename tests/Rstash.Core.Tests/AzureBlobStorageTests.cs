@@ -9,13 +9,13 @@ namespace Rstash.Core.Tests;
 /// so every storage backend is held to the same behavioural contract. Self-skips
 /// (via <see cref="AzuriteFactAttribute"/>) when no emulator is running.
 /// </summary>
-public sealed class AzureBlobStorageTests : IAsyncLifetime
+public sealed class AzureBlobStorageTests : IDisposable
 {
     private readonly string _container = $"rstash-test-{Guid.NewGuid():N}";
-    private BlobContainerClient _admin = null!;
-    private AzureBlobStorage _store = null!;
+    private readonly BlobContainerClient _admin;
+    private readonly AzureBlobStorage _store;
 
-    public async Task InitializeAsync()
+    public AzureBlobStorageTests()
     {
         var connectionString =
             "DefaultEndpointsProtocol=http;"
@@ -23,22 +23,15 @@ public sealed class AzureBlobStorageTests : IAsyncLifetime
             + $"BlobEndpoint=http://{AzuriteEmulator.Host}:{AzuriteEmulator.BlobPort}/{AzuriteEmulator.Account};";
 
         _admin = new BlobContainerClient(connectionString, _container);
-        await _admin.CreateIfNotExistsAsync();
+        _admin.CreateIfNotExists();
 
         _store = new AzureBlobStorage(AzuriteEmulator.BlobDsn(_container));
     }
 
-    public async Task DisposeAsync()
+    public void Dispose()
     {
-        if (_admin is not null)
-        {
-            await _admin.DeleteIfExistsAsync();
-        }
-
-        if (_store is not null)
-        {
-            await _store.DisposeAsync();
-        }
+        _admin.DeleteIfExists();
+        _store.DisposeAsync().AsTask().GetAwaiter().GetResult();
     }
 
     [AzuriteFact]
