@@ -1,3 +1,4 @@
+using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 
 namespace Rstash.Database;
@@ -28,7 +29,7 @@ public static class RstashDbContextOptionsExtensions
         {
             Dialect.Sqlite => builder
                 .UseSqlite(ToSqliteConnectionString(parsed.ConnectionString))
-                .AddInterceptors(SqliteCaseSensitiveLikeInterceptor.Instance),
+                .AddInterceptors(new SqliteConnectionInitInterceptor(SqliteJournalMode(parsed.ConnectionString))),
             _ => throw new NotSupportedException(
                 $"Database dialect '{parsed.Dialect}' is not yet wired in the .NET rewrite; " +
                 "only sqlite is implemented so far."),
@@ -40,8 +41,59 @@ public static class RstashDbContextOptionsExtensions
     /// string. Shared with <see cref="SchemaMigrator"/> so EF and FluentMigrator
     /// open the same database the same way.
     /// </summary>
-    internal static string ToSqliteConnectionString(string pathOrConnection) =>
-        pathOrConnection.Contains('=', StringComparison.Ordinal)
-            ? pathOrConnection // already a Microsoft.Data.Sqlite connection string
-            : $"Data Source={pathOrConnection}";
+    /// <remarks>
+    /// The remainder is normally a filesystem path (or <c>:memory:</c>), but the
+    /// DSN may append URI-style query parameters such as
+    /// <c>?journal_mode=delete</c>. Those are pragmas, not connection-string
+    /// keywords — Microsoft.Data.Sqlite would reject them — so the query is
+    /// stripped here and any pragmas are applied on open by
+    /// <see cref="SqliteConnectionInitInterceptor"/> (see
+    /// <see cref="SqliteJournalMode"/>). A value that already looks like a
+    /// Microsoft.Data.Sqlite connection string (contains <c>Data Source</c>) is
+    /// passed through unchanged.
+    /// </remarks>
+    internal static string ToSqliteConnectionString(string pathOrConnection)
+    {
+        if (pathOrConnection.Contains("Data Source", StringComparison.OrdinalIgnoreCase))
+        {
+            return pathOrConnection;
+        }
+
+        var path = pathOrConnection;
+        var queryStart = path.IndexOf('?', StringComparison.Ordinal);
+        if (queryStart >= 0)
+        {
+            path = path[..queryStart];
+        }
+
+        return new SqliteConnectionStringBuilder { DataSource = path }.ConnectionString;
+    }
+
+    /// <summary>
+    /// Reads the <c>journal_mode</c> query parameter from a SQLite DSN remainder,
+    /// or <c>null</c> when absent. This is environment-critical: the hosted
+    /// deployment stores its SQLite files on an Azure Files (SMB) share and must
+    /// run <c>journal_mode=delete</c> — WAL corrupts the database over SMB. The
+    /// value is honored (and validated) by <see cref="SqliteConnectionInitInterceptor"/>.
+    /// </summary>
+    internal static string? SqliteJournalMode(string pathOrConnection)
+    {
+        var queryStart = pathOrConnection.IndexOf('?', StringComparison.Ordinal);
+        if (queryStart < 0)
+        {
+            return null;
+        }
+
+        foreach (var pair in pathOrConnection[(queryStart + 1)..].Split('&', StringSplitOptions.RemoveEmptyEntries))
+        {
+            var eq = pair.IndexOf('=', StringComparison.Ordinal);
+            var key = eq < 0 ? pair : pair[..eq];
+            if (key.Equals("journal_mode", StringComparison.OrdinalIgnoreCase))
+            {
+                return eq < 0 ? "" : pair[(eq + 1)..];
+            }
+        }
+
+        return null;
+    }
 }
