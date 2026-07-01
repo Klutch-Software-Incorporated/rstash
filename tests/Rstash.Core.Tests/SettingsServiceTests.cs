@@ -17,10 +17,7 @@ public class SettingsServiceTests
 
         try
         {
-            await using (var db = await factory.CreateDbContextAsync())
-            {
-                await db.Database.MigrateAsync();
-            }
+            SchemaMigrator.MigrateUp($"sqlite:{path}");
 
             var settings = new SettingsService(factory);
             await settings.ReloadAsync();

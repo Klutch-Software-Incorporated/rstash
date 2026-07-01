@@ -35,7 +35,12 @@ public static class RstashDbContextOptionsExtensions
         };
     }
 
-    private static string ToSqliteConnectionString(string pathOrConnection) =>
+    /// <summary>
+    /// Converts a SQLite DSN remainder to a Microsoft.Data.Sqlite connection
+    /// string. Shared with <see cref="SchemaMigrator"/> so EF and FluentMigrator
+    /// open the same database the same way.
+    /// </summary>
+    internal static string ToSqliteConnectionString(string pathOrConnection) =>
         pathOrConnection.Contains('=', StringComparison.Ordinal)
             ? pathOrConnection // already a Microsoft.Data.Sqlite connection string
             : $"Data Source={pathOrConnection}";

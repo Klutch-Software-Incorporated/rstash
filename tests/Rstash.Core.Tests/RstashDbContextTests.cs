@@ -22,10 +22,10 @@ public class RstashDbContextTests
 
         try
         {
+            SchemaMigrator.MigrateUp($"sqlite:{path}");
+
             await using (var ctx = new RstashDbContext(options))
             {
-                await ctx.Database.MigrateAsync();
-
                 ctx.Nodes.Add(new Node
                 {
                     UserId = 1,

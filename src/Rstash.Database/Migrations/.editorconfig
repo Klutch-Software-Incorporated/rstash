@@ -1,3 +1,0 @@
-# EF Core migrations are tool-generated; exempt them from code analysis.
-[*.cs]
-generated_code = true

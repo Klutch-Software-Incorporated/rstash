@@ -21,11 +21,8 @@ public sealed class RemoteStorageServiceTests : IDisposable
         _metaPath = Path.Combine(Path.GetTempPath(), $"rstash-meta-{Guid.NewGuid():N}.sqlite");
         _blobDir = Path.Combine(Path.GetTempPath(), $"rstash-blob-{Guid.NewGuid():N}");
 
+        SchemaMigrator.MigrateUp($"sqlite:{_metaPath}");
         IDbContextFactory<RstashDbContext> factory = new ContextFactory($"sqlite:{_metaPath}");
-        using (var db = factory.CreateDbContext())
-        {
-            db.Database.Migrate();
-        }
 
         _service = new RemoteStorageService(factory, new FileSystemStorage(_blobDir), new SettingsService(factory));
     }

@@ -26,7 +26,7 @@ rstash.cloud deploy pipeline lives in the separate `rstash-infra` repo on Azure 
 - **Run all tests:** `dotnet test Rstash.slnx`
 - **Run one test project:** `dotnet test tests/Rstash.Core.Tests`
 - **Run a single test:** `dotnet test --filter "FullyQualifiedName~TestName"`
-- **EF migrations:** `dotnet dotnet-ef migrations add <Name> -p src/Rstash.Database -s src/Rstash.Database -o Migrations` (local `dotnet-ef` tool, pinned in `.config/dotnet-tools.json`)
+- **Schema migrations:** hand-written [FluentMigrator](https://fluentmigrator.github.io/) migrations in `src/Rstash.Database/Migrations/` (one agnostic set for all dialects). Add a new `[Migration(<version>)]` class; it is applied automatically at startup. No `dotnet-ef` codegen.
 - **Single-file publish:** `dotnet publish src/Rstash.Server -c Release -r <rid> --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true`
 
 ## CLI
@@ -88,9 +88,12 @@ Tests: **Rstash.Core.Tests** (xUnit unit tests over Model/Services/Storage/Datab
 
 - ASP.NET Core minimal APIs for the protocol surface; Blazor Web App (SSR-by-default, interactive
   islands opt-in) + MudBlazor for the human UI. Auth forms are static-SSR `EditForm` + `<InputText>`.
-- **EF Core** (multi-provider; SQLite wired) with code-first **migrations compiled into the
-  assembly**, applied at startup via `Database.Migrate()`. Access via `RstashDbContext` (and
-  `NodeStore`/stores) — no repository pattern.
+- **EF Core** (multi-provider; SQLite wired) for runtime queries + Identity. **DDL is owned by
+  FluentMigrator**, not EF: one database-agnostic migration set (`SchemaMigrator.MigrateUp`,
+  tracked in `VersionInfo`) is applied at startup; EF trusts the resulting schema and its model
+  must match it (guarded by `SchemaMigratorTests`). Access via `RstashDbContext` (and
+  `NodeStore`/stores) — no repository pattern. The `blobs` aux table is the one exception, still
+  created via EF `EnsureCreated()`.
 - **ASP.NET Core Identity** (`ApplicationUser : IdentityUser<long>`) + cookie auth; `LoginPath=/login`.
 - remoteStorage **app-authorization** (storage bearer tokens, `/oauth/*`) is a custom lightweight
   OAuth AS, kept distinct from user-identity auth. PKCE S256 on the code flow.

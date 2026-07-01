@@ -112,13 +112,10 @@ builder.Services.AddMudServices();
 
 var app = builder.Build();
 
-// Apply pending migrations and load runtime settings before serving.
+// Apply the schema (FluentMigrator owns DDL) and load runtime settings before serving.
+SchemaMigrator.MigrateUp(databaseDsn);
 await using (var scope = app.Services.CreateAsyncScope())
 {
-    var contextFactory = scope.ServiceProvider.GetRequiredService<IDbContextFactory<RstashDbContext>>();
-    await using var db = await contextFactory.CreateDbContextAsync();
-    await db.Database.MigrateAsync();
-
     await scope.ServiceProvider.GetRequiredService<SettingsService>().ReloadAsync();
 }
 
