@@ -3,6 +3,7 @@ using FluentMigrator.Runner;
 using FluentMigrator.Runner.Generators.Generic;
 using FluentMigrator.Runner.Generators.SQLite;
 using Microsoft.Extensions.DependencyInjection;
+using Npgsql;
 using Rstash.Database.Migrations;
 
 namespace Rstash.Database;
@@ -14,49 +15,76 @@ namespace Rstash.Database;
 /// startup and the tests reuse it to build a schema before exercising the EF
 /// stores.
 ///
-/// Only SQLite is wired today (the sole runtime provider). The Postgres/SQL
-/// Server/MySQL generators are registered here alongside their EF providers in a
-/// later branch — a matching <c>Dialect</c> arm plus the generator's
-/// <c>.Add…()</c> call.
+/// SQLite and Postgres are wired. The MySQL/SQL Server generators are registered
+/// here alongside their EF providers in a later branch — a matching <c>Dialect</c>
+/// arm plus the generator's <c>.Add…()</c> call (e.g. <c>.AddMySql5()</c> /
+/// <c>.AddSqlServer()</c>).
 /// </summary>
 public static class SchemaMigrator
 {
     public static void MigrateUp(string dsn)
     {
         var parsed = DatabaseDsn.Parse(dsn);
-        if (parsed.Dialect is not Dialect.Sqlite)
-        {
-            throw new NotSupportedException(
-                $"Database dialect '{parsed.Dialect}' is not yet wired for migrations; " +
-                "only sqlite is implemented so far.");
-        }
 
-        var connectionString = RstashDbContextOptionsExtensions.ToSqliteConnectionString(parsed.ConnectionString);
+        var connectionString = parsed.Dialect switch
+        {
+            Dialect.Sqlite => RstashDbContextOptionsExtensions.ToSqliteConnectionString(parsed.ConnectionString),
+            Dialect.Postgres => PostgresConnectionString(parsed.ConnectionString),
+            _ => throw new NotSupportedException(
+                $"Database dialect '{parsed.Dialect}' is not yet wired for migrations; " +
+                "sqlite and postgres are implemented so far."),
+        };
+
+        var isSqlite = parsed.Dialect is Dialect.Sqlite;
 
         var services = new ServiceCollection()
             .AddFluentMigratorCore()
-            .ConfigureRunner(rb => rb
-                .AddSQLite()
+            .ConfigureRunner(rb => (isSqlite ? rb.AddSQLite() : rb.AddPostgres())
                 .WithGlobalConnectionString(connectionString)
                 .ScanIn(typeof(InitialCreate).Assembly).For.Migrations())
             .AddLogging(lb => lb.AddFluentMigratorConsole());
 
-        // Teach the SQLite generator that DateTimeOffset maps to TEXT (see
-        // RstashSQLiteTypeMap); this override must follow AddSQLite() to win.
-        services.AddScoped<ISQLiteTypeMap, RstashSQLiteTypeMap>();
+        // SQLite-only: teach the generator that DateTimeOffset maps to TEXT (see
+        // RstashSQLiteTypeMap). This override must follow AddSQLite() to win, and it
+        // must not be registered for other dialects (it is an ISQLiteTypeMap).
+        if (isSqlite)
+        {
+            services.AddScoped<ISQLiteTypeMap, RstashSQLiteTypeMap>();
+        }
 
         using var serviceProvider = services.BuildServiceProvider(validateScopes: false);
         using var scope = serviceProvider.CreateScope();
 
-        // SQLite cannot ALTER TABLE ADD a standalone foreign key (and enforces no
-        // FKs by default anyway). LOOSE mode makes the generator skip those
-        // unsupported statements on SQLite, while the same agnostic migration
-        // still creates real, enforced FKs on Postgres/SQL Server.
-        if (scope.ServiceProvider.GetRequiredService<IMigrationGenerator>() is GenericGenerator generator)
+        // SQLite-only: it cannot ALTER TABLE ADD a standalone foreign key (and enforces
+        // no FKs by default anyway). LOOSE mode makes the SQLite generator skip those
+        // unsupported statements. Postgres keeps the default STRICT generator so the
+        // same agnostic migration creates real, enforced FKs.
+        if (isSqlite
+            && scope.ServiceProvider.GetRequiredService<IMigrationGenerator>() is GenericGenerator generator)
         {
             generator.CompatibilityMode = CompatibilityMode.LOOSE;
         }
 
         scope.ServiceProvider.GetRequiredService<IMigrationRunner>().MigrateUp();
+    }
+
+    /// <summary>
+    /// Resolves the Npgsql connection string for the migration run. Unlike the EF
+    /// path, FluentMigrator's runner takes a plain connection string (no
+    /// <c>NpgsqlDataSource</c> seam), so for <c>Auth=Entra</c> we inject a single
+    /// access token as the password — one token easily covers the sub-second run.
+    /// </summary>
+    private static string PostgresConnectionString(string connection)
+    {
+        var (connectionString, useEntra) = PostgresDsn.Parse(connection);
+        if (!useEntra)
+        {
+            return connectionString;
+        }
+
+        return new NpgsqlConnectionStringBuilder(connectionString)
+        {
+            Password = EntraPostgres.FetchToken(),
+        }.ConnectionString;
     }
 }

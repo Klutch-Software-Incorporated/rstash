@@ -53,10 +53,13 @@ else is a runtime setting managed in the admin UI and stored in the DB.
 | RSTASH_BLOB | sqlite:rstash-blobs.sqlite | Blob store DSN (sqlite:path, fs:/path, database DSN; s3:/azureblob: planned) |
 | RSTASH_EMAIL | | Email provider DSN (e.g. resend:API_KEY?from=noreply@example.com) |
 
-(The setting registry also defines TLS, log level/file, etc. Wired today: SQLite databases;
-filesystem, database, and **Azure Blob** (`azureblob://{account}/{container}`) blob backends.
-Postgres/MySQL/SQL Server providers and the S3 blob backend are stubbed behind their factories
-pending their NuGet packages.)
+(The setting registry also defines TLS, log level/file, etc. Wired today: SQLite and
+**Postgres** databases (Postgres via a native Npgsql connection string, e.g.
+`postgres:Host=…;Database=…;Username=…;Ssl Mode=Require`, plus Azure Entra ID auth by
+appending `;Auth=Entra`); filesystem, database, and **Azure Blob**
+(`azureblob://{account}/{container}`) blob backends. MySQL/SQL Server providers and the
+S3 blob backend are stubbed behind their factories (wiring seams in place) pending their
+NuGet packages.)
 
 ## Solution Layout
 

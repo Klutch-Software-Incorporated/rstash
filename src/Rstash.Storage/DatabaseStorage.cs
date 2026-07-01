@@ -5,7 +5,10 @@ namespace Rstash.Storage;
 
 /// <summary>
 /// Stores blobs as rows in a database (the blob DSN's database — by default a
-/// separate SQLite file). The schema is ensured on construction.
+/// separate SQLite file). The schema is ensured on construction. The blob DSN shares
+/// the <see cref="RstashDbContextOptionsExtensions.UseRstashDatabase"/> opener with
+/// the metadata database, so every wired dialect (sqlite/postgres, incl. Postgres
+/// <c>Auth=Entra</c>) works here identically and for free.
 /// </summary>
 public sealed class DatabaseStorage : IStorage, IStorageCounter
 {
@@ -13,6 +16,10 @@ public sealed class DatabaseStorage : IStorage, IStorageCounter
 
     public DatabaseStorage(string dsn)
     {
+        // Built once and reused for every context; the options capture the provider
+        // (and, for Postgres Entra, a long-lived NpgsqlDataSource + pool). Note this
+        // is a separate pool/data source from the metadata DB even when both DSNs
+        // point at the same server.
         _options = new DbContextOptionsBuilder<BlobDbContext>()
             .UseRstashDatabase(dsn)
             .Options;

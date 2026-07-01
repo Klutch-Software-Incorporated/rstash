@@ -4,9 +4,9 @@ using Microsoft.EntityFrameworkCore;
 namespace Rstash.Database;
 
 /// <summary>
-/// Configures a <see cref="RstashDbContext"/> from an rstash DSN. Only SQLite is
-/// wired today; the other dialects (Postgres/MySQL/SQL Server) are added with
-/// their provider packages in a later step.
+/// Configures a <see cref="RstashDbContext"/> from an rstash DSN. SQLite and Postgres
+/// (incl. Azure Entra ID auth) are wired; MySQL and SQL Server are added with their
+/// provider packages in a later step.
 /// </summary>
 public static class RstashDbContextOptionsExtensions
 {
@@ -30,10 +30,31 @@ public static class RstashDbContextOptionsExtensions
             Dialect.Sqlite => builder
                 .UseSqlite(ToSqliteConnectionString(parsed.ConnectionString))
                 .AddInterceptors(new SqliteConnectionInitInterceptor(SqliteJournalMode(parsed.ConnectionString))),
+            Dialect.Postgres => ConfigurePostgres(builder, parsed.ConnectionString),
+            // MySQL and SQL Server are stubbed. Each is a small drop-in: a
+            // ConfigureMySql/ConfigureSqlServer helper here (parallel to
+            // ConfigurePostgres), its provider package, and a matching SchemaMigrator
+            // branch. MySQL Flexible Server can reuse EntraPostgres (shared
+            // ossrdbms-aad scope); SQL Server uses Microsoft.Data.SqlClient's
+            // "Authentication=Active Directory Default" connection-string keyword.
             _ => throw new NotSupportedException(
                 $"Database dialect '{parsed.Dialect}' is not yet wired in the .NET rewrite; " +
-                "only sqlite is implemented so far."),
+                "sqlite and postgres are implemented so far."),
         };
+    }
+
+    /// <summary>
+    /// Configures the Npgsql provider from the connection portion of a <c>postgres:</c>
+    /// DSN. Postgres <c>LIKE</c> is case-sensitive by default, so — unlike SQLite — no
+    /// connection interceptor is needed to keep path-prefix queries case-sensitive.
+    /// </summary>
+    private static DbContextOptionsBuilder ConfigurePostgres(DbContextOptionsBuilder builder, string connection)
+    {
+        var (connectionString, useEntra) = PostgresDsn.Parse(connection);
+
+        return useEntra
+            ? builder.UseNpgsql(EntraPostgres.BuildDataSource(connectionString))
+            : builder.UseNpgsql(connectionString);
     }
 
     /// <summary>
