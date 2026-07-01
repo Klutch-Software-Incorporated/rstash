@@ -5,12 +5,16 @@ using Rstash.Database;
 namespace Rstash.Core.Tests;
 
 /// <summary>
-/// Guards the SQLite DSN → connection-string translation. The regression that
-/// prompted these: a production DSN of the form
-/// <c>sqlite:/home/rstash.sqlite?journal_mode=WAL</c> crashed boot because the
-/// old heuristic (any '=' means "already a connection string") fed the whole
-/// path+query to <see cref="SqliteConnectionStringBuilder"/>, which rejected
-/// <c>/home/rstash.sqlite?journal_mode</c> as an unknown keyword.
+/// Guards SQLite DSN handling. The regression that prompted these: a production
+/// DSN of the form <c>sqlite:/home/rstash.sqlite?journal_mode=delete</c> crashed
+/// boot because the old heuristic (any '=' means "already a connection string")
+/// fed the whole path+query to <see cref="SqliteConnectionStringBuilder"/>, which
+/// rejected <c>/home/rstash.sqlite?journal_mode</c> as an unknown keyword.
+///
+/// <c>journal_mode</c> is environment-critical: the hosted deployment keeps its
+/// SQLite files on an Azure Files (SMB) share and must use <c>delete</c> — WAL
+/// corrupts the database over SMB — so the app must honor the DSN's mode and must
+/// never force WAL.
 /// </summary>
 public class SqliteConnectionStringTests
 {
@@ -18,10 +22,10 @@ public class SqliteConnectionStringTests
     [InlineData("rstash.sqlite", "rstash.sqlite")]
     [InlineData(":memory:", ":memory:")]
     [InlineData("/home/rstash.sqlite", "/home/rstash.sqlite")]
-    [InlineData("/home/rstash.sqlite?journal_mode=WAL", "/home/rstash.sqlite")]       // query stripped
-    [InlineData("/home/rstash.sqlite?journal_mode=WAL&cache=shared", "/home/rstash.sqlite")]
-    [InlineData(@"C:\data\rstash.sqlite", @"C:\data\rstash.sqlite")]                  // Windows path, no '=' misfire
-    public void BuildsDataSource_StrippingAnyQuery(string dsnRemainder, string expectedDataSource)
+    [InlineData("/home/rstash.sqlite?journal_mode=delete", "/home/rstash.sqlite")]     // query stripped
+    [InlineData("/home/rstash.sqlite?journal_mode=delete&cache=shared", "/home/rstash.sqlite")]
+    [InlineData(@"C:\data\rstash.sqlite", @"C:\data\rstash.sqlite")]                    // Windows path, no '=' misfire
+    public void ToSqliteConnectionString_BuildsDataSource_StrippingAnyQuery(string dsnRemainder, string expectedDataSource)
     {
         var connectionString = RstashDbContextOptionsExtensions.ToSqliteConnectionString(dsnRemainder);
 
@@ -29,18 +33,40 @@ public class SqliteConnectionStringTests
     }
 
     [Fact]
-    public void PassesThroughAnExistingConnectionString()
+    public void ToSqliteConnectionString_PassesThroughAnExistingConnectionString()
     {
         const string connectionString = "Data Source=x.db;Mode=ReadOnly";
 
         Assert.Equal(connectionString, RstashDbContextOptionsExtensions.ToSqliteConnectionString(connectionString));
     }
 
+    [Theory]
+    [InlineData("/home/rstash.sqlite?journal_mode=delete", "delete")]
+    [InlineData("/home/rstash.sqlite?journal_mode=WAL", "WAL")]
+    [InlineData("/home/rstash.sqlite?foo=bar&journal_mode=delete", "delete")]
+    [InlineData("/home/rstash.sqlite", null)]                                          // no query
+    [InlineData("rstash.sqlite?cache=shared", null)]                                   // query without journal_mode
+    public void SqliteJournalMode_ReadsTheQueryParameter(string dsnRemainder, string? expected)
+    {
+        Assert.Equal(expected, RstashDbContextOptionsExtensions.SqliteJournalMode(dsnRemainder));
+    }
+
     [Fact]
-    public async Task ProductionDsnForm_WithQueryParams_MigratesAndEnablesWal()
+    public void UseRstashDatabase_InvalidJournalMode_ThrowsClearError()
+    {
+        var ex = Assert.Throws<ArgumentException>(() =>
+            new DbContextOptionsBuilder<RstashDbContext>().UseRstashDatabase("sqlite:x.db?journal_mode=bogus"));
+
+        Assert.Contains("journal_mode", ex.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Theory]
+    [InlineData("delete")] // the production (Azure Files / SMB) mode — must NOT become WAL
+    [InlineData("wal")]    // honored the other way too, proving it's DSN-driven not hard-coded
+    public async Task ProductionDsnForm_HonorsJournalModeFromDsn(string journalMode)
     {
         var path = Path.Combine(Path.GetTempPath(), $"rstash-dsn-{Guid.NewGuid():N}.sqlite");
-        var dsn = $"sqlite:{path}?journal_mode=WAL"; // the exact shape that crashed boot
+        var dsn = $"sqlite:{path}?journal_mode={journalMode}"; // the exact shape that crashed boot
 
         try
         {
@@ -52,7 +78,7 @@ public class SqliteConnectionStringTests
             {
                 // A real query opens the connection, running
                 // SqliteConnectionInitInterceptor, which applies PRAGMA
-                // journal_mode=WAL (persisted to the database file).
+                // journal_mode with the DSN's value.
                 Assert.Equal(0, await ctx.Settings.CountAsync());
             }
 
@@ -60,7 +86,7 @@ public class SqliteConnectionStringTests
             connection.Open();
             using var command = connection.CreateCommand();
             command.CommandText = "PRAGMA journal_mode;";
-            Assert.Equal("wal", ((string)command.ExecuteScalar()!).ToLowerInvariant());
+            Assert.Equal(journalMode, ((string)command.ExecuteScalar()!).ToLowerInvariant());
         }
         finally
         {
