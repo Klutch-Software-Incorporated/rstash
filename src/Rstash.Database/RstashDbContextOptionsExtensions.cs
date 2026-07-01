@@ -1,3 +1,4 @@
+using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 
 namespace Rstash.Database;
@@ -28,7 +29,7 @@ public static class RstashDbContextOptionsExtensions
         {
             Dialect.Sqlite => builder
                 .UseSqlite(ToSqliteConnectionString(parsed.ConnectionString))
-                .AddInterceptors(SqliteCaseSensitiveLikeInterceptor.Instance),
+                .AddInterceptors(SqliteConnectionInitInterceptor.Instance),
             _ => throw new NotSupportedException(
                 $"Database dialect '{parsed.Dialect}' is not yet wired in the .NET rewrite; " +
                 "only sqlite is implemented so far."),
@@ -40,8 +41,30 @@ public static class RstashDbContextOptionsExtensions
     /// string. Shared with <see cref="SchemaMigrator"/> so EF and FluentMigrator
     /// open the same database the same way.
     /// </summary>
-    internal static string ToSqliteConnectionString(string pathOrConnection) =>
-        pathOrConnection.Contains('=', StringComparison.Ordinal)
-            ? pathOrConnection // already a Microsoft.Data.Sqlite connection string
-            : $"Data Source={pathOrConnection}";
+    /// <remarks>
+    /// The remainder is normally a filesystem path (or <c>:memory:</c>), but DSNs
+    /// carried over from the Go server may append URI-style query parameters such
+    /// as <c>?journal_mode=WAL</c>. Those are pragmas, not connection-string
+    /// keywords — Microsoft.Data.Sqlite would reject them — so the query is
+    /// stripped here and the pragmas are applied on open by
+    /// <see cref="SqliteConnectionInitInterceptor"/>. A value that already looks
+    /// like a Microsoft.Data.Sqlite connection string (contains <c>Data Source</c>)
+    /// is passed through unchanged.
+    /// </remarks>
+    internal static string ToSqliteConnectionString(string pathOrConnection)
+    {
+        if (pathOrConnection.Contains("Data Source", StringComparison.OrdinalIgnoreCase))
+        {
+            return pathOrConnection;
+        }
+
+        var path = pathOrConnection;
+        var queryStart = path.IndexOf('?', StringComparison.Ordinal);
+        if (queryStart >= 0)
+        {
+            path = path[..queryStart];
+        }
+
+        return new SqliteConnectionStringBuilder { DataSource = path }.ConnectionString;
+    }
 }
