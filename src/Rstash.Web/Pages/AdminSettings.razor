@@ -2,7 +2,7 @@
 @page "/admin/settings/{Group}"
 @attribute [Authorize]
 @inject SettingsService Settings
-@inject UserManager<ApplicationUser> Users
+@inject CurrentUserAccessor CurrentUser
 @inject NavigationManager Navigation
 
 <PageTitle>@_activeGroup settings — admin</PageTitle>
@@ -78,7 +78,7 @@
 
     protected override async Task OnInitializedAsync()
     {
-        var user = HttpContext is null ? null : await Users.GetUserAsync(HttpContext.User);
+        var user = await CurrentUser.GetAsync(HttpContext?.User);
         if (user is null || !user.IsAdmin)
         {
             Navigation.NavigateTo("/", forceLoad: true);

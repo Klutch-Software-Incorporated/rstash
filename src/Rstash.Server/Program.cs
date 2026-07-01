@@ -85,6 +85,10 @@ builder.Services.AddCors(options => options.AddPolicy("rstash-storage", policy =
 builder.Services.AddScoped<RstashDbContext>(sp =>
     sp.GetRequiredService<IDbContextFactory<RstashDbContext>>().CreateDbContext());
 
+// Loads the current user once per request/circuit so the layout and page don't issue
+// concurrent UserManager reads on the shared scoped RstashDbContext (see CurrentUserAccessor).
+builder.Services.AddScoped<Rstash.Web.CurrentUserAccessor>();
+
 // ASP.NET Core Identity (core APIs only — the setup/login UI is custom Blazor).
 builder.Services.AddAuthentication(IdentityConstants.ApplicationScheme).AddIdentityCookies();
 builder.Services

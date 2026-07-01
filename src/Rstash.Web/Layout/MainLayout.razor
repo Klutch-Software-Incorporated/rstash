@@ -1,6 +1,6 @@
 @inherits LayoutComponentBase
 @inject Rstash.Services.SettingsService Settings
-@inject UserManager<ApplicationUser> Users
+@inject CurrentUserAccessor CurrentUser
 @inject NavigationManager Navigation
 
 <MudThemeProvider Theme="RstashTheme.Theme" IsDarkMode="_isDarkMode" />
@@ -162,7 +162,7 @@
 
         if (HttpContext.User.Identity?.IsAuthenticated == true)
         {
-            var user = await Users.GetUserAsync(HttpContext.User);
+            var user = await CurrentUser.GetAsync(HttpContext.User);
             _isAdmin = user?.IsAdmin ?? false;
 
             // Show the remoteStorage handle (user@host) — the brand's identity anchor.

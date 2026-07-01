@@ -1,6 +1,6 @@
 @page "/account/apps"
 @attribute [Authorize]
-@inject UserManager<ApplicationUser> Users
+@inject CurrentUserAccessor CurrentUser
 @inject TokenStore Tokens
 
 <PageTitle>Connected apps</PageTitle>
@@ -36,7 +36,7 @@
 
     protected override async Task OnInitializedAsync()
     {
-        var user = HttpContext is null ? null : await Users.GetUserAsync(HttpContext.User);
+        var user = await CurrentUser.GetAsync(HttpContext?.User);
         if (user is null)
         {
             return;
