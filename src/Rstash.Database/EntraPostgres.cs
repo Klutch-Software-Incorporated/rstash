@@ -8,9 +8,10 @@ namespace Rstash.Database;
 /// Azure Entra ID (managed-identity) auth for Azure Database for PostgreSQL,
 /// selected by the <c>Auth=Entra</c> DSN flag (see <see cref="PostgresDsn"/>). Ports
 /// <c>legacy/internal/db/entra_postgres.go</c>: the Postgres password is a
-/// short-lived AAD access token rather than a static secret. The token is fetched via
-/// <see cref="DefaultAzureCredential"/> (env service-principal → managed identity →
-/// Azure CLI → …), so the same code works locally and on the hosted deployment.
+/// short-lived AAD access token rather than a static secret. The token comes from
+/// <see cref="DefaultAzureCredential"/>, which walks the standard credential chain
+/// (environment service principal, then managed identity, then Azure CLI), so the same
+/// code works locally and on the hosted deployment.
 /// </summary>
 internal static class EntraPostgres
 {
@@ -30,15 +31,13 @@ internal static class EntraPostgres
     /// pool and its refresh timer; it is <b>app-owned</b> (EF does not dispose a data
     /// source passed to <c>UseNpgsql</c>), which is safe here because the opener runs
     /// once at options-build time (singleton context factory / singleton blob store),
-    /// never per <c>DbContext</c>. The credential is only invoked when a token is first
-    /// needed (first connection open), so building options never blocks on Azure.
+    /// never per <c>DbContext</c>.
     /// </summary>
     internal static NpgsqlDataSource BuildDataSource(string connectionString)
     {
-        // Construct the credential lazily on first token fetch — never at option-build
-        // time — so building EF options never touches Azure. This keeps non-Azure
-        // environments (and misconfigured credential chains) from failing at startup;
-        // they surface at connection time instead (e.g. via `rstash check`).
+        // Build the credential lazily, inside the token callback, so option-building
+        // never touches Azure. A non-Azure host or a broken credential chain then fails
+        // at first connection (e.g. via `rstash check`) rather than at startup.
         var credential = new Lazy<DefaultAzureCredential>(() => new DefaultAzureCredential());
         var builder = new NpgsqlDataSourceBuilder(connectionString);
         builder.UsePeriodicPasswordProvider(

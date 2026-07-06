@@ -7,8 +7,8 @@ namespace Rstash.Storage;
 /// Stores blobs as rows in a database (the blob DSN's database — by default a
 /// separate SQLite file). The schema is ensured on construction. The blob DSN shares
 /// the <see cref="RstashDbContextOptionsExtensions.UseRstashDatabase"/> opener with
-/// the metadata database, so every wired dialect (sqlite/postgres, incl. Postgres
-/// <c>Auth=Entra</c>) works here identically and for free.
+/// the metadata database, so every wired dialect (sqlite/postgres, including Postgres
+/// <c>Auth=Entra</c>) works here without any blob-specific code.
 /// </summary>
 public sealed class DatabaseStorage : IStorage, IStorageCounter
 {
