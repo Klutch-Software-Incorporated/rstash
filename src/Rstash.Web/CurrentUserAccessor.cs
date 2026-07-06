@@ -6,17 +6,16 @@ namespace Rstash.Web;
 
 /// <summary>
 /// Loads the signed-in <see cref="ApplicationUser"/> once per request/circuit and
-/// memoizes the in-flight task, so multiple components that need the current user
-/// during one render (e.g. the layout plus the page) share a single query instead of
-/// each issuing its own on the shared scoped <c>RstashDbContext</c>.
-/// <para>
-/// Two concurrent <see cref="UserManager{TUser}"/> reads on that shared context throw
-/// EF Core's "A second operation was started on this context instance" — a race that
-/// stayed hidden on SQLite (sub-millisecond queries never overlapped) but is reliably
-/// tripped by Postgres's network latency. Registered scoped so the cache lives for the
-/// request/circuit.
-/// </para>
+/// memoizes the in-flight task, so components that need the current user during one
+/// render (e.g. the layout plus the page) share a single query.
 /// </summary>
+/// <remarks>
+/// Registered scoped, so the cache lives for the request/circuit. Without it, two
+/// concurrent <see cref="UserManager{TUser}"/> reads on the shared scoped
+/// <c>RstashDbContext</c> throw EF Core's "A second operation was started on this
+/// context instance" — a race hidden on SQLite (sub-millisecond queries never
+/// overlapped) but reliably tripped by Postgres's network latency.
+/// </remarks>
 public sealed class CurrentUserAccessor(UserManager<ApplicationUser> users)
 {
     private Task<ApplicationUser?>? _cached;

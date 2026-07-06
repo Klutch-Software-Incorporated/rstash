@@ -5,8 +5,8 @@ namespace Rstash.Database;
 
 /// <summary>
 /// Configures a <see cref="RstashDbContext"/> from an rstash DSN. SQLite and Postgres
-/// (incl. Azure Entra ID auth) are wired; MySQL and SQL Server are added with their
-/// provider packages in a later step.
+/// (including Azure Entra ID auth) are wired; MySQL and SQL Server are not yet
+/// supported.
 /// </summary>
 public static class RstashDbContextOptionsExtensions
 {
@@ -31,21 +31,16 @@ public static class RstashDbContextOptionsExtensions
                 .UseSqlite(ToSqliteConnectionString(parsed.ConnectionString))
                 .AddInterceptors(new SqliteConnectionInitInterceptor(SqliteJournalMode(parsed.ConnectionString))),
             Dialect.Postgres => ConfigurePostgres(builder, parsed.ConnectionString),
-            // MySQL and SQL Server are stubbed. Each is a small drop-in: a
-            // ConfigureMySql/ConfigureSqlServer helper here (parallel to
-            // ConfigurePostgres), its provider package, and a matching SchemaMigrator
-            // branch. MySQL Flexible Server can reuse EntraPostgres (shared
-            // ossrdbms-aad scope); SQL Server uses Microsoft.Data.SqlClient's
-            // "Authentication=Active Directory Default" connection-string keyword.
+            // MySQL and SQL Server aren't wired yet; they fall through to the throw below.
             _ => throw new NotSupportedException(
-                $"Database dialect '{parsed.Dialect}' is not yet wired in the .NET rewrite; " +
-                "sqlite and postgres are implemented so far."),
+                $"Database dialect '{parsed.Dialect}' is not supported; " +
+                "only sqlite and postgres are wired."),
         };
     }
 
     /// <summary>
     /// Configures the Npgsql provider from the connection portion of a <c>postgres:</c>
-    /// DSN. Postgres <c>LIKE</c> is case-sensitive by default, so — unlike SQLite — no
+    /// DSN. Postgres <c>LIKE</c> is case-sensitive by default, so (unlike SQLite) no
     /// connection interceptor is needed to keep path-prefix queries case-sensitive.
     /// </summary>
     private static DbContextOptionsBuilder ConfigurePostgres(DbContextOptionsBuilder builder, string connection)

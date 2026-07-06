@@ -6,13 +6,14 @@ namespace Rstash.Database;
 
 /// <summary>
 /// Azure Entra ID (managed-identity) auth for Azure Database for PostgreSQL,
-/// selected by the <c>Auth=Entra</c> DSN flag (see <see cref="PostgresDsn"/>). Ports
-/// <c>legacy/internal/db/entra_postgres.go</c>: the Postgres password is a
-/// short-lived AAD access token rather than a static secret. The token comes from
-/// <see cref="DefaultAzureCredential"/>, which walks the standard credential chain
-/// (environment service principal, then managed identity, then Azure CLI), so the same
-/// code works locally and on the hosted deployment.
+/// selected by the <c>Auth=Entra</c> DSN flag (see <see cref="PostgresDsn"/>).
 /// </summary>
+/// <remarks>
+/// The Postgres password is a short-lived Entra access token rather than a static
+/// secret, obtained from <see cref="DefaultAzureCredential"/>, which walks the standard
+/// credential chain (environment service principal, managed identity, Azure CLI), so
+/// the same code runs locally and on the hosted deployment.
+/// </remarks>
 internal static class EntraPostgres
 {
     /// <summary>
@@ -27,12 +28,14 @@ internal static class EntraPostgres
 
     /// <summary>
     /// Builds a long-lived <see cref="NpgsqlDataSource"/> whose password is a
-    /// periodically-refreshed Entra access token. The data source owns the connection
-    /// pool and its refresh timer; it is <b>app-owned</b> (EF does not dispose a data
-    /// source passed to <c>UseNpgsql</c>), which is safe here because the opener runs
-    /// once at options-build time (singleton context factory / singleton blob store),
-    /// never per <c>DbContext</c>.
+    /// periodically-refreshed Entra access token.
     /// </summary>
+    /// <remarks>
+    /// The data source owns the connection pool and its refresh timer, and is app-owned:
+    /// EF does not dispose one passed to <c>UseNpgsql</c>. That is safe because the opener
+    /// runs once at options-build time (singleton context factory / singleton blob store),
+    /// never per <c>DbContext</c>.
+    /// </remarks>
     internal static NpgsqlDataSource BuildDataSource(string connectionString)
     {
         // Build the credential lazily, inside the token callback, so option-building

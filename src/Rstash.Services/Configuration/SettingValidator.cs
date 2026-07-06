@@ -5,7 +5,6 @@ namespace Rstash.Services.Configuration;
 /// <summary>
 /// Validates a setting write against the registry: the key must be known and
 /// runtime-editable, and the value must satisfy the setting's input type.
-/// Ports the Go <c>validateSetting</c>.
 /// </summary>
 public static class SettingValidator
 {

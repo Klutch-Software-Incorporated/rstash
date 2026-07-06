@@ -2,9 +2,8 @@ namespace Rstash.Database;
 
 /// <summary>
 /// A parsed database DSN: the dialect plus the provider connection string.
-/// Mirrors the Go reference — supported schemes are <c>sqlite:</c>,
-/// <c>postgres:</c>, <c>mysql:</c>, <c>mssql:</c>; a bare value with no scheme
-/// is treated as a SQLite path.
+/// Supported schemes are <c>sqlite:</c>, <c>postgres:</c>, <c>mysql:</c>,
+/// <c>mssql:</c>; a bare value with no scheme is treated as a SQLite path.
 /// </summary>
 public readonly record struct DatabaseDsn(Dialect Dialect, string ConnectionString)
 {

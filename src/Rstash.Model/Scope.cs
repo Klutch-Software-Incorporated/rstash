@@ -4,7 +4,7 @@ namespace Rstash.Model;
 
 /// <summary>
 /// remoteStorage OAuth scopes: "module:r" / "module:rw" (module is
-/// [A-Za-z0-9_-]+ or "*"). Ports the Go reference exactly.
+/// [A-Za-z0-9_-]+ or "*").
 /// </summary>
 public static partial class Scope
 {

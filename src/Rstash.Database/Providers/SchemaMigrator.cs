@@ -10,16 +10,13 @@ namespace Rstash.Database;
 
 /// <summary>
 /// Applies the FluentMigrator schema (see <see cref="InitialCreate"/>) to the
-/// configured database, bringing it up to the latest version. This replaces EF
-/// Core's <c>Database.Migrate()</c> as the owner of DDL; the host runs it once at
-/// startup and the tests reuse it to build a schema before exercising the EF
-/// stores.
-///
-/// SQLite and Postgres are wired. The MySQL/SQL Server generators are registered
-/// here alongside their EF providers in a later branch — a matching <c>Dialect</c>
-/// arm plus the generator's <c>.Add…()</c> call (e.g. <c>.AddMySql5()</c> /
-/// <c>.AddSqlServer()</c>).
+/// configured database, bringing it up to the latest version.
 /// </summary>
+/// <remarks>
+/// This owns DDL in place of EF Core's <c>Database.Migrate()</c>: the host runs it once
+/// at startup, and the tests reuse it to build a schema before exercising the EF stores.
+/// SQLite and Postgres are wired; MySQL and SQL Server are not yet supported.
+/// </remarks>
 public static class SchemaMigrator
 {
     public static void MigrateUp(string dsn)
@@ -31,8 +28,8 @@ public static class SchemaMigrator
             Dialect.Sqlite => RstashDbContextOptionsExtensions.ToSqliteConnectionString(parsed.ConnectionString),
             Dialect.Postgres => PostgresConnectionString(parsed.ConnectionString),
             _ => throw new NotSupportedException(
-                $"Database dialect '{parsed.Dialect}' is not yet wired for migrations; " +
-                "sqlite and postgres are implemented so far."),
+                $"Database dialect '{parsed.Dialect}' is not supported; " +
+                "only sqlite and postgres are wired."),
         };
 
         var isSqlite = parsed.Dialect is Dialect.Sqlite;

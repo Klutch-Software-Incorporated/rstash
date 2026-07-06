@@ -5,25 +5,21 @@ namespace Rstash.Database;
 /// <summary>
 /// Parses the connection portion of a <c>postgres:</c> DSN into a native Npgsql
 /// connection string and detects the rstash-specific <c>Auth=Entra</c> flag.
-/// <para>
-/// Unlike Go's <c>pgx</c> (the parity oracle in <c>legacy/internal/db</c>), Npgsql
-/// does not accept <c>postgres://…</c> URLs — only its own semicolon-keyword form
-/// (<c>Host=…;Database=…;Username=…;Ssl Mode=Require</c>), which is exactly what the
-/// Azure portal's "Connection strings" (ADO.NET) blade hands operators. So the
-/// remainder after <c>postgres:</c> is treated as a native Npgsql string and passed
-/// through untouched; a <c>postgres://</c> URL is rejected with an actionable message
-/// rather than surfacing Npgsql's opaque parse error.
-/// </para>
-/// <para>
-/// Npgsql has no native keyword to trigger Azure AD auth (unlike SqlClient's
-/// <c>Authentication=Active Directory Default</c>), so rstash owns one pseudo-keyword,
-/// <c>Auth=Entra</c>, appended to the string. It is the sole token we special-case:
-/// detected and stripped here (the .NET analog of Go's <c>extractEntraAuth</c>) so the
-/// remaining string is a clean, driver-valid connection string. When set, the caller
-/// supplies the password from an Entra access token — the <c>Username</c> (the AAD
-/// principal / managed-identity name) must stay in the string.
-/// </para>
 /// </summary>
+/// <remarks>
+/// Npgsql accepts only its own semicolon-keyword form
+/// (<c>Host=…;Database=…;Username=…;Ssl Mode=Require</c>), not a <c>postgres://</c>
+/// URL — the same form the Azure portal's ADO.NET connection-string blade hands out.
+/// The remainder after <c>postgres:</c> is passed to the driver untouched; a
+/// <c>postgres://</c> URL is rejected with an actionable message instead of surfacing
+/// Npgsql's opaque parse error.
+/// <para>
+/// Npgsql has no keyword to trigger Entra ID auth, so rstash owns one pseudo-keyword,
+/// <c>Auth=Entra</c>, and strips it here before handing the clean string to the driver.
+/// When set, the caller supplies the password from an Entra token; the <c>Username</c>
+/// (the Entra principal / managed-identity name) stays in the string.
+/// </para>
+/// </remarks>
 public static class PostgresDsn
 {
     /// <summary>The connection-string keyword rstash owns to opt into Entra ID auth.</summary>

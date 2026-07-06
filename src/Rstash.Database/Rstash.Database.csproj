@@ -11,21 +11,14 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" Version="10.0.9" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="10.0.9" />
-    <!-- PostgreSQL provider (10.0.x targets EF Core 10; keeps the repo at 10.0.9).
-         MySQL/SQL Server providers are added alongside their dialect arms later. -->
     <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.2" />
-    <!-- Azure.Identity backs Entra ID (managed-identity) auth for Azure Database for
-         PostgreSQL (?…;Auth=Entra). Version matches Rstash.Storage's reference. -->
     <PackageReference Include="Azure.Identity" Version="1.14.0" />
-    <!-- FluentMigrator owns DDL (one agnostic, versioned migration set applied at
-         startup). EF Core is kept purely for runtime queries + Identity. SQLite and
-         Postgres generators are wired; MySQL/SQL Server arrive with their arms. -->
     <PackageReference Include="FluentMigrator.Runner" Version="8.0.1" />
     <PackageReference Include="FluentMigrator.Runner.SQLite" Version="8.0.1" />
     <PackageReference Include="FluentMigrator.Runner.Postgres" Version="8.0.1" />
-    <!-- Direct ref overrides the vulnerable transitive SQLitePCLRaw.lib.e_sqlite3 2.1.11
-         (GHSA-2m69-gcr7-jv3q) pulled in by EF Core's Sqlite provider. Verify runtime DB
-         open in P1 (3.x is a major bump over the 2.1.x EF Core 10 ships against). -->
+    <!-- Direct ref pins away from the vulnerable transitive SQLitePCLRaw.lib.e_sqlite3
+         2.1.11 (GHSA-2m69-gcr7-jv3q) that EF Core's Sqlite provider pulls in. Do not
+         remove without confirming the transitive version is patched. -->
     <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" Version="3.0.3" />
   </ItemGroup>
 

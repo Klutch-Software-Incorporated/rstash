@@ -20,10 +20,7 @@ public sealed record SettingDef
     /// <summary>One-line description (grid + env file).</summary>
     public string Description { get; init; } = "";
 
-    /// <summary>
-    /// Extended docs for the detail page / env doc. Populated in P5/P6 from the
-    /// legacy registry where it is actually rendered.
-    /// </summary>
+    /// <summary>Extended docs for the detail page / env doc.</summary>
     public string Help { get; init; } = "";
 
     /// <summary>Default value as a display string.</summary>
