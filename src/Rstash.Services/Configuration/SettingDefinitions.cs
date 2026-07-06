@@ -4,8 +4,6 @@ namespace Rstash.Services.Configuration;
 /// Metadata for every configurable setting. Env vars are reserved for settings
 /// that must be known before the database is available (listen address, DSNs,
 /// TLS, log level); all others default and are runtime-managed.
-/// Verbose per-setting <see cref="SettingDef.Help"/> prose is ported in P5/P6
-/// from legacy/internal/config/settingdef.go where it is rendered.
 /// </summary>
 public static class SettingDefinitions
 {

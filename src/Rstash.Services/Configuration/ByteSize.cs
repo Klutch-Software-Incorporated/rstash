@@ -4,7 +4,7 @@ namespace Rstash.Services.Configuration;
 
 /// <summary>
 /// Human-readable byte-size parsing and formatting. Binary units (1 KB = 1024
-/// bytes); a plain integer is bytes. Ports the Go reference exactly.
+/// bytes); a plain integer is bytes.
 /// </summary>
 public static class ByteSize
 {

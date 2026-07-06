@@ -4,8 +4,8 @@ using System.Text.RegularExpressions;
 namespace Rstash.Services.Configuration;
 
 /// <summary>
-/// Parses a token-lifetime string into a <see cref="TimeSpan"/>. Accepts Go-style
-/// duration strings (e.g. "720h", "30m", "1h30m") plus a convenience "d" day
+/// Parses a token-lifetime string into a <see cref="TimeSpan"/>. Accepts duration
+/// strings (e.g. "720h", "30m", "1h30m") plus a convenience "d" day
 /// suffix (e.g. "30d"). "" or "0" means no expiry (<see cref="TimeSpan.Zero"/>).
 /// </summary>
 public static partial class TokenLifetime

@@ -4,8 +4,8 @@ using System.Text;
 namespace Rstash.Model;
 
 /// <summary>
-/// remoteStorage ETag computation. Ports the Go reference exactly: the ETag is
-/// the first 8 bytes of a SHA-256 digest rendered as lowercase hex (16 chars).
+/// remoteStorage ETag computation: the ETag is the first 8 bytes of a SHA-256
+/// digest rendered as lowercase hex (16 chars).
 /// </summary>
 public static class ETag
 {

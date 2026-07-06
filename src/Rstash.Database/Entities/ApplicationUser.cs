@@ -5,7 +5,8 @@ namespace Rstash.Database;
 /// <summary>
 /// The rstash user. Extends Identity's user (which owns UserName, Email,
 /// PasswordHash, EmailConfirmed, lockout, etc.) with rstash-specific fields.
-/// Identity's token providers replace the Go email-verify/password-reset columns.
+/// Identity's token providers handle email verification and password resets, so
+/// those need no columns here.
 /// </summary>
 public class ApplicationUser : IdentityUser<long>
 {

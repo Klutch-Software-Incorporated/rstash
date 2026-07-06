@@ -12,7 +12,7 @@ public static class UserProvisioning
     /// non-zero defaults are applied (0 leaves that dimension unlimited). The
     /// defaults are captured at creation time — changing <c>default_user_storage_limit</c>
     /// or <c>default_user_egress_limit</c> later does not retroactively affect
-    /// existing accounts (mirrors the Go <c>ApplyUserLimitDefaults</c>).
+    /// existing accounts.
     /// </summary>
     public static async Task ApplyDefaultLimitsAsync(
         UserManager<ApplicationUser> users, ApplicationUser user, SettingsSnapshot settings)

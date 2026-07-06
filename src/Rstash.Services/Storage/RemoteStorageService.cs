@@ -65,7 +65,7 @@ public sealed class RemoteStorageService(
         catch (Exception ex)
         {
             // Best-effort blob cleanup on metadata failure, except for the
-            // conflict/precondition cases (matching the Go reference).
+            // conflict/precondition cases.
             if (ex is not StorageException { Error: StorageError.Conflict or StorageError.PreconditionFailed })
             {
                 try
