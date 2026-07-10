@@ -58,18 +58,27 @@ public static class RstashDbContextOptionsExtensions
     /// open the same database the same way.
     /// </summary>
     /// <remarks>
-    /// The remainder is normally a filesystem path (or <c>:memory:</c>), but the
-    /// DSN may append URI-style query parameters such as
-    /// <c>?journal_mode=delete</c>. Those are pragmas, not connection-string
-    /// keywords — Microsoft.Data.Sqlite would reject them — so the query is
-    /// stripped here and any pragmas are applied on open by
-    /// <see cref="SqliteConnectionInitInterceptor"/> (see
+    /// The remainder is normally a filesystem path, but it may also be an in-memory
+    /// database (<c>:memory:</c>, optionally named as <c>:memory:blobs</c>), which
+    /// <see cref="SqliteInMemory"/> maps to a shared-cache database with a
+    /// process-lifetime keep-alive connection so it survives across opens. The DSN may
+    /// also append URI-style query parameters such as <c>?journal_mode=delete</c>.
+    /// Those are pragmas, not connection-string keywords — Microsoft.Data.Sqlite would
+    /// reject them — so the query is stripped here and any pragmas are applied on open
+    /// by <see cref="SqliteConnectionInitInterceptor"/> (see
     /// <see cref="SqliteJournalMode"/>). A value that already looks like a
     /// Microsoft.Data.Sqlite connection string (contains <c>Data Source</c>) is
     /// passed through unchanged.
     /// </remarks>
     internal static string ToSqliteConnectionString(string pathOrConnection)
     {
+        // In-memory databases need a shared cache plus a keep-alive connection, or the
+        // schema would vanish between the migrator and the first EF query.
+        if (SqliteInMemory.IsInMemory(pathOrConnection))
+        {
+            return SqliteInMemory.Resolve(pathOrConnection);
+        }
+
         if (pathOrConnection.Contains("Data Source", StringComparison.OrdinalIgnoreCase))
         {
             return pathOrConnection;
@@ -111,5 +120,36 @@ public static class RstashDbContextOptionsExtensions
         }
 
         return null;
+    }
+
+    /// <summary>
+    /// Throws when the metadata and blob DSNs point at the SAME in-memory SQLite
+    /// database. An in-memory database is per-process and holds a single schema, so
+    /// sharing one between the metadata tables and the blob table makes blob
+    /// initialization fail confusingly. File-backed and server DSNs are always allowed
+    /// (they can safely share a server, and even a file, without clashing).
+    /// </summary>
+    public static void EnsureDistinctInMemoryDatabases(string metadataDsn, string blobDsn)
+    {
+        var meta = DatabaseDsn.Parse(metadataDsn);
+        var blob = DatabaseDsn.Parse(blobDsn);
+
+        if (meta.Dialect is not Dialect.Sqlite || blob.Dialect is not Dialect.Sqlite
+            || !SqliteInMemory.IsInMemory(meta.ConnectionString)
+            || !SqliteInMemory.IsInMemory(blob.ConnectionString))
+        {
+            return;
+        }
+
+        if (string.Equals(
+                SqliteInMemory.SharedConnectionString(meta.ConnectionString),
+                SqliteInMemory.SharedConnectionString(blob.ConnectionString),
+                StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException(
+                "RSTASH_DB and RSTASH_BLOB point at the same in-memory SQLite database, which " +
+                "cannot hold both schemas. Give them distinct names, e.g. RSTASH_DB=sqlite::memory: " +
+                "and RSTASH_BLOB=sqlite::memory:blobs.");
+        }
     }
 }

@@ -20,7 +20,6 @@ public class SqliteConnectionStringTests
 {
     [Theory]
     [InlineData("rstash.sqlite", "rstash.sqlite")]
-    [InlineData(":memory:", ":memory:")]
     [InlineData("/home/rstash.sqlite", "/home/rstash.sqlite")]
     [InlineData("/home/rstash.sqlite?journal_mode=delete", "/home/rstash.sqlite")]     // query stripped
     [InlineData("/home/rstash.sqlite?journal_mode=delete&cache=shared", "/home/rstash.sqlite")]

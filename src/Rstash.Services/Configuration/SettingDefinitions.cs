@@ -48,9 +48,11 @@ public static class SettingDefinitions
             EnvVar = EnvVars.Database,
             Group = "Server",
             Label = "Database DSN",
-            Description = "Metadata database DSN. sqlite:PATH, or postgres: + a native Npgsql " +
-                "connection string (e.g. postgres:Host=…;Database=…;Username=…;Ssl Mode=Require; " +
-                "append ;Auth=Entra for Azure managed-identity auth). mysql:/mssql: not yet wired.",
+            Description = "Metadata database DSN. sqlite:PATH (use sqlite::memory: for a clean, " +
+                "wiped-on-restart in-memory database, handy for local dev), or postgres: + a " +
+                "native Npgsql connection string (e.g. postgres:Host=…;Database=…;Username=…;" +
+                "Ssl Mode=Require; append ;Auth=Entra for Azure managed-identity auth). " +
+                "mysql:/mssql: not yet wired.",
             Default = "sqlite:rstash.sqlite",
             InputType = SettingInputType.Text,
         },
@@ -60,7 +62,8 @@ public static class SettingDefinitions
             EnvVar = EnvVars.Blob,
             Group = "Server",
             Label = "Blob store DSN",
-            Description = "Blob store DSN. Supported: sqlite:, fs:, postgres:, mysql:, mssql:, s3:, azureblob:.",
+            Description = "Blob store DSN. Supported: sqlite:, fs:, postgres:, mysql:, mssql:, s3:, azureblob:. " +
+                "For an in-memory dev store use a NAMED sqlite::memory:blobs (distinct from RSTASH_DB).",
             Default = "sqlite:rstash-blobs.sqlite",
             InputType = SettingInputType.Text,
         },
