@@ -981,6 +981,37 @@ textarea.rs-control {
 .rs-auth-foot a { color: var(--rs-gold-deep); text-decoration: none; }
 .rs-auth-foot a:hover { text-decoration: underline; }
 
+/* First-run setup: onboarding framing layered on top of the auth card. */
+.rs-auth-card.rs-setup { max-width: 440px; }
+
+.rs-setup-kicker {
+    display: inline-block;
+    margin-bottom: 12px;
+    padding: .2rem .6rem;
+    border: 1px solid var(--rs-gold-tint-line);
+    border-radius: 999px;
+    background: var(--rs-gold-tint);
+    color: var(--rs-gold-deep);
+    font-size: .68rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .08em;
+}
+
+/* Muted "optional" tag beside a field label. */
+.rs-optional {
+    font-weight: 400;
+    font-size: .72rem;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    color: var(--mud-palette-text-secondary);
+    margin-left: .35rem;
+}
+
+.rs-auth-card .rs-help { margin: .4rem 0 0; }
+
+.rs-setup-reassure { color: var(--mud-palette-text-secondary); line-height: 1.5; }
+
 /* Chrome-light focus layout (OAuth consent and similar standalone flows). */
 .rs-focus { min-height: 100vh; display: flex; flex-direction: column; }
 .rs-focus-bar {
