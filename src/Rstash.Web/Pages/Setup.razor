@@ -1,35 +1,54 @@
 @page "/setup"
+@layout FocusLayout
 @inject UserManager<ApplicationUser> UserManager
 @inject SignInManager<ApplicationUser> SignInManager
 @inject NavigationManager Navigation
 @inject SetupState SetupStatus
 @inject SettingsService Settings
 
-<PageTitle>Setup</PageTitle>
+<PageTitle>Set up · @Settings.Current.SiteName</PageTitle>
 
-<MudText Typo="Typo.h4" GutterBottom="true">Create the first admin account</MudText>
-<MudText Class="mb-4">Welcome to rstash. Create an administrator account to finish setup.</MudText>
+<div class="rs-auth">
+    <div class="rs-auth-card rs-setup">
+        <div class="rs-auth-head">
+            <img src="/favicon.svg" class="rs-auth-logo" alt="" />
+            <div><span class="rs-setup-kicker">First-run setup</span></div>
+            <h1>Welcome to @Settings.Current.SiteName</h1>
+            <p>Create the administrator account to finish setting up your server. This is a one-time step.</p>
+        </div>
 
-@if (_error is not null)
-{
-    <MudAlert Severity="Severity.Error" Class="mb-4">@_error</MudAlert>
-}
+        @if (_error is not null)
+        {
+            <div class="rs-auth-error">@_error</div>
+        }
 
-<EditForm Model="Input" method="post" OnValidSubmit="CreateAdminAsync" FormName="setup">
-    <DataAnnotationsValidator />
-    <div class="mb-3">
-        <label>Username<br /><InputText @bind-Value="Input.Username" autocomplete="username" /></label>
+        <EditForm Model="Input" method="post" OnValidSubmit="CreateAdminAsync" FormName="setup">
+            <DataAnnotationsValidator />
+            <div class="rs-field">
+                <label class="rs-label" for="setup-username">Username</label>
+                <InputText id="setup-username" class="rs-control" @bind-Value="Input.Username" autocomplete="username" />
+            </div>
+            <div class="rs-field">
+                <label class="rs-label" for="setup-email">Email <span class="rs-optional">optional</span></label>
+                <InputText id="setup-email" class="rs-control" @bind-Value="Input.Email" autocomplete="email" />
+                <p class="rs-help">Used for password resets and important account notices.</p>
+            </div>
+            <div class="rs-field">
+                <label class="rs-label" for="setup-password">Password</label>
+                <InputText id="setup-password" type="password" class="rs-control"
+                           @bind-Value="Input.Password" autocomplete="new-password" />
+                <p class="rs-help">At least 6 characters, with upper- and lower-case letters, a number, and a symbol.</p>
+            </div>
+            <button type="submit" class="rs-auth-submit">Create admin account</button>
+        </EditForm>
+
+        <div class="rs-auth-foot">
+            <span class="rs-setup-reassure">
+                This account gets full administrative access. You can add more users once setup is complete.
+            </span>
+        </div>
     </div>
-    <div class="mb-3">
-        <label>Email (optional)<br /><InputText @bind-Value="Input.Email" autocomplete="email" /></label>
-    </div>
-    <div class="mb-3">
-        <label>Password<br /><InputText type="password" @bind-Value="Input.Password" autocomplete="new-password" /></label>
-    </div>
-    <MudButton ButtonType="ButtonType.Submit" Variant="Variant.Filled" Color="Color.Success">
-        Create account
-    </MudButton>
-</EditForm>
+</div>
 
 @code {
     [SupplyParameterFromForm]
