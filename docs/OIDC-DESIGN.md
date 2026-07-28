@@ -1,8 +1,14 @@
 # External Identity & Entitlements (OIDC) — Design
 
-Status: **design only, not implemented.** Written 2026-07-13 to settle the
-architecture before it constrains adjacent work (rate limiting, the OAuth
-refresh grant, the admin API).
+Status: **partially implemented** on `feat/oidc-embedded`. Written 2026-07-13 to
+settle the architecture before it constrains adjacent work (rate limiting, the
+OAuth refresh grant, the admin API); revised 2026-07-28 as the first phase was
+built.
+
+Built: the table split (Decision 2), `IEntitlementSource` and its local
+implementation (Decision 4), and the bundled provider with rstash as a relying
+party against it (Decision 1). Not built: external-provider mode, the HTTP
+entitlement pull, rate limiting, the refresh grant, audit coverage.
 
 Supersedes the billing direction in the older `saas-roadmap` (in-process Stripe)
 and the June 2026 in-process-Polar decision. Neither is current.
@@ -139,8 +145,8 @@ with `SyncedAt` / `SourceIssuer` so staleness is visible and auditable. The nami
 exists to make it impossible to mistake these for rstash-owned fields: in external
 mode they are never user-editable and never admin-editable.
 
-Refresh policy is Decision 4: **claims at web login** (routine), **admin API push**
-(immediate revocation), **periodic reconcile** (backstop).
+Refresh policy is Decision 4: **claims at web login** (routine) and a **pull with a
+TTL** (the guarantee), optionally triggered early by a thin change event.
 
 Why the storage side must have a record at all: the schema is keyed on a local
 user id (`Node.OwnerId`, `OAuthToken.UserId`, `AuditEntry.ActorId`) and the
@@ -166,14 +172,6 @@ So:
 
 `StorageUser`'s entitlement fields are a **cache, never a source of truth**, in
 external mode: never user-editable, and admin user-management screens go read-only.
-
-### The username is the hard part
-
-`sub` is the durable join key, but `UserName` is what appears in storage URLs and
-WebFinger. It therefore cannot change after any data exists, and it must be
-unique across the instance. Constraints to enforce at provisioning:
-
-- Reject a login whose `preferred_username` collides with a different `sub`.
 
 ### The username is the hard part
 
@@ -248,41 +246,99 @@ This is also why the claim→record sync is not fragile: limits change rarely (a
 upgrade, a revocation), so a sync at login plus a push channel for revocation is
 entirely adequate. No claim needs refreshing on a timer.
 
-## Decision 4 — entitlement propagation is push-primary
+## Decision 4 — entitlement propagation is pull-primary
+
+*Revised 2026-07-28. The original version of this decision was push-primary, via an
+admin JSON API the control plane would call. That inverted the dependency: it put
+write credentials for rstash in the control plane's hands, required the control
+plane to know rstash's data model, and made correctness depend on delivery — so the
+control plane owned retries, ordering, and dead letters.*
 
 Login-time claims alone are insufficient: a user who lapses may not log into the
 rstash *web UI* for months while their remoteStorage apps keep using a valid
 storage token. Revocation would never land.
 
-Three channels, in order of authority:
+**rstash pulls.** It fetches entitlements from the control plane and caches them
+with a TTL. The TTL is the correctness guarantee — not a delivery mechanism.
 
-1. **Push (primary).** Control plane → rstash **admin JSON API** (API-key authed):
-   set quota, set plan, disable/enable, delete. Takes effect immediately.
-   *This makes the already-planned Admin API a hard prerequisite for the hosted
-   billing story, not an independent roadmap item.*
-2. **Login-time claim sync.** Cheap correction on every OIDC login. Handles drift.
-3. **Periodic reconcile (backstop).** A background job re-reads entitlements for
-   active users, so a dropped webhook self-heals instead of silently granting
-   free service forever.
+Preferred transport is a **client-credentials** call to a narrow
+`GET /entitlements/{sub}` endpoint, in preference to OIDC UserInfo with a stored
+per-user refresh token. Both work; the difference is blast radius. UserInfo is
+user-scoped by definition, so it needs a refresh token per user, and a rstash
+database compromise then becomes a control-plane compromise for every account at
+once. Client credentials is one credential total, against an endpoint the control
+plane is writing anyway.
 
-All three write the same shadow-user fields. All three must write **audit
-entries** — with the control plane as actor — which is currently impossible
-(see Ramifications).
+What this buys over push:
+
+- The control plane holds no credentials into rstash and never learns what a
+  `StorageUser` is.
+- rstash holds a credential outward, which is ordinary for a relying party.
+- A control plane that is down degrades to stale-but-working rather than wrong.
+- **The admin JSON API stops being a prerequisite.** It goes back to being a
+  roadmap item to build when it is wanted for its own sake.
+- The periodic-reconcile channel disappears. The TTL *is* the reconcile.
+
+### Optional: events as a trigger, never as a transport
+
+If the TTL lag proves too slow, add **Shared Signals / CAEP** — Security Event
+Tokens (RFC 8417), delivered by push (RFC 8935) or poll (RFC 8936). A SET is a
+signed JWT, validated with the same keys and code as an ID token, so push needs no
+API key: the signature is the trust anchor.
+
+**Thin events only.** An event says *"subject X changed, re-read"* and never carries
+values. That is what makes it safe:
+
+- duplicate delivery is a no-op
+- out-of-order delivery is a no-op
+- the control plane never learns rstash's field names
+- a dropped event degrades to stale-until-TTL, not wrong-forever
+
+Because delivery guarantees stop mattering, the control plane's write path can be
+fire-and-forget. Poll delivery also keeps the credential direction outward and works
+from behind NAT, which push cannot.
+
+This is strictly additive: the pull is the transport and is required either way, so
+nothing built for it is discarded by adding events later.
+
+### What actually decides whether events are needed
+
+Not billing. A lapsed account getting service for another ten minutes costs
+approximately nothing, and quota downgrades lagging is harmless. The case that
+forces sub-TTL revocation is **abuse response** — illegal content, a compromised
+account, a ToS termination — where the question is how fast an account can be
+killed. If "within the hour" is acceptable, the pull alone suffices indefinitely.
 
 ### Bounding the revocation window
 
-Even with push, a disabled user's *already-issued* storage token must stop
+Even with a fast channel, a disabled user's *already-issued* storage token must stop
 working. Two enforcement points:
 
-- **Every storage request** already resolves the owner; check `Disabled` there.
-  This closes the window to zero and is the real answer.
+- **Every storage request** already resolves the owner; the entitlement resolve
+  there checks `Disabled`. This closes the window to whatever the TTL is, and is the
+  real answer.
 - **Short-lived access tokens + the refresh grant** bound it structurally: the
   refresh call is where rstash re-checks user state, so a revoked user's app dies
-  at next refresh even if the per-request check were ever bypassed.
+  at next refresh.
 
 This is an independent argument *for* building the refresh grant, beyond the
 "the setting lies" argument. It is the lifecycle hook for a long-lived
 third-party token.
+
+All channels write the same `StorageUser` fields, and all must write **audit
+entries** — with the control plane as actor — which is currently impossible
+(see Ramifications).
+
+### SCIM was considered
+
+SCIM is the standard for exactly this shape of problem, and its schema maps cleanly:
+`externalId` to `Subject`, `active` to `Disabled`, extension attributes to the
+entitlement fields, and its defined 409-on-duplicate-`userName` *is* the username
+contract this document says both projects need. It was deferred because we own both
+ends — a standard's payoff is largest when you do not — and because implementing a
+conformant server (filter grammar, PATCH semantics, pagination) is real work. It
+becomes worth revisiting the moment a self-hoster wants to provision rstash accounts
+from Entra or Okta, which is the only thing that justifies the cost.
 
 ## Decision 5 — rate limiting is per-user override over a global setting
 
@@ -316,16 +372,19 @@ a boundary, and in external mode it simply isn't reached.
 Things that assume a local account, and therefore belong to the provider:
 
 - **First-run setup flow.** The setup guard redirects to `/setup` when no users
-  exist and creates a local admin. In OIDC mode there is no local admin to create
-  and no first user — setup must be skipped entirely, and admin-ness comes from a
-  claim. `SetupState` needs to be mode-aware.
+  exist and creates a local admin. In external mode there is no local admin to
+  create and no first user — setup must be skipped entirely, and admin-ness comes
+  from a claim. `SetupState` needs to be mode-aware. (`/connect/*` and
+  `/signin-oidc` are already exempt from the guard, or discovery and the authorize
+  endpoint would be unreachable before the first account exists.)
 - **Registration, login, password reset, email verification.** All local-mode-only.
   The control plane owns them in hosted mode. Notably this makes the outstanding
   **email-verification parity gap** hosted-irrelevant — it only matters for
   self-hosters, which lowers its priority.
 - **Account page.** Email/password/username editing must be hidden in OIDC mode.
-- **Admin user management.** Read-only in OIDC mode; mutations belong to the
-  control plane.
+- **Admin user management.** Read-only in external mode; mutations belong to the
+  control plane. The quota and disable writes already target `storage_users`, so
+  making them read-only is a guard rather than a rewrite.
 - **Audit log.** Needs an actor that is not a user id (the control plane, acting
   via API key), and needs to actually record admin/auth/OAuth events — today it
   records only `storage.put` and `storage.delete`. Control-plane-driven quota and
@@ -342,18 +401,22 @@ Nothing here forces OIDC to be built now. The dependencies point the other way �
 these are prerequisites for it, and each stands on its own merit:
 
 1. **Rate limiting** — build with the per-user resolver (Decision 5). Currently a
-   setting that lies.
+   setting that lies. `Entitlements.RateLimitOverride` already carries the per-user
+   value, so the limiter has a resolver to build against.
 2. **OAuth refresh grant** — the token-lifecycle hook (Decision 4). Currently a
    setting that lies.
 3. **Audit coverage + actor model** — so control-plane actions are recordable.
-4. **Admin JSON API + API-key auth** — the push channel. Promoted from
-   "nice-to-have" to *prerequisite* by Decision 4.
-5. **OIDC RP + embedded IdP** — the biggest single step, and it is worth doing in
-   two passes:
+   Still the largest untouched gap: the log records only `storage.put` and
+   `storage.delete`, and has no actor that is not a user id.
+4. **Entitlement pull + `IEntitlementSource`** — the transport (Decision 4).
+   The interface and its local implementation are **built**; the HTTP
+   implementation lands with external mode.
+   *(The admin JSON API is no longer a prerequisite — see Decision 4.)*
+5. **OIDC RP + embedded IdP** — the biggest single step, done in two passes:
    - **5a. Embedded IdP (OpenIddict over Identity) + rstash as RP against itself.**
-     Ships with *zero* external dependency and is independently verifiable: a
-     self-hoster logs in, and the login now happens to be an OIDC round-trip.
-     Carries the signing-key and issuer work from Decision 1.
+     **Done.** Ships with zero external dependency: a self-hoster logs in, and the
+     login now happens to be an OIDC round-trip. Carried the signing-key and issuer
+     work from Decision 1.
    - **5b. External IdP mode.** Swap the provider, add JIT shadow provisioning
      and claim sync. By this point the RP side is already proven by 5a.
 
@@ -361,17 +424,51 @@ Steps 1–4 are all things the codebase already advertises or has queued. OIDC d
 not add work to them; it constrains their shape. That constraint is the point of
 this document.
 
-Note that 5a is the step that *earns* Decision 1: if the embedded IdP turns out to
-be a swamp (key management, redirect handling in the single-binary case), the
-fallback is local Identity in embedded mode and OIDC only for external — which
-costs a second entitlement source and the branching Decision 1 was meant to avoid,
-but is not fatal. Treat 5a as the go/no-go on always-RP.
+5a was the go/no-go on always-RP, and it passed — but the verdict is narrower than
+this document originally assumed, and worth recording honestly.
 
-## Open questions for the control-plane project
+The stated fallback (local Identity in embedded mode, OIDC only for external) was
+said to cost "a second entitlement source". **It no longer does.**
+`IEntitlementSource` unifies entitlements regardless of how login happens, so that
+cost was paid off by Decision 2/4 work rather than by always-RP. What always-RP
+actually buys is narrower: *one* claims-to-`StorageUser` path instead of two.
 
-- Username rules must match rstash's, enforced at signup (see Decision 2).
-- Claim names for entitlements (`storage_quota`, `egress_quota`, `rate_tier`,
-  `plan`) — needs a fixed schema both sides agree on.
+What it costs, measured rather than guessed:
+
+- **Two cookie schemes.** The provider's session and the relying party's session
+  cannot be the same cookie — the challenge would loop forever. Logout must clear
+  both.
+- **A loopback HTTP call.** As a relying party against itself, rstash fetches its
+  own discovery document and posts to its own token endpoint. In production this
+  means the app must be able to reach its own `RSTASH_BASE_URL`; behind a proxy that
+  is a real deployment constraint, not a detail.
+- **Redirect-URI discipline.** The handler derives `redirect_uri` from the incoming
+  request, so it must be pinned to `RSTASH_BASE_URL` on both the authorize and token
+  legs or the provider rejects the request. Same trap as everything else in
+  Decision 1's cost list.
+
+None of these was fatal, and embedded mode works. But the case for always-RP rests
+on one-claim-mapping alone, which is worth remembering if it ever starts to hurt.
+
+## Contract with the control-plane project
+
+Now that the storage side is built, these are the things the other project has to
+agree to rather than open questions about our own design.
+
+- **Username rules must match rstash's, enforced at signup** (see Decision 2).
+  rstash rejects a login whose `preferred_username` already belongs to a different
+  `sub`, so a control plane that permits a collision produces an account that can
+  authenticate but never reach storage. Failing at signup is the only place this can
+  be handled well.
+- **Scope the credential narrowly.** Whatever rstash holds to fetch entitlements
+  must be good for entitlements and nothing else — not a token with general account
+  reach.
+- **Claim/field names for entitlements** — needs a fixed schema both sides agree
+  on. The receiving shape already exists: `MaxStorage`, `MaxEgress`,
+  `RateLimitOverride`, `Plan`, `Disabled` on `StorageUser`, surfaced as
+  `Entitlements`.
+- **`sub` must be stable forever.** It is the join key to the storage record; a
+  control plane that reissues subjects orphans data.
 - Does deleting a user in the control plane delete their *data* in rstash, or
   disable and retain? (Retention/GDPR question, not a technical one.)
 - Does the control plane need to read usage back out of rstash (for metered
