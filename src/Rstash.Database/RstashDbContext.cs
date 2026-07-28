@@ -27,6 +27,10 @@ public class RstashDbContext(DbContextOptions<RstashDbContext> options)
     /// </summary>
     public DbSet<DataProtectionKey> DataProtectionKeys => Set<DataProtectionKey>();
 
+    /// <summary>The storage server's own user records — see <see cref="StorageUser"/>
+    /// for why these are separate from the Identity tables.</summary>
+    public DbSet<StorageUser> StorageUsers => Set<StorageUser>();
+
     public DbSet<Node> Nodes => Set<Node>();
 
     public DbSet<AuditEntry> AuditLog => Set<AuditEntry>();

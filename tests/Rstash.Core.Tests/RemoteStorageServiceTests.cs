@@ -2,6 +2,7 @@ using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Rstash.Database;
 using Rstash.Services;
+using Rstash.Services.Entitlements;
 using Rstash.Services.Storage;
 using Rstash.Storage;
 
@@ -24,7 +25,11 @@ public sealed class RemoteStorageServiceTests : IDisposable
         SchemaMigrator.MigrateUp($"sqlite:{_metaPath}");
         IDbContextFactory<RstashDbContext> factory = new ContextFactory($"sqlite:{_metaPath}");
 
-        _service = new RemoteStorageService(factory, new FileSystemStorage(_blobDir), new SettingsService(factory));
+        _service = new RemoteStorageService(
+            factory,
+            new FileSystemStorage(_blobDir),
+            new SettingsService(factory),
+            new LocalEntitlementSource(factory));
     }
 
     public void Dispose()

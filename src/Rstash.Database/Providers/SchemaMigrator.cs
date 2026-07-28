@@ -19,7 +19,14 @@ namespace Rstash.Database;
 /// </remarks>
 public static class SchemaMigrator
 {
-    public static void MigrateUp(string dsn)
+    public static void MigrateUp(string dsn) => MigrateUp(dsn, targetVersion: null);
+
+    /// <param name="targetVersion">
+    /// Stop after this migration instead of applying everything. Only tests use this,
+    /// to build a database at an older schema and then exercise a data-migrating step
+    /// against rows that actually exist.
+    /// </param>
+    internal static void MigrateUp(string dsn, long? targetVersion)
     {
         var parsed = DatabaseDsn.Parse(dsn);
 
@@ -62,7 +69,15 @@ public static class SchemaMigrator
             generator.CompatibilityMode = CompatibilityMode.LOOSE;
         }
 
-        scope.ServiceProvider.GetRequiredService<IMigrationRunner>().MigrateUp();
+        var runner = scope.ServiceProvider.GetRequiredService<IMigrationRunner>();
+        if (targetVersion is { } version)
+        {
+            runner.MigrateUp(version);
+        }
+        else
+        {
+            runner.MigrateUp();
+        }
     }
 
     /// <summary>

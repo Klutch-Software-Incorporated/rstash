@@ -2,6 +2,7 @@
 @attribute [Authorize]
 @using Microsoft.EntityFrameworkCore
 @inject UserManager<ApplicationUser> Users
+@inject IDbContextFactory<RstashDbContext> DbFactory
 @inject CurrentUserAccessor CurrentUser
 @inject NavigationManager Navigation
 
@@ -35,7 +36,7 @@
             {
                 <tr data-user="@user.UserName" data-email="@(user.Email ?? "")"
                     data-role="@(user.IsAdmin ? "admin" : "user")" data-status="@StatusKey(user)"
-                    data-quota="@user.StorageQuota" data-egress="@user.EgressQuota"
+                    data-quota="@Limits(user).MaxStorage" data-egress="@Limits(user).MaxEgress"
                     data-search="@($"{user.UserName} {user.Email}".ToLowerInvariant())">
                     <td>@user.UserName</td>
                     <td>@(string.IsNullOrEmpty(user.Email) ? (MarkupString)"<span class=\"rs-muted\">—</span>" : (MarkupString)System.Net.WebUtility.HtmlEncode(user.Email))</td>
@@ -50,7 +51,7 @@
                         }
                     </td>
                     <td>
-                        @if (user.Disabled)
+                        @if (Limits(user).Disabled)
                         {
                             <span class="rs-badge rs-badge-off">Disabled</span>
                         }
@@ -63,8 +64,8 @@
                             <span class="rs-badge rs-badge-ok">Active</span>
                         }
                     </td>
-                    <td class="rs-num">@FormatQuota(user.StorageQuota)</td>
-                    <td class="rs-num">@FormatQuota(user.EgressQuota)</td>
+                    <td class="rs-num">@FormatQuota(Limits(user).MaxStorage)</td>
+                    <td class="rs-num">@FormatQuota(Limits(user).MaxEgress)</td>
                     <td class="rs-actions">
                         <div class="rs-actions-cell">
                             @if (!user.Approved)
@@ -78,8 +79,8 @@
                             else
                             {
                                 <PostButton Action="/admin/users/toggle-disabled" Id="@user.Id"
-                                            Label="@(user.Disabled ? "Enable" : "Disable")"
-                                            Kind="@(user.Disabled ? "confirm" : "danger")" />
+                                            Label="@(Limits(user).Disabled ? "Enable" : "Disable")"
+                                            Kind="@(Limits(user).Disabled ? "confirm" : "danger")" />
                                 <PostButton Action="/admin/users/delete" Id="@user.Id" Label="Delete" Kind="danger" />
                             }
                             <form action="/admin/users/quota" method="post" class="rs-quota-form">
@@ -87,12 +88,12 @@
                                 <input type="hidden" name="id" value="@user.Id" />
                                 <label class="rs-quota-field">
                                     <span>Storage</span>
-                                    <input type="text" name="storageQuota" value="@QuotaEditValue(user.StorageQuota)"
+                                    <input type="text" name="storageQuota" value="@QuotaEditValue(Limits(user).MaxStorage)"
                                            placeholder="unlimited" class="rs-quota-input" />
                                 </label>
                                 <label class="rs-quota-field">
                                     <span>Egress/mo</span>
-                                    <input type="text" name="egressQuota" value="@QuotaEditValue(user.EgressQuota)"
+                                    <input type="text" name="egressQuota" value="@QuotaEditValue(Limits(user).MaxEgress)"
                                            placeholder="unlimited" class="rs-quota-input" />
                                 </label>
                                 <button type="submit" class="rs-action">Save</button>
@@ -110,6 +111,10 @@
 
     private List<ApplicationUser> _users = [];
 
+    // Entitlements live on the storage record now, so the table joins the two halves.
+    // Keyed by user id, which matches the storage id for accounts created here.
+    private Dictionary<long, StorageUser> _limits = [];
+
     protected override async Task OnInitializedAsync()
     {
         var actor = await CurrentUser.GetAsync(HttpContext?.User);
@@ -120,7 +125,15 @@
         }
 
         _users = await Users.Users.OrderBy(u => u.UserName).ToListAsync();
+
+        await using var db = await DbFactory.CreateDbContextAsync();
+        _limits = await db.StorageUsers.ToDictionaryAsync(s => s.Id);
     }
+
+    /// <summary>The storage record for a user, or an empty one if provisioning has not
+    /// caught up — the table still renders rather than throwing.</summary>
+    private StorageUser Limits(ApplicationUser user) =>
+        _limits.TryGetValue(user.Id, out var found) ? found : new StorageUser();
 
     private static string FormatQuota(long bytes) => bytes == 0 ? "unlimited" : ByteSize.Format(bytes);
 
@@ -146,6 +159,6 @@
     }
 
     // Sort key for the combined status column.
-    private static string StatusKey(ApplicationUser u) =>
-        u.Disabled ? "disabled" : !u.Approved ? "pending" : "active";
+    private string StatusKey(ApplicationUser u) =>
+        Limits(u).Disabled ? "disabled" : !u.Approved ? "pending" : "active";
 }
