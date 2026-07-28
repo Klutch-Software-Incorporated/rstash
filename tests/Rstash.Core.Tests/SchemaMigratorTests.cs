@@ -42,8 +42,9 @@ public sealed class SchemaMigratorTests : IDisposable
         connection.Open();
 
         using var version = connection.CreateCommand();
-        version.CommandText = "SELECT COUNT(*) FROM VersionInfo WHERE Version = 202607010001;";
-        Assert.Equal(1L, (long)version.ExecuteScalar()!);
+        version.CommandText =
+            "SELECT COUNT(*) FROM VersionInfo WHERE Version IN (202607010001, 202607280001);";
+        Assert.Equal(2L, (long)version.ExecuteScalar()!);
     }
 
     [Fact]
@@ -60,6 +61,7 @@ public sealed class SchemaMigratorTests : IDisposable
             "nodes", "settings", "oauth_tokens", "authorization_codes", "egress_usage", "audit_log",
             "AspNetUsers", "AspNetRoles", "AspNetUserRoles", "AspNetUserClaims",
             "AspNetUserLogins", "AspNetRoleClaims", "AspNetUserTokens",
+            "DataProtectionKeys",
         ];
         foreach (var table in expectedTables)
         {
@@ -127,6 +129,14 @@ public sealed class SchemaMigratorTests : IDisposable
 
             ctx.Settings.Add(new Setting { Key = "registration_mode", Value = "open", UpdatedAt = DateTimeOffset.UnixEpoch });
 
+            // The Data Protection key ring: written by the DP stack at runtime, but the
+            // schema must match its entity or auth cookies break on first request.
+            ctx.DataProtectionKeys.Add(new Microsoft.AspNetCore.DataProtection.EntityFrameworkCore.DataProtectionKey
+            {
+                FriendlyName = "key-2026-07-28",
+                Xml = "<key id=\"test\" />",
+            });
+
             ctx.AuditLog.Add(new AuditEntry
             {
                 ActorId = 1,
@@ -150,6 +160,10 @@ public sealed class SchemaMigratorTests : IDisposable
 
             Assert.Equal("alice", (await ctx.Users.SingleAsync()).UserName);
             Assert.Equal("open", (await ctx.Settings.SingleAsync()).Value);
+
+            var key = await ctx.DataProtectionKeys.SingleAsync();
+            Assert.Equal("key-2026-07-28", key.FriendlyName);
+            Assert.Equal("<key id=\"test\" />", key.Xml);
         }
     }
 }

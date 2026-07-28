@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.DataProtection.EntityFrameworkCore;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
@@ -17,8 +18,15 @@ namespace Rstash.Database;
 /// </para>
 /// </summary>
 public class RstashDbContext(DbContextOptions<RstashDbContext> options)
-    : IdentityDbContext<ApplicationUser, IdentityRole<long>, long>(options)
+    : IdentityDbContext<ApplicationUser, IdentityRole<long>, long>(options), IDataProtectionKeyContext
 {
+    /// <summary>
+    /// The Data Protection key ring. These keys encrypt the auth cookie and antiforgery
+    /// tokens, so they must outlive the process — without persistence every restart
+    /// invalidates every session. Written only by the Data Protection stack.
+    /// </summary>
+    public DbSet<DataProtectionKey> DataProtectionKeys => Set<DataProtectionKey>();
+
     public DbSet<Node> Nodes => Set<Node>();
 
     public DbSet<AuditEntry> AuditLog => Set<AuditEntry>();
