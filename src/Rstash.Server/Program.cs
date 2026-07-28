@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using MudBlazor.Services;
@@ -92,6 +93,15 @@ builder.Services.AddScoped<RstashDbContext>(sp =>
 // Loads the current user once per request/circuit so the layout and page don't issue
 // concurrent UserManager reads on the shared scoped RstashDbContext (see CurrentUserAccessor).
 builder.Services.AddScoped<Rstash.Web.CurrentUserAccessor>();
+
+// Data Protection keys encrypt the auth cookie and antiforgery tokens. The default
+// provider stores them in the container filesystem, so every restart wipes the ring
+// and signs out every user; persisting to the database fixes that and lets a
+// multi-instance deployment share one ring. The application name isolates the ring,
+// so changing it invalidates every existing cookie.
+builder.Services.AddDataProtection()
+    .SetApplicationName("rstash")
+    .PersistKeysToDbContext<RstashDbContext>();
 
 // ASP.NET Core Identity (core APIs only — the setup/login UI is custom Blazor).
 builder.Services.AddAuthentication(IdentityConstants.ApplicationScheme).AddIdentityCookies();

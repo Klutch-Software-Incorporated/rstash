@@ -9,8 +9,15 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" Version="10.0.9" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="10.0.9" />
+    <!-- Data Protection serializes its key ring through System.Security.Cryptography.Xml,
+         and the 10.0.9 chain resolves that to 10.0.9 — five high-severity advisories
+         (GHSA-23rf-6693-g89p, -8q5v-6pqq-x66h, -cvvh-rhrc-wg4q, -g8r8-53c2-pm3f,
+         -mmjf-rqrv-855v). 10.0.10 clears them. This is why every Microsoft.* reference
+         across the solution is floored at 10.0.10: mixing 10.0.9 in anywhere reintroduces
+         the vulnerable package or trips NU1605. Do not downgrade one without the rest. -->
+    <PackageReference Include="Microsoft.AspNetCore.DataProtection.EntityFrameworkCore" Version="10.0.10" />
+    <PackageReference Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" Version="10.0.10" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="10.0.10" />
     <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.2" />
     <PackageReference Include="Azure.Identity" Version="1.14.0" />
     <PackageReference Include="FluentMigrator.Runner" Version="8.0.1" />
