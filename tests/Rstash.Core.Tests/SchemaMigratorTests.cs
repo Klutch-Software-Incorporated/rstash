@@ -114,7 +114,6 @@ public sealed class SchemaMigratorTests : IDisposable
                 Email = "alice@example.com",
                 NormalizedEmail = "ALICE@EXAMPLE.COM",
                 CreatedAt = DateTimeOffset.UnixEpoch,
-                StorageQuota = 1024,
             });
 
             ctx.Nodes.Add(new Node

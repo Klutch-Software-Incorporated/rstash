@@ -8,22 +8,21 @@ namespace Rstash.Database;
 /// Identity's token providers handle email verification and password resets, so
 /// those need no columns here.
 /// </summary>
+/// <remarks>
+/// Strictly the *identity* half. Quotas, the disabled flag, and anything else a
+/// provider owns live on <see cref="StorageUser"/> — see that type for why they are
+/// not columns here, next to the password hash.
+/// </remarks>
 public class ApplicationUser : IdentityUser<long>
 {
     public bool IsAdmin { get; set; }
 
-    /// <summary>Per-user storage cap in bytes; 0 = unlimited.</summary>
-    public long StorageQuota { get; set; }
-
-    /// <summary>Per-user monthly egress cap in bytes; 0 = unlimited.</summary>
-    public long EgressQuota { get; set; }
-
-    public bool Disabled { get; set; }
-
+    /// <summary>
+    /// Local registration gate (invite/approval modes). Not an entitlement: there is
+    /// no counterpart under an external provider, which is why the local entitlement
+    /// source folds it into the effective disabled flag rather than storing it there.
+    /// </summary>
     public bool Approved { get; set; } = true;
-
-    /// <summary>True for accounts provisioned by an external admin/billing app.</summary>
-    public bool ExternallyManaged { get; set; }
 
     public DateTimeOffset CreatedAt { get; set; }
 

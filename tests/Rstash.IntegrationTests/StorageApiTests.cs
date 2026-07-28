@@ -2,9 +2,11 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Text;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Rstash.Database;
 using Rstash.Services;
+using Rstash.Web;
 
 namespace Rstash.IntegrationTests;
 
@@ -122,13 +124,7 @@ public sealed class StorageApiTests(RstashAppFactory factory) : IClassFixture<Rs
     {
         var (user, token) = await SeedUserWithTokenAsync("quotauser", "*:rw");
 
-        using (var scope = factory.Services.CreateScope())
-        {
-            var users = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
-            var account = await users.FindByNameAsync(user);
-            account!.StorageQuota = 10;
-            await users.UpdateAsync(account);
-        }
+        await SetLimitsAsync(user, maxStorage: 10);
 
         var client = factory.CreateClient();
 
@@ -146,13 +142,7 @@ public sealed class StorageApiTests(RstashAppFactory factory) : IClassFixture<Rs
     {
         var (user, token) = await SeedUserWithTokenAsync("egressuser", "*:rw");
 
-        using (var scope = factory.Services.CreateScope())
-        {
-            var users = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
-            var account = await users.FindByNameAsync(user);
-            account!.EgressQuota = 10; // bytes for the current period
-            await users.UpdateAsync(account);
-        }
+        await SetLimitsAsync(user, maxEgress: 10); // bytes for the current period
 
         var client = factory.CreateClient();
 
@@ -213,6 +203,13 @@ public sealed class StorageApiTests(RstashAppFactory factory) : IClassFixture<Rs
                 "Sup3r!secret");
             Assert.True(created.Succeeded);
             user = await users.FindByNameAsync(username);
+
+            // Without the storage record the account cannot serve a document — the
+            // storage API resolves owners against storage_users, not the Identity table.
+            await UserProvisioning.ProvisionStorageUserAsync(
+                factory.Services.GetRequiredService<IDbContextFactory<RstashDbContext>>(),
+                user!,
+                factory.Services.GetRequiredService<SettingsService>().Current);
         }
 
         var tokens = scope.ServiceProvider.GetRequiredService<TokenStore>();
@@ -225,5 +222,29 @@ public sealed class StorageApiTests(RstashAppFactory factory) : IClassFixture<Rs
         var request = new HttpRequestMessage(method, url) { Content = content };
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
         return request;
+    }
+
+    /// <summary>
+    /// Sets limits on the storage record. Quotas live there rather than on the Identity
+    /// row, and the storage API resolves owners by normalized username.
+    /// </summary>
+    private async Task SetLimitsAsync(string userName, long? maxStorage = null, long? maxEgress = null)
+    {
+        var contextFactory = factory.Services.GetRequiredService<IDbContextFactory<RstashDbContext>>();
+        await using var db = await contextFactory.CreateDbContextAsync();
+
+        var normalized = userName.ToUpperInvariant();
+        var row = await db.StorageUsers.SingleAsync(s => s.NormalizedUserName == normalized);
+        if (maxStorage is { } storage)
+        {
+            row.MaxStorage = storage;
+        }
+
+        if (maxEgress is { } egress)
+        {
+            row.MaxEgress = egress;
+        }
+
+        await db.SaveChangesAsync();
     }
 }

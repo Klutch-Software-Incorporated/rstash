@@ -10,6 +10,7 @@ using Rstash.Server.Endpoints;
 using Rstash.Server.Health;
 using Rstash.Server.Identity;
 using Rstash.Services;
+using Rstash.Services.Entitlements;
 using Rstash.Services.Configuration;
 using Rstash.Services.Storage;
 using Rstash.Storage;
@@ -82,6 +83,12 @@ builder.Services.AddOpenApi();
 builder.Services.AddDbContextFactory<RstashDbContext>(options => options.UseRstashDatabase(databaseDsn));
 builder.Services.AddSingleton<IStorage>(_ => StorageFactory.Open(blobDsn));
 builder.Services.AddSingleton<SettingsService>();
+
+// Entitlement resolution goes through this everywhere, so enforcement is identical
+// whether the limits were set by a local admin or handed down by a control plane.
+// The external implementation swaps in here and nothing downstream changes.
+builder.Services.AddSingleton<IEntitlementSource, LocalEntitlementSource>();
+
 builder.Services.AddSingleton<RemoteStorageService>();
 builder.Services.AddSingleton<EgressTracker>();
 builder.Services.AddHostedService(sp => sp.GetRequiredService<EgressTracker>());

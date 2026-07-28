@@ -2,9 +2,11 @@ using System.Buffers;
 using System.Globalization;
 using System.Text.Json;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.EntityFrameworkCore;
 using Rstash.Database;
 using Rstash.Model;
 using Rstash.Services;
+using Rstash.Services.Entitlements;
 using Rstash.Services.Storage;
 
 namespace Rstash.Server.Endpoints;
@@ -30,7 +32,8 @@ internal static class StorageEndpoints
         RemoteStorageService storage,
         EgressTracker egress,
         TokenStore tokens,
-        UserManager<ApplicationUser> users,
+        IDbContextFactory<RstashDbContext> contextFactory,
+        IEntitlementSource entitlements,
         SettingsService settings,
         AuditService audit)
     {
@@ -79,20 +82,38 @@ internal static class StorageEndpoints
             tokenUserId = token.UserId;
         }
 
-        var owner = await users.FindByNameAsync(user);
-        if (owner is null)
+        // Resolved against storage_users, not the Identity table. The two ids match for
+        // accounts that predate the split, but new ones come from separate sequences,
+        // so using the Identity id here would address the wrong owner's nodes.
+        var normalized = user.ToUpperInvariant();
+        long ownerId;
+        await using (var db = await contextFactory.CreateDbContextAsync(ctx.RequestAborted))
+        {
+            ownerId = await db.StorageUsers
+                .Where(s => s.NormalizedUserName == normalized)
+                .Select(s => s.Id)
+                .FirstOrDefaultAsync(ctx.RequestAborted);
+        }
+
+        if (ownerId == 0)
         {
             await TextAsync(ctx, StatusCodes.Status404NotFound, "user not found");
             return;
         }
 
-        if (needsAuth && (owner.Disabled || !owner.Approved))
+        // One resolve per request, covering both the kill switch and the egress limit.
+        // Under an external provider this is the point where a revoked account stops
+        // working, so it must stay on the request path rather than being cached in the
+        // token.
+        var limits = await entitlements.ResolveAsync(ownerId, ctx.RequestAborted);
+
+        if (needsAuth && limits.Disabled)
         {
             await TextAsync(ctx, StatusCodes.Status403Forbidden, "account disabled");
             return;
         }
 
-        if (needsAuth && tokenUserId != owner.Id)
+        if (needsAuth && tokenUserId != ownerId)
         {
             await TextAsync(ctx, StatusCodes.Status403Forbidden, "forbidden");
             return;
@@ -113,31 +134,31 @@ internal static class StorageEndpoints
             switch (method)
             {
                 case "GET" when isFolder:
-                    await GetFolderAsync(ctx, storage, owner.Id, storagePath, isPublic, conditions, writeBody: true);
+                    await GetFolderAsync(ctx, storage, ownerId, storagePath, isPublic, conditions, writeBody: true);
                     break;
                 case "HEAD" when isFolder:
-                    await GetFolderAsync(ctx, storage, owner.Id, storagePath, isPublic, conditions, writeBody: false);
+                    await GetFolderAsync(ctx, storage, ownerId, storagePath, isPublic, conditions, writeBody: false);
                     break;
                 case "GET":
                     await GetDocumentAsync(
-                        ctx, storage, egress, owner.Id, owner.EgressQuota, storagePath, isPublic, conditions);
+                        ctx, storage, egress, ownerId, limits.MaxEgress, storagePath, isPublic, conditions);
                     break;
                 case "HEAD":
-                    await HeadDocumentAsync(ctx, storage, owner.Id, storagePath, isPublic, conditions);
+                    await HeadDocumentAsync(ctx, storage, ownerId, storagePath, isPublic, conditions);
                     break;
                 case "PUT" when isFolder:
                     await TextAsync(ctx, StatusCodes.Status400BadRequest, "cannot PUT a folder");
                     break;
                 case "PUT":
-                    if (await PutDocumentAsync(ctx, storage, owner.Id, storagePath, conditions, settings.Current.MaxUploadSize))
+                    if (await PutDocumentAsync(ctx, storage, ownerId, storagePath, conditions, settings.Current.MaxUploadSize))
                     {
-                        await audit.RecordAsync(owner.Id, "storage.put", "storage", storagePath);
+                        await audit.RecordAsync(ownerId, "storage.put", "storage", storagePath);
                     }
 
                     break;
                 case "DELETE":
-                    await DeleteDocumentAsync(ctx, storage, owner.Id, storagePath, conditions);
-                    await audit.RecordAsync(owner.Id, "storage.delete", "storage", storagePath);
+                    await DeleteDocumentAsync(ctx, storage, ownerId, storagePath, conditions);
+                    await audit.RecordAsync(ownerId, "storage.delete", "storage", storagePath);
                     break;
                 default:
                     await TextAsync(ctx, StatusCodes.Status405MethodNotAllowed, "method not allowed");

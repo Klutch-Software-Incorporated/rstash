@@ -5,6 +5,7 @@
 @inject NavigationManager Navigation
 @inject SetupState SetupStatus
 @inject SettingsService Settings
+@inject IDbContextFactory<RstashDbContext> DbFactory
 
 <PageTitle>Set up · @Settings.Current.SiteName</PageTitle>
 
@@ -74,7 +75,7 @@
             return;
         }
 
-        await UserProvisioning.ApplyDefaultLimitsAsync(UserManager, user, Settings.Current);
+        await UserProvisioning.ProvisionStorageUserAsync(DbFactory, user, Settings.Current);
 
         SetupStatus.MarkComplete();
         await SignInManager.SignInAsync(user, isPersistent: true);

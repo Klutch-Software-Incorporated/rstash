@@ -6,9 +6,11 @@ using System.Text;
 using System.Text.Json;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Rstash.Database;
 using Rstash.Services;
+using Rstash.Web;
 
 namespace Rstash.IntegrationTests;
 
@@ -144,6 +146,12 @@ public sealed class OAuthTests(RstashAppFactory factory) : IClassFixture<RstashA
             user = new ApplicationUser { UserName = username, CreatedAt = DateTimeOffset.UtcNow, Approved = true };
             var created = await users.CreateAsync(user, "Sup3r!secret");
             Assert.True(created.Succeeded);
+
+            // The token exchange resolves entitlements, which needs the storage record.
+            await UserProvisioning.ProvisionStorageUserAsync(
+                services.GetRequiredService<IDbContextFactory<RstashDbContext>>(),
+                user,
+                services.GetRequiredService<SettingsService>().Current);
         }
 
         return user.Id;

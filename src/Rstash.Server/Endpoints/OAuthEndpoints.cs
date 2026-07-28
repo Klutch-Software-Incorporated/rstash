@@ -7,6 +7,7 @@ using Rstash.Database;
 using Rstash.Model;
 using Rstash.Services;
 using Rstash.Services.Configuration;
+using Rstash.Services.Entitlements;
 
 namespace Rstash.Server.Endpoints;
 
@@ -110,7 +111,8 @@ internal static class OAuthEndpoints
 
     // POST /oauth/token — authorization-code + PKCE exchange.
     private static async Task<IResult> TokenAsync(
-        HttpContext ctx, UserManager<ApplicationUser> users, TokenStore tokens, SettingsService settings)
+        HttpContext ctx, UserManager<ApplicationUser> users, TokenStore tokens, SettingsService settings,
+        IEntitlementSource entitlements)
     {
         ctx.Response.Headers.CacheControl = "no-store";
 
@@ -146,7 +148,14 @@ internal static class OAuthEndpoints
         }
 
         var user = await users.FindByIdAsync(ac.UserId.ToString(System.Globalization.CultureInfo.InvariantCulture));
-        if (user is null || user.Disabled || !user.Approved)
+        if (user is null)
+        {
+            return TokenError("invalid_grant", "user account is disabled", 400);
+        }
+
+        // Minting an app token is a good moment to re-check standing: the entitlement
+        // source folds local approval together with the provider's kill switch.
+        if ((await entitlements.ResolveAsync(user.Id)).Disabled)
         {
             return TokenError("invalid_grant", "user account is disabled", 400);
         }

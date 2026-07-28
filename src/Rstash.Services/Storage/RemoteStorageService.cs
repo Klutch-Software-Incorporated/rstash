@@ -2,6 +2,7 @@ using System.Globalization;
 using Microsoft.EntityFrameworkCore;
 using Rstash.Database;
 using Rstash.Model;
+using Rstash.Services.Entitlements;
 using Rstash.Storage;
 
 namespace Rstash.Services.Storage;
@@ -12,7 +13,10 @@ namespace Rstash.Services.Storage;
 /// Quota and egress enforcement are layered on later (currently no-op).
 /// </summary>
 public sealed class RemoteStorageService(
-    IDbContextFactory<RstashDbContext> contextFactory, IStorage storage, SettingsService settings)
+    IDbContextFactory<RstashDbContext> contextFactory,
+    IStorage storage,
+    SettingsService settings,
+    IEntitlementSource entitlements)
 {
     public async Task<PutResult> PutDocumentAsync(
         long userId, string path, Stream content, string contentType,
@@ -279,17 +283,19 @@ public sealed class RemoteStorageService(
     }
 
     /// <summary>
-    /// Enforces the per-user storage quota (ApplicationUser.StorageQuota; 0 =
-    /// unlimited) and the global cap (settings; 0 = disabled). <paramref name="delta"/>
-    /// is the net byte change (new size minus any replaced size).
+    /// Enforces the per-user storage limit (0 = unlimited) and the global cap
+    /// (settings; 0 = disabled). <paramref name="delta"/> is the net byte change (new
+    /// size minus any replaced size).
     /// </summary>
+    /// <remarks>
+    /// The limit comes from <see cref="IEntitlementSource"/> and the usage from
+    /// rstash's own node sizes — the provider says what is allowed, rstash knows what
+    /// has been used, and enforcement is the comparison.
+    /// </remarks>
     private async Task EnsureWithinQuotaAsync(
         RstashDbContext db, long userId, long delta, CancellationToken cancellationToken)
     {
-        var userQuota = await db.Users
-            .Where(u => u.Id == userId)
-            .Select(u => u.StorageQuota)
-            .FirstOrDefaultAsync(cancellationToken);
+        var userQuota = (await entitlements.ResolveAsync(userId, cancellationToken)).MaxStorage;
 
         if (userQuota > 0)
         {

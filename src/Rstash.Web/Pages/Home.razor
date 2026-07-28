@@ -1,5 +1,6 @@
 @page "/"
 @inject Rstash.Services.SettingsService Settings
+@inject Rstash.Services.Entitlements.IEntitlementSource Entitlements
 @inject CurrentUserAccessor CurrentUser
 @inject RemoteStorageService Storage
 @inject TokenStore Tokens
@@ -176,14 +177,17 @@
         _usage = await Storage.GetUsageAsync(_user.Id);
         _maxFolderBytes = _usage.Folders.Count > 0 ? _usage.Folders.Max(f => f.Bytes) : 0;
 
+        // Limits come from the entitlement source, usage from rstash's own measurements.
+        var limits = await Entitlements.ResolveAsync(_user.Id);
+
         // Effective storage cap: the user's own quota wins; otherwise the global limit. 0 = unlimited.
-        _quota = _user.StorageQuota > 0 ? _user.StorageQuota : Settings.Current.TotalStorageLimit;
+        _quota = limits.MaxStorage > 0 ? limits.MaxStorage : Settings.Current.TotalStorageLimit;
         _storagePercent = _quota > 0 ? (int)Math.Min(100, Math.Round(_usage.TotalBytes * 100.0 / _quota)) : 0;
 
         // Bandwidth shows the user's own monthly egress against their personal cap only —
         // the global limit is a server-wide backstop, not a meaningful per-user figure.
         _egressUsed = await Egress.GetUsedAsync(_user.Id);
-        _egressQuota = _user.EgressQuota;
+        _egressQuota = limits.MaxEgress;
         _egressPercent = _egressQuota > 0 ? (int)Math.Min(100, Math.Round(_egressUsed * 100.0 / _egressQuota)) : 0;
     }
 

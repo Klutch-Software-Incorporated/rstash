@@ -1,5 +1,6 @@
 @page "/register"
 @inject SettingsService Settings
+@inject IDbContextFactory<RstashDbContext> DbFactory
 @inject UserManager<ApplicationUser> UserManager
 @inject SignInManager<ApplicationUser> SignInManager
 @inject NavigationManager Navigation
@@ -92,7 +93,7 @@ else
             return;
         }
 
-        await UserProvisioning.ApplyDefaultLimitsAsync(UserManager, user, Settings.Current);
+        await UserProvisioning.ProvisionStorageUserAsync(DbFactory, user, Settings.Current);
 
         if (approved)
         {
