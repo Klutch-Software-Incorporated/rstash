@@ -8,6 +8,7 @@ public static class EnvVars
 {
     public const string Addr = "RSTASH_ADDR";
     public const string BaseUrl = "RSTASH_BASE_URL";
+    public const string TrustProxy = "RSTASH_TRUST_PROXY";
     public const string Database = "RSTASH_DB";
     public const string Blob = "RSTASH_BLOB";
     public const string LogLevel = "RSTASH_LOG_LEVEL";

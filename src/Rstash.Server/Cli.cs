@@ -35,6 +35,25 @@ internal static class Cli
         var blobDsn = config["RSTASH_BLOB"] ?? "sqlite:rstash-blobs.sqlite";
         var ok = true;
 
+        // Checked first: a wrong base URL does not surface as a connection error, it
+        // surfaces later as WebFinger links and OAuth redirects pointing somewhere
+        // nobody can reach.
+        var baseUrl = BaseUrl.Resolve(config[EnvVars.BaseUrl]);
+        if (BaseUrl.TryValidate(baseUrl, out var baseUrlError))
+        {
+            Console.WriteLine($"[ok]   base URL:   {baseUrl}");
+        }
+        else
+        {
+            ok = false;
+            Console.WriteLine($"[FAIL] base URL:   {baseUrl} — {baseUrlError}");
+        }
+
+        if (config.GetValue(EnvVars.TrustProxy, false))
+        {
+            Console.WriteLine("[ok]   proxy:      trusting X-Forwarded-* headers");
+        }
+
         try
         {
             await using var db = new RstashDbContext(

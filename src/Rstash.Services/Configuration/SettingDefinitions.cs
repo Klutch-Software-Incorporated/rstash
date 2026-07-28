@@ -44,6 +44,19 @@ public static class SettingDefinitions
         },
         new()
         {
+            Key = "trust_proxy",
+            EnvVar = EnvVars.TrustProxy,
+            Group = "Server",
+            Label = "Trust reverse-proxy headers",
+            Description = "Set true when running behind a reverse proxy (Caddy, nginx, Azure " +
+                "Container Apps). Honours X-Forwarded-Proto/Host/For so the client IP and " +
+                "scheme are the user's, not the proxy's. Leave false when rstash is exposed " +
+                "directly — those headers are trivially spoofed by anyone who can reach it.",
+            Default = "false",
+            InputType = SettingInputType.Text,
+        },
+        new()
+        {
             Key = "database_dsn",
             EnvVar = EnvVars.Database,
             Group = "Server",

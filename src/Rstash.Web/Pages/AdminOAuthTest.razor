@@ -2,6 +2,7 @@
 @attribute [Authorize]
 @inject CurrentUserAccessor CurrentUser
 @inject NavigationManager Navigation
+@inject IConfiguration Config
 
 <PageTitle>OAuth test — admin</PageTitle>
 
@@ -109,7 +110,11 @@ else
         }
 
         _username = user.UserName ?? "";
-        _baseUrl = new Uri(Navigation.BaseUri).GetLeftPart(UriPartial.Authority);
+
+        // From RSTASH_BASE_URL, not Navigation.BaseUri: behind a TLS-terminating proxy
+        // the request believes it is http://localhost:8080, which would put a URL nobody
+        // can reach into both the sample curl command and the OAuth callback below.
+        _baseUrl = BaseUrl.Resolve(Config[EnvVars.BaseUrl]);
         _callbackUrl = $"{_baseUrl}/admin/oauth-test";
         _accessToken = AccessTokenParam;
         _tokenType = TokenTypeParam;

@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.DataProtection;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using MudBlazor.Services;
@@ -8,6 +9,7 @@ using Rstash.Server.Components;
 using Rstash.Server.Endpoints;
 using Rstash.Server.Health;
 using Rstash.Services;
+using Rstash.Services.Configuration;
 using Rstash.Services.Storage;
 using Rstash.Storage;
 
@@ -42,7 +44,16 @@ builder.WebHost.UseStaticWebAssets();
 // Boot-critical configuration (env vars; see the settings registry for the rest).
 var databaseDsn = builder.Configuration["RSTASH_DB"] ?? "sqlite:rstash.sqlite";
 var blobDsn = builder.Configuration["RSTASH_BLOB"] ?? "sqlite:rstash-blobs.sqlite";
-var baseUrl = (builder.Configuration["RSTASH_BASE_URL"] ?? "http://localhost:8080").TrimEnd('/');
+// Every absolute URL rstash emits derives from this, never from the incoming request
+// (see BaseUrl). A malformed value breaks WebFinger and OAuth redirects, so fail at
+// boot rather than serving links nobody can follow.
+var baseUrl = BaseUrl.ResolveOrThrow(builder.Configuration[EnvVars.BaseUrl]);
+
+// Reverse-proxy support is opt-in. X-Forwarded-* headers are trivially spoofed by
+// anyone who can reach the server, and ASP.NET Core's default trust list (loopback
+// only) silently ignores them in a container anyway — so rather than half-work, honour
+// them only when the operator confirms a proxy is in front.
+var trustProxy = builder.Configuration.GetValue(EnvVars.TrustProxy, false);
 
 // In-memory SQLite is a per-process dev/test convenience; the metadata and blob DSNs
 // must name DISTINCT in-memory databases (one can't hold both schemas).
@@ -135,6 +146,22 @@ SchemaMigrator.MigrateUp(databaseDsn);
 await using (var scope = app.Services.CreateAsyncScope())
 {
     await scope.ServiceProvider.GetRequiredService<SettingsService>().ReloadAsync();
+}
+
+// Must precede any middleware that reads the scheme, host, or client IP. Clearing the
+// known-network/proxy lists is what makes this work in a container, where the proxy's
+// address is not knowable ahead of time; it is safe only because reaching this line at
+// all required the operator to opt in via RSTASH_TRUST_PROXY.
+if (trustProxy)
+{
+    app.UseForwardedHeaders(new ForwardedHeadersOptions
+    {
+        ForwardedHeaders = ForwardedHeaders.XForwardedProto
+            | ForwardedHeaders.XForwardedHost
+            | ForwardedHeaders.XForwardedFor,
+        KnownNetworks = { },
+        KnownProxies = { },
+    });
 }
 
 // Security response headers (CSP tuned for Blazor + MudBlazor + Google Fonts).
