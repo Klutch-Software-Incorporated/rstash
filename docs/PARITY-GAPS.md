@@ -11,10 +11,6 @@ stubbed** in the C# rewrite, to be tackled as individual features after the
 
 ## Tier 1 — impactful and currently misrepresented (a setting/comment implies they exist)
 
-- **Encryption at rest (`RSTASH_BLOB_KEY`).** Go wraps blobs in an encrypted
-  store with a key provider (`legacy/internal/blob/encrypted.go`,
-  `keyprovider.go`). C# only has a "layered on later" comment in
-  `src/Rstash.Storage/StorageFactory.cs`. No encryption today.
 - **Rate limiting enforcement.** Go enforces per-IP and per-user token buckets
   (`legacy/internal/api/ratelimit.go`). C# defines `rate_limit_*` /
   `user_rate_limit_*` settings but never reads or enforces them.
@@ -49,6 +45,17 @@ stubbed** in the C# rewrite, to be tackled as individual features after the
 
 ## Intentional / non-gaps (do not port without a reason)
 
+- **App-level blob encryption at rest (`RSTASH_BLOB_KEY`).** Go wrapped blobs in
+  an app-managed AES store (`legacy/internal/blob/encrypted.go`, `keyprovider.go`).
+  Deliberately **not** ported (decision 2026-07-06): it only defends a "leaked
+  storage credential *without* the app env" seam that the single-container hosted
+  topology doesn't have, and it carries an unrotatable-key / lose-the-key-lose-all-
+  data footgun. Azure Storage already encrypts every blob at rest (AES-256) by
+  default, covering the physical-media threat for free. If app-managed keys are ever
+  required (e.g. an honest "we hold the encryption keys" claim), use a Key Vault
+  customer-managed key — infra-only, with real rotation — not an app-held key.
+  (The "layered on later" note in `src/Rstash.Storage/StorageFactory.cs` is now
+  stale and should be reconciled to say this.)
 - **Range requests (RFC 7233).** Not implemented in *either* version (Go lacks it
   too); listed as planned, not a regression.
 - **OAuth client registry.** remoteStorage is registration-free by design
