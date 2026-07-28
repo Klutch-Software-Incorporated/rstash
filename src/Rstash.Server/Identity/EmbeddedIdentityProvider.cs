@@ -1,5 +1,7 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Tokens;
 using OpenIddict.Abstractions;
+using OpenIddict.Server;
 using Rstash.Database;
 
 namespace Rstash.Server.Identity;
@@ -54,13 +56,9 @@ internal static class EmbeddedIdentityProvider
                     OpenIddictConstants.Scopes.Profile,
                     OpenIddictConstants.Scopes.Email);
 
-                // SPIKE ONLY — ephemeral keys are regenerated on every restart, which
-                // breaks logins that are mid-flight across it. Established sessions
-                // survive, because login yields an ordinary auth cookie, so this is not
-                // as severe as it sounds. Still must become DB-persisted, rotating keys
-                // before this ships.
-                options.AddEphemeralEncryptionKey()
-                    .AddEphemeralSigningKey();
+                // Keys are attached below via a deferred options configuration, because
+                // loading them needs the database and this callback runs before the
+                // service provider exists.
 
                 // Passthrough on the two endpoints that need rstash's own logic. UserInfo
                 // is deliberately left to OpenIddict, which answers it from the access
@@ -86,6 +84,25 @@ internal static class EmbeddedIdentityProvider
             {
                 options.UseLocalServer();
                 options.UseAspNetCore();
+            });
+
+        // Deferred so it runs against the built service provider — after the schema
+        // migration, which the key table obviously depends on. Blocking on the async
+        // load is acceptable here: options are initialized once, at startup, before any
+        // request is served.
+        services.AddOptions<OpenIddictServerOptions>()
+            .Configure<IServiceProvider>((options, provider) =>
+            {
+                var (signing, encryption) = OidcKeyStore.LoadOrCreateAsync(provider)
+                    .GetAwaiter().GetResult();
+
+                options.SigningCredentials.Add(
+                    new SigningCredentials(signing, SecurityAlgorithms.RsaSha256));
+                options.EncryptionCredentials.Add(
+                    new EncryptingCredentials(
+                        encryption,
+                        SecurityAlgorithms.RsaOAEP,
+                        SecurityAlgorithms.Aes256CbcHmacSha512));
             });
 
         return services;

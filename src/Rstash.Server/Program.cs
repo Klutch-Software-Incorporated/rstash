@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Identity;
@@ -122,8 +123,11 @@ builder.Services.AddDataProtection()
     .SetApplicationName("rstash")
     .PersistKeysToDbContext<RstashDbContext>();
 
+// rstash authenticates humans as an OpenID Connect relying party. Two cookie schemes,
+// deliberately — see RstashAuthentication for why collapsing them loops forever.
+builder.Services.AddRstashAuthentication(baseUrl);
+
 // ASP.NET Core Identity (core APIs only — the setup/login UI is custom Blazor).
-builder.Services.AddAuthentication(IdentityConstants.ApplicationScheme).AddIdentityCookies();
 builder.Services
     .AddIdentityCore<ApplicationUser>(options =>
     {
@@ -141,12 +145,6 @@ builder.Services.AddEmbeddedIdentityProvider(baseUrl);
 
 builder.Services.AddAuthorization();
 builder.Services.AddCascadingAuthenticationState();
-builder.Services.ConfigureApplicationCookie(options =>
-{
-    options.LoginPath = "/login";
-    options.AccessDeniedPath = "/login";
-    options.ReturnUrlParameter = "redirect";
-});
 
 // Blazor Web App (interactive server) + MudBlazor.
 builder.Services.AddRazorComponents().AddInteractiveServerComponents();
@@ -224,6 +222,8 @@ app.Use(async (context, next) =>
             || path.StartsWithSegments("/storage")
             || path.StartsWithSegments("/.well-known")
             || path.StartsWithSegments("/oauth")
+            || path.StartsWithSegments("/connect")
+            || path.StartsWithSegments("/signin-oidc")
             || path.StartsWithSegments("/ui")
             || path.StartsWithSegments("/_")
             || (path.Value?.Contains('.') ?? false);
@@ -253,9 +253,13 @@ app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode()
     .AddAdditionalAssemblies(typeof(Rstash.Web.Layout.MainLayout).Assembly);
 
-app.MapPost("/auth/logout", async (SignInManager<ApplicationUser> signInManager) =>
+// Both sessions, or logout does not log anyone out: SignOutAsync clears the provider's
+// Identity cookie, but the application's own relying-party cookie is what actually
+// authorizes a request. Clearing only one leaves the user signed in via the other.
+app.MapPost("/auth/logout", async (HttpContext context, SignInManager<ApplicationUser> signInManager) =>
 {
     await signInManager.SignOutAsync();
+    await context.SignOutAsync(RstashAuthentication.ApplicationScheme);
     return Results.Redirect("/");
 }).DisableAntiforgery();
 

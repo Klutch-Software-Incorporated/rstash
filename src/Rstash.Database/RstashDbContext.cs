@@ -31,6 +31,9 @@ public class RstashDbContext(DbContextOptions<RstashDbContext> options)
     /// for why these are separate from the Identity tables.</summary>
     public DbSet<StorageUser> StorageUsers => Set<StorageUser>();
 
+    /// <summary>Key material for the embedded OpenID Connect provider.</summary>
+    public DbSet<OidcKey> OidcKeys => Set<OidcKey>();
+
     public DbSet<Node> Nodes => Set<Node>();
 
     public DbSet<AuditEntry> AuditLog => Set<AuditEntry>();
