@@ -48,7 +48,8 @@ else is a runtime setting managed in the admin UI and stored in the DB.
 | Variable | Default | Description |
 |----------|---------|-------------|
 | RSTASH_ADDR | :8080 | Listen address (host:port) |
-| RSTASH_BASE_URL | http://localhost:8080 | Public URL of the server |
+| RSTASH_BASE_URL | http://localhost:8080 | Public URL of the server. Validated at boot; every absolute URL rstash emits derives from it, never from the request |
+| RSTASH_TRUST_PROXY | false | Honour `X-Forwarded-Proto/Host/For`. Enable only behind a reverse proxy — those headers are forgeable when rstash is directly exposed |
 | RSTASH_DB | sqlite:rstash.sqlite | Metadata database DSN (sqlite:, postgres:, mysql:, mssql:; `sqlite::memory:` for a wiped-on-restart in-memory dev DB) |
 | RSTASH_BLOB | sqlite:rstash-blobs.sqlite | Blob store DSN (sqlite:path, fs:/path, database DSN; s3:/azureblob: planned). In-memory dev: a *named* `sqlite::memory:blobs`, distinct from RSTASH_DB |
 | RSTASH_EMAIL | | Email provider DSN (e.g. resend:API_KEY?from=noreply@example.com) |
