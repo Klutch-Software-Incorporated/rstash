@@ -23,11 +23,15 @@ public sealed class AdminTests(RstashAppFactory factory) : IClassFixture<RstashA
             }
         }
 
-        var client = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+        // rstash authenticates as an OpenID Connect relying party, so an anonymous
+        // request no longer jumps straight to a password form: it challenges the
+        // provider, which finds no session and challenges Identity in turn. Following
+        // the chain asserts the user-visible outcome is unchanged.
+        var client = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = true });
 
         var response = await client.GetAsync("/admin/settings");
 
-        Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
-        Assert.Contains("/login", response.Headers.Location?.OriginalString ?? string.Empty);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Contains("/login", response.RequestMessage!.RequestUri!.PathAndQuery);
     }
 }
