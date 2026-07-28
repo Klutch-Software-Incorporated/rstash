@@ -43,5 +43,11 @@ public class RstashDbContext(DbContextOptions<RstashDbContext> options)
     {
         base.OnModelCreating(builder);
         builder.ApplyConfigurationsFromAssembly(typeof(RstashDbContext).Assembly);
+
+        // The embedded OpenID Connect provider's four tables (applications,
+        // authorizations, scopes, tokens). This registers only the EF model; the DDL
+        // is hand-written in a FluentMigrator migration like everything else, and
+        // OpenIddictSchemaTests guards the two against drifting.
+        builder.UseOpenIddict();
     }
 }
