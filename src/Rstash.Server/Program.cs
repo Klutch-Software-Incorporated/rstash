@@ -8,6 +8,7 @@ using Rstash.Notifications;
 using Rstash.Server.Components;
 using Rstash.Server.Endpoints;
 using Rstash.Server.Health;
+using Rstash.Server.Identity;
 using Rstash.Services;
 using Rstash.Services.Configuration;
 using Rstash.Services.Storage;
@@ -126,6 +127,11 @@ builder.Services
     .AddEntityFrameworkStores<RstashDbContext>()
     .AddSignInManager()
     .AddDefaultTokenProviders();
+// The bundled OpenID Connect provider (/connect/*), plus rstash registered as a
+// relying party against it. Kept strictly apart from the remoteStorage
+// app-authorization server at /oauth/*, which authorizes apps rather than humans.
+builder.Services.AddEmbeddedIdentityProvider(baseUrl);
+
 builder.Services.AddAuthorization();
 builder.Services.AddCascadingAuthenticationState();
 builder.Services.ConfigureApplicationCookie(options =>
@@ -147,6 +153,10 @@ await using (var scope = app.Services.CreateAsyncScope())
 {
     await scope.ServiceProvider.GetRequiredService<SettingsService>().ReloadAsync();
 }
+
+// In embedded mode the provider and the relying party ship together, so rstash
+// registers its own client row rather than expecting an operator to.
+await EmbeddedIdentityProvider.EnsureClientRegisteredAsync(app.Services, baseUrl);
 
 // Must precede any middleware that reads the scheme, host, or client IP. Clearing the
 // known-network/proxy lists is what makes this work in a container, where the proxy's
@@ -243,6 +253,7 @@ app.MapPost("/auth/logout", async (SignInManager<ApplicationUser> signInManager)
 }).DisableAntiforgery();
 
 // remoteStorage storage API (bearer-token auth + scopes).
+app.MapConnectEndpoints();
 app.MapStorageEndpoints();
 app.MapWebFinger(baseUrl);
 app.MapOAuthEndpoints();
