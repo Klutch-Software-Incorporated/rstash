@@ -206,11 +206,15 @@ app.Use(async (context, next) =>
 
 app.MapStaticAssets();
 app.UseCors();
-app.UseAuthentication();
-app.UseAuthorization();
-app.UseAntiforgery();
 
 // First-run setup guard: until an account exists, route everything to /setup.
+//
+// Ahead of authorization deliberately. Pages carry [Authorize], and authorization
+// challenges before this ever runs if it sits behind it — so a brand-new server would
+// send its very first visitor into an OpenID Connect flow to prove an identity that
+// cannot exist yet, instead of to the wizard that creates it. This only reads the
+// request path and the user table, so it has no business running after authentication
+// anyway.
 app.Use(async (context, next) =>
 {
     var setup = context.RequestServices.GetRequiredService<SetupState>();
@@ -243,6 +247,10 @@ app.Use(async (context, next) =>
 
     await next(context);
 });
+
+app.UseAuthentication();
+app.UseAuthorization();
+app.UseAntiforgery();
 
 app.MapHealthChecks("/healthz", new Microsoft.AspNetCore.Diagnostics.HealthChecks.HealthCheckOptions
 {

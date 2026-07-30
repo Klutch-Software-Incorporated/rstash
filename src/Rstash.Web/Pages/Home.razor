@@ -1,4 +1,5 @@
 @page "/"
+@attribute [Authorize]
 @inject Rstash.Services.SettingsService Settings
 @inject Rstash.Services.Entitlements.IEntitlementSource Entitlements
 @inject CurrentUserAccessor CurrentUser
@@ -156,10 +157,13 @@
 
     protected override async Task OnInitializedAsync()
     {
-        if (HttpContext?.User.Identity?.IsAuthenticated != true)
+        // Signed-out visitors never render this: [Authorize] challenges OpenID Connect
+        // first. Redirecting to /login here instead would strand them — the login page
+        // is the *provider's* form, so it signs in the Identity cookie and sends them
+        // back to a dashboard that authenticates against the application cookie, which
+        // is still empty. They would bounce between the two forever.
+        if (HttpContext is null)
         {
-            // Signed-out visitors get the sign-in page, not an empty dashboard.
-            Navigation.NavigateTo("/login", forceLoad: true);
             return;
         }
 

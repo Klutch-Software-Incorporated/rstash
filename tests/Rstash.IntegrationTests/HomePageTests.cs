@@ -12,14 +12,25 @@ public sealed class HomePageTests(RstashAppFactory factory) : IClassFixture<Rsta
     public async Task Home_WhenSignedOut_RedirectsToLogin()
     {
         // An account exists (so the setup guard is satisfied), but the request is
-        // unauthenticated — the dashboard redirects signed-out visitors to /login.
+        // unauthenticated.
         await SeedAdminAsync();
 
-        var client = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+        // The dashboard no longer redirects to /login itself: it carries [Authorize],
+        // so it challenges OpenID Connect, the provider finds no session and challenges
+        // Identity, and *that* is what serves the password form. Asserting on the first
+        // Location would only pin down the first hop of three; what matters to the
+        // person is where they end up, so follow the chain.
+        var client = factory.CreateClient(new WebApplicationFactoryClientOptions
+        {
+            AllowAutoRedirect = true,
+            MaxAutomaticRedirections = 12,
+        });
+
         var response = await client.GetAsync("/");
 
-        Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
-        Assert.Contains("/login", response.Headers.Location?.OriginalString);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Contains("/login", response.RequestMessage!.RequestUri!.PathAndQuery);
+        Assert.Contains("__RequestVerificationToken", await response.Content.ReadAsStringAsync());
     }
 
     private async Task SeedAdminAsync()
