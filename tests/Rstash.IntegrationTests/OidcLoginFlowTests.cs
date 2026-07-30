@@ -44,24 +44,59 @@ public sealed class OidcLoginFlowTests
         Assert.DoesNotContain("/login", page.RequestMessage!.RequestUri!.PathAndQuery);
     }
 
+    /// <summary>
+    /// Provisioning refuses to hand one person's storage to another, and the refusal
+    /// stops the login rather than being logged and stepped over.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// This is the branch of provisioning that embedded mode can actually reach. Its
+    /// creation branch cannot be: registration writes the storage record, and a login
+    /// with no record is refused before provisioning ever runs, because entitlements
+    /// resolve a missing row to disabled. So asserting "a record exists after login"
+    /// proves nothing about provisioning at all — which is exactly what an earlier
+    /// version of this test did.
+    /// </para>
+    /// <para>
+    /// Repointing the record at a foreign subject reproduces what an external provider
+    /// re-issuing a taken username would look like from here: provisioning finds no
+    /// record for the subject, then finds the username already spoken for.
+    /// </para>
+    /// </remarks>
     [Fact]
-    public async Task JitProvisioning_WritesTheStorageRecordFromClaims()
+    public async Task JitProvisioning_RefusesTheLogin_WhenTheUsernameBelongsToAnotherSubject()
     {
         using var factory = new RstashAppFactory(new Dictionary<string, string>());
-        var client = factory.CreateClient(new WebApplicationFactoryClientOptions
-        {
-            AllowAutoRedirect = true,
-        });
-
-        await CompleteSetupAsync(client, "claimsuser");
-        await client.GetAsync("/admin/users"); // drives the OIDC round-trip
+        await CompleteSetupAsync(Following(factory), "claimsuser");
 
         var contextFactory = factory.Services.GetRequiredService<IDbContextFactory<RstashDbContext>>();
-        await using var db = await contextFactory.CreateDbContextAsync();
+        await using (var seeded = await contextFactory.CreateDbContextAsync())
+        {
+            var row = await seeded.StorageUsers.SingleAsync(s => s.NormalizedUserName == "CLAIMSUSER");
+            row.Subject = "a-different-persons-subject";
+            await seeded.SaveChangesAsync();
+        }
 
-        var row = await db.StorageUsers.SingleAsync(s => s.NormalizedUserName == "CLAIMSUSER");
-        Assert.Equal("claimsuser", row.UserName);
-        Assert.False(string.IsNullOrEmpty(row.Subject));
+        // A fresh client, so this is a real login through the password form rather than
+        // a session left over from setup.
+        var client = Following(factory);
+        var landed = await FormHelpers.SignInAsync(client, "claimsuser", "Sup3r!secret", "/admin/users");
+        var body = await landed.Content.ReadAsStringAsync();
+
+        Assert.NotEqual(HttpStatusCode.OK, landed.StatusCode);
+        Assert.DoesNotContain("claimsuser@", body);
+
+        // The rule itself has to be what refuses, named in the failure. Asserting only
+        // that the login failed passes with the rule deleted, because the unique index
+        // rejects the duplicate a moment later anyway — verified by removing the rule
+        // and watching a weaker version of this test stay green.
+        Assert.Contains("already belongs to a different account", body);
+
+        // And the record still belongs to whoever it belonged to before.
+        await using var db = await contextFactory.CreateDbContextAsync();
+        Assert.Equal(
+            "a-different-persons-subject",
+            (await db.StorageUsers.SingleAsync(s => s.NormalizedUserName == "CLAIMSUSER")).Subject);
     }
 
     [Fact]
@@ -90,6 +125,13 @@ public sealed class OidcLoginFlowTests
 
         return jwks.RootElement.GetProperty("keys")[0].GetProperty("n").GetString();
     }
+
+    private static HttpClient Following(RstashAppFactory factory) =>
+        factory.CreateClient(new WebApplicationFactoryClientOptions
+        {
+            AllowAutoRedirect = true,
+            MaxAutomaticRedirections = 12,
+        });
 
     private static async Task CompleteSetupAsync(HttpClient client, string username)
     {
