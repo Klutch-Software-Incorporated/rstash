@@ -146,12 +146,6 @@ public sealed class OAuthTests(RstashAppFactory factory) : IClassFixture<RstashA
             user = new ApplicationUser { UserName = username, CreatedAt = DateTimeOffset.UtcNow, Approved = true };
             var created = await users.CreateAsync(user, "Sup3r!secret");
             Assert.True(created.Succeeded);
-
-            // The token exchange resolves entitlements, which needs the storage record.
-            await UserProvisioning.ProvisionStorageUserAsync(
-                services.GetRequiredService<IDbContextFactory<RstashDbContext>>(),
-                user,
-                services.GetRequiredService<SettingsService>().Current);
         }
 
         return user.Id;

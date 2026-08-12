@@ -7,8 +7,8 @@ using Rstash.Model;
 namespace Rstash.Database;
 
 /// <summary>
-/// The rstash EF Core context, built on Identity (AspNet* tables). OpenIddict
-/// stores are layered on in P4; it also owns the protocol domain tables.
+/// The rstash EF Core context, built on Identity (AspNet* tables); it also owns the
+/// protocol domain tables.
 /// <para>
 /// Cross-provider invariant: all <see cref="DateTimeOffset"/> values persisted here
 /// must be UTC (offset 0). Npgsql maps <c>DateTimeOffset</c> to <c>timestamptz</c>
@@ -27,13 +27,6 @@ public class RstashDbContext(DbContextOptions<RstashDbContext> options)
     /// </summary>
     public DbSet<DataProtectionKey> DataProtectionKeys => Set<DataProtectionKey>();
 
-    /// <summary>The storage server's own user records — see <see cref="StorageUser"/>
-    /// for why these are separate from the Identity tables.</summary>
-    public DbSet<StorageUser> StorageUsers => Set<StorageUser>();
-
-    /// <summary>Key material for the embedded OpenID Connect provider.</summary>
-    public DbSet<OidcKey> OidcKeys => Set<OidcKey>();
-
     public DbSet<Node> Nodes => Set<Node>();
 
     public DbSet<AuditEntry> AuditLog => Set<AuditEntry>();
@@ -50,11 +43,5 @@ public class RstashDbContext(DbContextOptions<RstashDbContext> options)
     {
         base.OnModelCreating(builder);
         builder.ApplyConfigurationsFromAssembly(typeof(RstashDbContext).Assembly);
-
-        // The embedded OpenID Connect provider's four tables (applications,
-        // authorizations, scopes, tokens). This registers only the EF model; the DDL
-        // is hand-written in a FluentMigrator migration like everything else, and
-        // OpenIddictSchemaTests guards the two against drifting.
-        builder.UseOpenIddict();
     }
 }

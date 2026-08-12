@@ -84,6 +84,11 @@ else
             Email = string.IsNullOrWhiteSpace(Input.Email) ? null : Input.Email,
             Approved = approved,
             CreatedAt = DateTimeOffset.UtcNow,
+
+            // Stamped at creation rather than read from settings on every check, so
+            // raising the default later does not silently re-quota existing accounts.
+            StorageQuota = Math.Max(0, Settings.Current.DefaultUserStorageLimit),
+            EgressQuota = Math.Max(0, Settings.Current.DefaultUserEgressLimit),
         };
 
         var result = await UserManager.CreateAsync(user, Input.Password);
@@ -92,8 +97,6 @@ else
             _error = string.Join(" ", result.Errors.Select(e => e.Description));
             return;
         }
-
-        await UserProvisioning.ProvisionStorageUserAsync(DbFactory, user, Settings.Current);
 
         if (approved)
         {

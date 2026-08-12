@@ -22,12 +22,15 @@ public sealed class InitialCreate : Migration
     {
         CreateApplicationTables();
         CreateIdentityTables();
+        CreateDataProtectionKeys();
         CreateForeignKeys();
         CreateIndexes();
     }
 
     public override void Down()
     {
+        Delete.Table("DataProtectionKeys");
+
         // Dependents first (FK order), then principals.
         Delete.Table("AspNetRoleClaims");
         Delete.Table("AspNetUserClaims");
@@ -43,6 +46,25 @@ public sealed class InitialCreate : Migration
         Delete.Table("oauth_tokens");
         Delete.Table("settings");
         Delete.Table("nodes");
+    }
+
+    /// <summary>
+    /// The ASP.NET Core Data Protection key ring, which encrypts the auth cookie and
+    /// antiforgery tokens. Left on the default provider these live in the container
+    /// filesystem (or, with no suitable location, in memory), so every restart
+    /// generates a fresh ring and silently signs out every user.
+    ///
+    /// The shape matches <c>DataProtectionKey</c> from
+    /// <c>Microsoft.AspNetCore.DataProtection.EntityFrameworkCore</c>: an int identity
+    /// key plus two unbounded nullable strings. <c>Xml</c> holds the serialized key
+    /// element, which is why it is not length-capped.
+    /// </summary>
+    private void CreateDataProtectionKeys()
+    {
+        Create.Table("DataProtectionKeys")
+            .WithColumn("Id").AsInt32().NotNullable().PrimaryKey().Identity()
+            .WithColumn("FriendlyName").AsString(int.MaxValue).Nullable()
+            .WithColumn("Xml").AsString(int.MaxValue).Nullable();
     }
 
     private void CreateApplicationTables()
@@ -115,7 +137,6 @@ public sealed class InitialCreate : Migration
             .WithColumn("EgressQuota").AsInt64().NotNullable()
             .WithColumn("Disabled").AsBoolean().NotNullable()
             .WithColumn("Approved").AsBoolean().NotNullable()
-            .WithColumn("ExternallyManaged").AsBoolean().NotNullable()
             .WithColumn("CreatedAt").AsDateTimeOffset().NotNullable()
             .WithColumn("LastLoginAt").AsDateTimeOffset().Nullable()
             .WithColumn("LastLoginIp").AsString(int.MaxValue).Nullable()

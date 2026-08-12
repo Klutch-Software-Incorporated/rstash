@@ -203,13 +203,6 @@ public sealed class StorageApiTests(RstashAppFactory factory) : IClassFixture<Rs
                 "Sup3r!secret");
             Assert.True(created.Succeeded);
             user = await users.FindByNameAsync(username);
-
-            // Without the storage record the account cannot serve a document — the
-            // storage API resolves owners against storage_users, not the Identity table.
-            await UserProvisioning.ProvisionStorageUserAsync(
-                factory.Services.GetRequiredService<IDbContextFactory<RstashDbContext>>(),
-                user!,
-                factory.Services.GetRequiredService<SettingsService>().Current);
         }
 
         var tokens = scope.ServiceProvider.GetRequiredService<TokenStore>();
@@ -225,8 +218,8 @@ public sealed class StorageApiTests(RstashAppFactory factory) : IClassFixture<Rs
     }
 
     /// <summary>
-    /// Sets limits on the storage record. Quotas live there rather than on the Identity
-    /// row, and the storage API resolves owners by normalized username.
+    /// Sets quotas on the account. The storage API resolves owners by normalized
+    /// username, which is what these tests address them by.
     /// </summary>
     private async Task SetLimitsAsync(string userName, long? maxStorage = null, long? maxEgress = null)
     {
@@ -234,15 +227,15 @@ public sealed class StorageApiTests(RstashAppFactory factory) : IClassFixture<Rs
         await using var db = await contextFactory.CreateDbContextAsync();
 
         var normalized = userName.ToUpperInvariant();
-        var row = await db.StorageUsers.SingleAsync(s => s.NormalizedUserName == normalized);
+        var row = await db.Users.SingleAsync(u => u.NormalizedUserName == normalized);
         if (maxStorage is { } storage)
         {
-            row.MaxStorage = storage;
+            row.StorageQuota = storage;
         }
 
         if (maxEgress is { } egress)
         {
-            row.MaxEgress = egress;
+            row.EgressQuota = egress;
         }
 
         await db.SaveChangesAsync();

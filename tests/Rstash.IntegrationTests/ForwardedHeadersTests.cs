@@ -53,7 +53,7 @@ public sealed class ForwardedHeadersTests
 
         var authCookie = response.Headers
             .GetValues("Set-Cookie")
-            .FirstOrDefault(c => c.StartsWith(".AspNetCore.Identity.Application", StringComparison.Ordinal));
+            .FirstOrDefault(c => c.StartsWith("rstash.session", StringComparison.Ordinal));
 
         Assert.NotNull(authCookie); // setup must have signed the admin in
         return authCookie.Contains("secure", StringComparison.OrdinalIgnoreCase);

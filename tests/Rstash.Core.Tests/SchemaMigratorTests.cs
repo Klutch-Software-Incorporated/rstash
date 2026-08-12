@@ -43,8 +43,8 @@ public sealed class SchemaMigratorTests : IDisposable
 
         using var version = connection.CreateCommand();
         version.CommandText =
-            "SELECT COUNT(*) FROM VersionInfo WHERE Version IN (202607010001, 202607280001);";
-        Assert.Equal(2L, (long)version.ExecuteScalar()!);
+            "SELECT COUNT(*) FROM VersionInfo WHERE Version = 202607010001;";
+        Assert.Equal(1L, (long)version.ExecuteScalar()!);
     }
 
     [Fact]

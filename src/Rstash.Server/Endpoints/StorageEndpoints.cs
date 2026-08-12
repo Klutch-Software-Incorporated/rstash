@@ -6,7 +6,6 @@ using Microsoft.EntityFrameworkCore;
 using Rstash.Database;
 using Rstash.Model;
 using Rstash.Services;
-using Rstash.Services.Entitlements;
 using Rstash.Services.Storage;
 
 namespace Rstash.Server.Endpoints;
@@ -33,7 +32,6 @@ internal static class StorageEndpoints
         EgressTracker egress,
         TokenStore tokens,
         IDbContextFactory<RstashDbContext> contextFactory,
-        IEntitlementSource entitlements,
         SettingsService settings,
         AuditService audit)
     {
@@ -82,17 +80,24 @@ internal static class StorageEndpoints
             tokenUserId = token.UserId;
         }
 
-        // Resolved against storage_users, not the Identity table. The two ids match for
-        // accounts that predate the split, but new ones come from separate sequences,
-        // so using the Identity id here would address the wrong owner's nodes.
+        // One query per request resolves the owner and everything enforced below: the
+        // admin kill switch, the approval gate, and the egress cap. It stays on the
+        // request path rather than being baked into the token so that disabling an
+        // account takes effect immediately.
         var normalized = user.ToUpperInvariant();
         long ownerId;
+        long maxEgress;
+        bool barred;
         await using (var db = await contextFactory.CreateDbContextAsync(ctx.RequestAborted))
         {
-            ownerId = await db.StorageUsers
-                .Where(s => s.NormalizedUserName == normalized)
-                .Select(s => s.Id)
+            var owner = await db.Users
+                .Where(u => u.NormalizedUserName == normalized)
+                .Select(u => new { u.Id, u.EgressQuota, Barred = u.Disabled || !u.Approved })
                 .FirstOrDefaultAsync(ctx.RequestAborted);
+
+            ownerId = owner?.Id ?? 0;
+            maxEgress = owner?.EgressQuota ?? 0;
+            barred = owner?.Barred ?? true;
         }
 
         if (ownerId == 0)
@@ -101,13 +106,7 @@ internal static class StorageEndpoints
             return;
         }
 
-        // One resolve per request, covering both the kill switch and the egress limit.
-        // Under an external provider this is the point where a revoked account stops
-        // working, so it must stay on the request path rather than being cached in the
-        // token.
-        var limits = await entitlements.ResolveAsync(ownerId, ctx.RequestAborted);
-
-        if (needsAuth && limits.Disabled)
+        if (needsAuth && barred)
         {
             await TextAsync(ctx, StatusCodes.Status403Forbidden, "account disabled");
             return;
@@ -141,7 +140,7 @@ internal static class StorageEndpoints
                     break;
                 case "GET":
                     await GetDocumentAsync(
-                        ctx, storage, egress, ownerId, limits.MaxEgress, storagePath, isPublic, conditions);
+                        ctx, storage, egress, ownerId, maxEgress, storagePath, isPublic, conditions);
                     break;
                 case "HEAD":
                     await HeadDocumentAsync(ctx, storage, ownerId, storagePath, isPublic, conditions);
