@@ -2,7 +2,6 @@ using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Rstash.Database;
 using Rstash.Services;
-using Rstash.Services.Entitlements;
 using Rstash.Services.Storage;
 using Rstash.Storage;
 
@@ -28,8 +27,7 @@ public sealed class RemoteStorageServiceTests : IDisposable
         _service = new RemoteStorageService(
             factory,
             new FileSystemStorage(_blobDir),
-            new SettingsService(factory),
-            new LocalEntitlementSource(factory));
+            new SettingsService(factory));
     }
 
     public void Dispose()

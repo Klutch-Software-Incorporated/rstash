@@ -41,8 +41,7 @@ internal static class AdminUserEndpoints
         target.IsAdmin || target.Id == actor.Id;
 
     private static async Task<IResult> ToggleDisabledAsync(
-        HttpContext ctx, IAntiforgery af, UserManager<ApplicationUser> users,
-        IDbContextFactory<RstashDbContext> contextFactory)
+        HttpContext ctx, IAntiforgery af, UserManager<ApplicationUser> users)
     {
         var (ok, actor, target) = await ResolveAsync(ctx, af, users);
         if (!ok)
@@ -53,16 +52,8 @@ internal static class AdminUserEndpoints
         // Admins (incl. yourself) must retain access — never disable them.
         if (target is not null && !IsProtected(actor, target))
         {
-            // Disabled is an entitlement, so it lives on the storage record now. Under
-            // an external provider this write moves to the control plane and the admin
-            // UI goes read-only.
-            await using var db = await contextFactory.CreateDbContextAsync();
-            var storageUser = await db.StorageUsers.FirstOrDefaultAsync(s => s.Id == target.Id);
-            if (storageUser is not null)
-            {
-                storageUser.Disabled = !storageUser.Disabled;
-                await db.SaveChangesAsync();
-            }
+            target.Disabled = !target.Disabled;
+            await users.UpdateAsync(target);
         }
 
         return Results.Redirect("/admin/users");
@@ -86,8 +77,7 @@ internal static class AdminUserEndpoints
     }
 
     private static async Task<IResult> QuotaAsync(
-        HttpContext ctx, IAntiforgery af, UserManager<ApplicationUser> users,
-        IDbContextFactory<RstashDbContext> contextFactory)
+        HttpContext ctx, IAntiforgery af, UserManager<ApplicationUser> users)
     {
         var (ok, _, target) = await ResolveAsync(ctx, af, users);
         if (!ok)
@@ -100,14 +90,9 @@ internal static class AdminUserEndpoints
             var storageRaw = ctx.Request.Form["storageQuota"].ToString();
             var egressRaw = ctx.Request.Form["egressQuota"].ToString();
 
-            await using var db = await contextFactory.CreateDbContextAsync();
-            var storageUser = await db.StorageUsers.FirstOrDefaultAsync(s => s.Id == target.Id);
-            if (storageUser is not null)
-            {
-                storageUser.MaxStorage = ByteSize.TryParse(storageRaw, out var storage) ? storage : 0;
-                storageUser.MaxEgress = ByteSize.TryParse(egressRaw, out var egress) ? egress : 0;
-                await db.SaveChangesAsync();
-            }
+            target.StorageQuota = ByteSize.TryParse(storageRaw, out var storage) ? storage : 0;
+            target.EgressQuota = ByteSize.TryParse(egressRaw, out var egress) ? egress : 0;
+            await users.UpdateAsync(target);
         }
 
         return Results.Redirect("/admin/users");

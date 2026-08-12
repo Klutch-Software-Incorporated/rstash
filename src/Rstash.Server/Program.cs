@@ -1,4 +1,3 @@
-using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Identity;
@@ -9,9 +8,7 @@ using Rstash.Notifications;
 using Rstash.Server.Components;
 using Rstash.Server.Endpoints;
 using Rstash.Server.Health;
-using Rstash.Server.Identity;
 using Rstash.Services;
-using Rstash.Services.Entitlements;
 using Rstash.Services.Configuration;
 using Rstash.Services.Storage;
 using Rstash.Storage;
@@ -85,11 +82,6 @@ builder.Services.AddDbContextFactory<RstashDbContext>(options => options.UseRsta
 builder.Services.AddSingleton<IStorage>(_ => StorageFactory.Open(blobDsn));
 builder.Services.AddSingleton<SettingsService>();
 
-// Entitlement resolution goes through this everywhere, so enforcement is identical
-// whether the limits were set by a local admin or handed down by a control plane.
-// The external implementation swaps in here and nothing downstream changes.
-builder.Services.AddSingleton<IEntitlementSource, LocalEntitlementSource>();
-
 builder.Services.AddSingleton<RemoteStorageService>();
 builder.Services.AddSingleton<EgressTracker>();
 builder.Services.AddHostedService(sp => sp.GetRequiredService<EgressTracker>());
@@ -123,9 +115,23 @@ builder.Services.AddDataProtection()
     .SetApplicationName("rstash")
     .PersistKeysToDbContext<RstashDbContext>();
 
-// rstash authenticates humans as an OpenID Connect relying party. Two cookie schemes,
-// deliberately — see RstashAuthentication for why collapsing them loops forever.
-builder.Services.AddRstashAuthentication(baseUrl);
+// Humans sign in with a username and password against ASP.NET Core Identity, and the
+// resulting cookie authorizes every subsequent request. This is deliberately separate
+// from the remoteStorage app-authorization server at /oauth/*, which hands bearer
+// tokens to third-party apps rather than signing in people.
+builder.Services.AddAuthentication(IdentityConstants.ApplicationScheme)
+    .AddIdentityCookies();
+
+builder.Services.ConfigureApplicationCookie(options =>
+{
+    options.Cookie.Name = "rstash.session";
+    options.Cookie.HttpOnly = true;
+    options.Cookie.SameSite = SameSiteMode.Lax;
+    options.SlidingExpiration = true;
+    options.LoginPath = "/login";
+    options.AccessDeniedPath = "/login";
+    options.ReturnUrlParameter = "redirect";
+});
 
 // ASP.NET Core Identity (core APIs only — the setup/login UI is custom Blazor).
 builder.Services
@@ -138,10 +144,6 @@ builder.Services
     .AddEntityFrameworkStores<RstashDbContext>()
     .AddSignInManager()
     .AddDefaultTokenProviders();
-// The bundled OpenID Connect provider (/connect/*), plus rstash registered as a
-// relying party against it. Kept strictly apart from the remoteStorage
-// app-authorization server at /oauth/*, which authorizes apps rather than humans.
-builder.Services.AddEmbeddedIdentityProvider(baseUrl);
 
 builder.Services.AddAuthorization();
 builder.Services.AddCascadingAuthenticationState();
@@ -158,10 +160,6 @@ await using (var scope = app.Services.CreateAsyncScope())
 {
     await scope.ServiceProvider.GetRequiredService<SettingsService>().ReloadAsync();
 }
-
-// In embedded mode the provider and the relying party ship together, so rstash
-// registers its own client row rather than expecting an operator to.
-await EmbeddedIdentityProvider.EnsureClientRegisteredAsync(app.Services, baseUrl);
 
 // Must precede any middleware that reads the scheme, host, or client IP. Clearing the
 // known-network/proxy lists is what makes this work in a container, where the proxy's
@@ -211,10 +209,9 @@ app.UseCors();
 //
 // Ahead of authorization deliberately. Pages carry [Authorize], and authorization
 // challenges before this ever runs if it sits behind it — so a brand-new server would
-// send its very first visitor into an OpenID Connect flow to prove an identity that
-// cannot exist yet, instead of to the wizard that creates it. This only reads the
-// request path and the user table, so it has no business running after authentication
-// anyway.
+// send its very first visitor to a login form to prove an identity that cannot exist
+// yet, instead of to the wizard that creates it. This only reads the request path and
+// the user table, so it has no business running after authentication anyway.
 app.Use(async (context, next) =>
 {
     var setup = context.RequestServices.GetRequiredService<SetupState>();
@@ -226,8 +223,6 @@ app.Use(async (context, next) =>
             || path.StartsWithSegments("/storage")
             || path.StartsWithSegments("/.well-known")
             || path.StartsWithSegments("/oauth")
-            || path.StartsWithSegments("/connect")
-            || path.StartsWithSegments("/signin-oidc")
             || path.StartsWithSegments("/ui")
             || path.StartsWithSegments("/_")
             || (path.Value?.Contains('.') ?? false);
@@ -261,18 +256,13 @@ app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode()
     .AddAdditionalAssemblies(typeof(Rstash.Web.Layout.MainLayout).Assembly);
 
-// Both sessions, or logout does not log anyone out: SignOutAsync clears the provider's
-// Identity cookie, but the application's own relying-party cookie is what actually
-// authorizes a request. Clearing only one leaves the user signed in via the other.
-app.MapPost("/auth/logout", async (HttpContext context, SignInManager<ApplicationUser> signInManager) =>
+app.MapPost("/auth/logout", async (SignInManager<ApplicationUser> signInManager) =>
 {
     await signInManager.SignOutAsync();
-    await context.SignOutAsync(RstashAuthentication.ApplicationScheme);
     return Results.Redirect("/");
 }).DisableAntiforgery();
 
 // remoteStorage storage API (bearer-token auth + scopes).
-app.MapConnectEndpoints();
 app.MapStorageEndpoints();
 app.MapWebFinger(baseUrl);
 app.MapOAuthEndpoints();

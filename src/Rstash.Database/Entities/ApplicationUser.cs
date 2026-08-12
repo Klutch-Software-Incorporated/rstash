@@ -9,20 +9,28 @@ namespace Rstash.Database;
 /// those need no columns here.
 /// </summary>
 /// <remarks>
-/// Strictly the *identity* half. Quotas, the disabled flag, and anything else a
-/// provider owns live on <see cref="StorageUser"/> — see that type for why they are
-/// not columns here, next to the password hash.
+/// One row per account, quotas included. rstash owns its users outright — there is no
+/// external provider to keep in sync with — so splitting the storage-side columns into
+/// a second table would buy nothing but a join and a write to keep consistent.
 /// </remarks>
 public class ApplicationUser : IdentityUser<long>
 {
     public bool IsAdmin { get; set; }
 
-    /// <summary>
-    /// Local registration gate (invite/approval modes). Not an entitlement: there is
-    /// no counterpart under an external provider, which is why the local entitlement
-    /// source folds it into the effective disabled flag rather than storing it there.
-    /// </summary>
+    /// <summary>Local registration gate (invite/approval modes).</summary>
     public bool Approved { get; set; } = true;
+
+    /// <summary>Storage cap in bytes; 0 = unlimited.</summary>
+    public long StorageQuota { get; set; }
+
+    /// <summary>Monthly egress cap in bytes; 0 = unlimited.</summary>
+    public long EgressQuota { get; set; }
+
+    /// <summary>
+    /// Admin kill switch, checked on every storage request. Distinct from
+    /// <see cref="Approved"/>, which gates a brand-new account; both bar access.
+    /// </summary>
+    public bool Disabled { get; set; }
 
     public DateTimeOffset CreatedAt { get; set; }
 

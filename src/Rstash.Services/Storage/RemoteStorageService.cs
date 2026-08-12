@@ -2,7 +2,6 @@ using System.Globalization;
 using Microsoft.EntityFrameworkCore;
 using Rstash.Database;
 using Rstash.Model;
-using Rstash.Services.Entitlements;
 using Rstash.Storage;
 
 namespace Rstash.Services.Storage;
@@ -15,8 +14,7 @@ namespace Rstash.Services.Storage;
 public sealed class RemoteStorageService(
     IDbContextFactory<RstashDbContext> contextFactory,
     IStorage storage,
-    SettingsService settings,
-    IEntitlementSource entitlements)
+    SettingsService settings)
 {
     public async Task<PutResult> PutDocumentAsync(
         long userId, string path, Stream content, string contentType,
@@ -288,14 +286,16 @@ public sealed class RemoteStorageService(
     /// size minus any replaced size).
     /// </summary>
     /// <remarks>
-    /// The limit comes from <see cref="IEntitlementSource"/> and the usage from
-    /// rstash's own node sizes — the provider says what is allowed, rstash knows what
-    /// has been used, and enforcement is the comparison.
+    /// The limit is the account's own <c>StorageQuota</c> and the usage comes from
+    /// rstash's node sizes; enforcement is the comparison.
     /// </remarks>
     private async Task EnsureWithinQuotaAsync(
         RstashDbContext db, long userId, long delta, CancellationToken cancellationToken)
     {
-        var userQuota = (await entitlements.ResolveAsync(userId, cancellationToken)).MaxStorage;
+        var userQuota = await db.Users
+            .Where(u => u.Id == userId)
+            .Select(u => u.StorageQuota)
+            .FirstOrDefaultAsync(cancellationToken);
 
         if (userQuota > 0)
         {
