@@ -60,5 +60,5 @@ stubbed** in the C# rewrite, to be tackled as individual features after the
   too); listed as planned, not a regression.
 - **OAuth client registry.** remoteStorage is registration-free by design
   (client_id == redirect origin); Go's registry was bookkeeping, not a spec need.
-- **Webhooks** (`legacy/internal/webhooks/`). Superseded by the roadmap's move to
-  OIDC entitlement claims for billing/integration.
+- **Webhooks** (`legacy/internal/webhooks/`). Existed to drive billing/integration for
+  a hosted offering; that direction was dropped (see ROADMAP non-goals).

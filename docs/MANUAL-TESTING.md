@@ -283,7 +283,7 @@ Auth is chosen by the DSN: `key=` → shared key, `sas=` → SAS token, neither 
 - Remaining Go→C# parity gaps (encryption at rest, rate-limit enforcement, refresh-token grant,
   admin JSON API, metrics, email verification, abuse reports, …) are tracked in
   [PARITY-GAPS.md](PARITY-GAPS.md).
-- Postgres/MySQL/SQL Server DB providers and the S3 blob backend are stubbed (factories throw)
+- MySQL/SQL Server DB providers and the S3 blob backend are stubbed (factories throw); Postgres and Azure Blob are wired
   pending their NuGet packages — SQLite + filesystem + database blobs work today. Azure Blob
   (`azureblob://{account}/{container}`) is wired.
 - `/healthz` returns JSON (`{status, checks[]}`) with per-dependency status and probes

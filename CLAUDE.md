@@ -16,8 +16,14 @@ start the server and complete setup through the web UI.
 > implementation is preserved under `legacy/` as a behavioral reference and parity oracle.
 > It is not built or shipped. The Go tests were ported to xUnit as the correctness baseline.
 
-Source control is Git, hosted on GitHub (Klutch-Software-Incorporated/rstash). The hosted
-rstash.cloud deploy pipeline lives in the separate `rstash-infra` repo on Azure DevOps.
+Source control is Git, hosted on GitHub (Klutch-Software-Incorporated/rstash).
+
+> **Direction:** self-hosting is the product. A hosted multi-tenant offering was
+> explored through mid-2026 and **dropped** in August 2026 — the embedded OIDC
+> provider, the `storage_users` split, and the entitlement indirection it required were
+> all removed. Weigh new work against "does this make rstash better to self-host?"; see
+> [ROADMAP.md](ROADMAP.md) for the non-goals and [docs/IDENTITY.md](docs/IDENTITY.md)
+> for what the reversal cost.
 
 ## Build & Run Commands
 
