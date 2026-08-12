@@ -20,6 +20,13 @@ namespace Rstash.Database.Migrations;
 [Migration(202607280003, "Split storage_users out of AspNetUsers")]
 public sealed class SplitStorageUser : Migration
 {
+    /// <summary>
+    /// Matches every FluentMigrator processor id for PostgreSQL. The runner reports a
+    /// version-specific id, so an equality test silently matches nothing.
+    /// </summary>
+    private static bool IsPostgres(string dialect) =>
+        dialect.StartsWith("Postgres", StringComparison.OrdinalIgnoreCase);
+
     public override void Up()
     {
         Create.Table("storage_users")
@@ -48,24 +55,47 @@ public sealed class SplitStorageUser : Migration
         // /connect/authorize puts in the sub claim. NormalizedUserName is copied from
         // Identity's own normalized column rather than recomputed, so the two agree
         // even for names whose upper-casing is culture-sensitive.
-        Execute.Sql(
+        //
+        // Every identifier is quoted. The rest of the schema is built through
+        // FluentMigrator's fluent API, which quotes, so the tables and columns really
+        // are mixed-case; Postgres folds an *unquoted* identifier to lower case, so
+        // bare `AspNetUsers` names a relation that does not exist. VARCHAR rather than
+        // CHAR for the subject cast, because CHAR(n) blank-pads to the full width on
+        // Postgres and the padded value would not match the sub claim.
+        const string insertInto =
             """
             INSERT INTO storage_users
-                (Id, Subject, UserName, NormalizedUserName, Plan,
-                 MaxStorage, MaxEgress, Disabled, CreatedAt)
-            SELECT Id, CAST(Id AS CHAR(255)), UserName, NormalizedUserName, '',
-                   StorageQuota, EgressQuota, Disabled, CreatedAt
-            FROM AspNetUsers;
-            """);
+                ("Id", "Subject", "UserName", "NormalizedUserName", "Plan",
+                 "MaxStorage", "MaxEgress", "Disabled", "CreatedAt")
+            """;
+        const string selectFrom =
+            """
+            SELECT "Id", CAST("Id" AS VARCHAR(255)), "UserName", "NormalizedUserName", '',
+                   "StorageQuota", "EgressQuota", "Disabled", "CreatedAt"
+            FROM "AspNetUsers";
+            """;
+
+        // Postgres declares the identity column GENERATED ALWAYS and rejects an
+        // explicit key outright, so its backfill has to say OVERRIDING SYSTEM VALUE.
+        // Both branches test the same predicate so they cannot both run — or, worse,
+        // both be skipped, which is how an earlier version of this migration reported
+        // success while copying zero rows.
+        IfDatabase(IsPostgres).Execute.Sql($"{insertInto}\nOVERRIDING SYSTEM VALUE\n{selectFrom}");
+        IfDatabase(dialect => !IsPostgres(dialect)).Execute.Sql($"{insertInto}\n{selectFrom}");
 
         // Postgres does not advance an identity sequence for explicitly-supplied keys,
         // so the next insert would collide with a backfilled row. SQLite tracks the
         // high-water mark itself and needs nothing. This is the one place the schema
         // cannot stay dialect-agnostic; it is a sequence fix-up, not a shape difference.
-        IfDatabase("Postgres").Execute.Sql(
+        //
+        // pg_get_serial_sequence treats its *column* argument as a quoted identifier
+        // and preserves case, so this has to be 'Id': the lower-case form returns NULL
+        // and setval then fails. The table argument may name a schema, so it is folded
+        // instead — lower case is right there.
+        IfDatabase(IsPostgres).Execute.Sql(
             """
             SELECT setval(
-                pg_get_serial_sequence('storage_users', 'id'),
+                pg_get_serial_sequence('storage_users', 'Id'),
                 COALESCE((SELECT MAX("Id") FROM storage_users), 1),
                 true);
             """);
@@ -86,15 +116,17 @@ public sealed class SplitStorageUser : Migration
             .AddColumn("Disabled").AsBoolean().NotNullable().WithDefaultValue(false)
             .AddColumn("ExternallyManaged").AsBoolean().NotNullable().WithDefaultValue(false);
 
+        // Quoted for the same reason as Up. The Disabled fallback is a real boolean
+        // rather than 0, which Postgres rejects for a boolean column.
         Execute.Sql(
             """
-            UPDATE AspNetUsers SET
-                StorageQuota = COALESCE(
-                    (SELECT MaxStorage FROM storage_users s WHERE s.Id = AspNetUsers.Id), 0),
-                EgressQuota = COALESCE(
-                    (SELECT MaxEgress FROM storage_users s WHERE s.Id = AspNetUsers.Id), 0),
-                Disabled = COALESCE(
-                    (SELECT Disabled FROM storage_users s WHERE s.Id = AspNetUsers.Id), 0);
+            UPDATE "AspNetUsers" SET
+                "StorageQuota" = COALESCE(
+                    (SELECT s."MaxStorage" FROM storage_users s WHERE s."Id" = "AspNetUsers"."Id"), 0),
+                "EgressQuota" = COALESCE(
+                    (SELECT s."MaxEgress" FROM storage_users s WHERE s."Id" = "AspNetUsers"."Id"), 0),
+                "Disabled" = COALESCE(
+                    (SELECT s."Disabled" FROM storage_users s WHERE s."Id" = "AspNetUsers"."Id"), FALSE);
             """);
 
         Delete.Table("storage_users");
