@@ -4,8 +4,9 @@ namespace Rstash.Storage;
 
 /// <summary>
 /// A minimal context for the database blob backend — a single <c>blobs</c>
-/// table living in the (possibly separate) blob database. Created via
-/// EnsureCreated rather than migrations, since it is a standalone aux schema.
+/// table living in the (possibly separate) blob database. It sits outside the
+/// FluentMigrator set because the blob DSN need not name the metadata database;
+/// <see cref="DatabaseStorage"/> creates the table when it is missing.
 /// </summary>
 public sealed class BlobDbContext(DbContextOptions<BlobDbContext> options) : DbContext(options)
 {

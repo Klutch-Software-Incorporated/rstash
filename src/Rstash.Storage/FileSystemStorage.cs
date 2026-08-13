@@ -7,7 +7,7 @@ namespace Rstash.Storage;
 /// atomic (temp file + rename). All resolved paths are verified to stay under
 /// the base directory to prevent traversal.
 /// </summary>
-public sealed class FileSystemStorage : IStorage, IStorageCounter
+public sealed class FileSystemStorage : IStorage, IStorageCounter, IStorageProbe
 {
     private readonly string _basePath;
 
@@ -82,6 +82,21 @@ public sealed class FileSystemStorage : IStorage, IStorageCounter
         Task.FromResult(Directory.Exists(_basePath)
             ? Directory.EnumerateFiles(_basePath, "*", SearchOption.AllDirectories).LongCount()
             : 0L);
+
+    public async Task ProbeAsync(CancellationToken cancellationToken = default)
+    {
+        await StorageRoundTrip.RunAsync(this, cancellationToken);
+
+        // The round trip leaves behind the directory it wrote into.
+        try
+        {
+            Directory.Delete(Path.Combine(_basePath, "0"));
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            // Only tidiness — a leftover empty directory is not a failed probe.
+        }
+    }
 
     public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 

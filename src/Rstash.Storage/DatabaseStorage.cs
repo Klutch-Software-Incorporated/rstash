@@ -1,4 +1,7 @@
+using System.Data.Common;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Storage;
 using Rstash.Database;
 
 namespace Rstash.Storage;
@@ -10,7 +13,7 @@ namespace Rstash.Storage;
 /// the metadata database, so every wired dialect (sqlite/postgres, including Postgres
 /// <c>Auth=Entra</c>) works here without any blob-specific code.
 /// </summary>
-public sealed class DatabaseStorage : IStorage, IStorageCounter
+public sealed class DatabaseStorage : IStorage, IStorageCounter, IStorageProbe
 {
     private readonly DbContextOptions<BlobDbContext> _options;
 
@@ -25,7 +28,45 @@ public sealed class DatabaseStorage : IStorage, IStorageCounter
             .Options;
 
         using var context = new BlobDbContext(_options);
-        context.Database.EnsureCreated();
+        EnsureBlobsTable(context);
+    }
+
+    /// <summary>Creates the <c>blobs</c> table if it is not already there.</summary>
+    /// <remarks>
+    /// Deliberately not <c>EnsureCreated</c>: that asks whether the *database*
+    /// exists, so it does nothing at all once the database holds any table. When
+    /// the blob DSN names the metadata database, the metadata migrations have
+    /// already run by the time anything resolves this backend, so the table would
+    /// never be created and the first upload would fail on a missing relation.
+    /// </remarks>
+    private static void EnsureBlobsTable(BlobDbContext context)
+    {
+        var creator = (RelationalDatabaseCreator)context.GetService<IDatabaseCreator>();
+
+        if (!creator.Exists())
+        {
+            creator.Create();
+        }
+
+        if (!BlobsTableExists(context))
+        {
+            // The context maps exactly one table, so this creates only "blobs".
+            creator.CreateTables();
+        }
+    }
+
+    /// <summary>Asks the provider a question only an existing table can answer.</summary>
+    private static bool BlobsTableExists(BlobDbContext context)
+    {
+        try
+        {
+            _ = context.Blobs.Any();
+            return true;
+        }
+        catch (DbException)
+        {
+            return false;
+        }
     }
 
     public async Task<Stream> GetAsync(long userId, string path, CancellationToken cancellationToken = default)
@@ -82,6 +123,9 @@ public sealed class DatabaseStorage : IStorage, IStorageCounter
         await using var context = new BlobDbContext(_options);
         return await context.Blobs.LongCountAsync(cancellationToken);
     }
+
+    public Task ProbeAsync(CancellationToken cancellationToken = default) =>
+        StorageRoundTrip.RunAsync(this, cancellationToken);
 
     public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 }
