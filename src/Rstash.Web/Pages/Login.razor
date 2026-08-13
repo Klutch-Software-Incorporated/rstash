@@ -45,12 +45,44 @@
 
     private string? _error;
 
+    private const string InvalidCredentials = "Invalid username or password.";
+
+    /// <remarks>
+    /// Nothing about an account is disclosed until the password proves the caller
+    /// owns it. Reporting standing first made "does this user exist?" a free
+    /// question: any password at all — no correct guess, no lockout — surfaced
+    /// "disabled" or "pending approval" for real accounts and the generic refusal
+    /// for everything else.
+    /// <para>
+    /// Hence CheckPasswordSignInAsync rather than PasswordSignInAsync: it verifies
+    /// the password without issuing a cookie, so an account that fails the standing
+    /// checks below is never signed in on the way to being told it can't be.
+    /// </para>
+    /// </remarks>
     private async Task SignInAsync()
     {
         var user = await UserManager.FindByNameAsync(Input.Username);
         if (user is null)
         {
-            _error = "Invalid username or password.";
+            _error = InvalidCredentials;
+            return;
+        }
+
+        var result = await SignInManager.CheckPasswordSignInAsync(
+            user, Input.Password, lockoutOnFailure: true);
+
+        // Deliberately still specific: extracting this costs five failed attempts,
+        // and hiding it would leave someone whose correct password suddenly stopped
+        // working with no idea why.
+        if (result.IsLockedOut)
+        {
+            _error = "Too many failed attempts. This account is locked for a few minutes.";
+            return;
+        }
+
+        if (!result.Succeeded)
+        {
+            _error = InvalidCredentials;
             return;
         }
 
@@ -66,20 +98,7 @@
             return;
         }
 
-        var result = await SignInManager.PasswordSignInAsync(
-            user, Input.Password, isPersistent: true, lockoutOnFailure: true);
-
-        if (result.IsLockedOut)
-        {
-            _error = "Too many failed attempts. This account is locked for a few minutes.";
-            return;
-        }
-
-        if (!result.Succeeded)
-        {
-            _error = "Invalid username or password.";
-            return;
-        }
+        await SignInManager.SignInAsync(user, isPersistent: true);
 
         // Honor a local return URL (e.g. from /oauth/authorize); never off-site.
         var target = ReturnUrl is { Length: > 0 } url && url.StartsWith('/') ? url : "/";
