@@ -31,15 +31,35 @@ public sealed record SettingsSnapshot
 
     /// <summary>
     /// Builds a snapshot from optional DB overrides, falling back to each
-    /// setting's registry default. Malformed override values fall back to the
-    /// default (writes are validated, so this only guards against drift).
+    /// setting's registry default. Values that are malformed, or that the setting
+    /// no longer offers, fall back to the default (writes are validated, so this
+    /// only guards against drift).
     /// </summary>
     public static SettingsSnapshot Resolve(IReadOnlyDictionary<string, string>? overrides)
     {
-        string Val(string key) =>
-            overrides is not null && overrides.TryGetValue(key, out var v)
-                ? v
-                : SettingDefinitions.ByKey(key)?.Default ?? "";
+        string Val(string key)
+        {
+            var def = SettingDefinitions.ByKey(key);
+            if (overrides is null || !overrides.TryGetValue(key, out var value))
+            {
+                return def?.Default ?? "";
+            }
+
+            // A stored value the setting no longer offers falls back to the
+            // default. Writes are validated, so this catches drift: a choice that
+            // was retired after it was chosen, or a hand-edited row. Left
+            // unchecked, dropping "external" from registration_mode would have
+            // turned a server that had deliberately delegated sign-ups into one
+            // rendering an open registration form — the value no longer matched
+            // "closed", and nothing else was looking.
+            if (def is { ValidValues.Count: > 0 }
+                && !def.ValidValues.Contains(value, StringComparer.Ordinal))
+            {
+                return def.Default;
+            }
+
+            return value;
+        }
 
         long Bytes(string key) =>
             ByteSize.TryParse(Val(key), out var n)
