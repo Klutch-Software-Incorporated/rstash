@@ -1,4 +1,6 @@
 using System.Globalization;
+using System.Security.Cryptography;
+using System.Text;
 using System.Threading.RateLimiting;
 using Rstash.Services;
 
@@ -26,6 +28,23 @@ public static class RateLimiting
     /// </summary>
     private static readonly string[] AuthPaths =
         ["/login", "/register", "/setup", "/forgot-password", "/reset-password"];
+
+    /// <summary>
+    /// Extensions served out of <c>wwwroot</c>. Only ever consulted for
+    /// root-level paths, so a stored document named <c>cat.png</c> can't buy
+    /// itself an exemption from the storage budget.
+    /// </summary>
+    private static readonly string[] StaticExtensions =
+        [".css", ".js", ".mjs", ".map", ".ico", ".svg", ".png", ".jpg", ".jpeg",
+         ".gif", ".webp", ".woff", ".woff2", ".ttf", ".webmanifest", ".txt"];
+
+    /// <summary>
+    /// Ceiling on a token bucket's replenishment period. A rate of 1e-9/s is a
+    /// valid setting write, and <c>TimeSpan.FromSeconds(1/rate)</c> would
+    /// overflow — on the global limiter, so every request 500s, including the
+    /// settings page you'd use to undo it.
+    /// </summary>
+    private const double MaxPeriodSeconds = 86_400;
 
     public static IServiceCollection AddRstashRateLimiting(this IServiceCollection services)
     {
@@ -60,17 +79,24 @@ public static class RateLimiting
             return RateLimitPartition.GetNoLimiter("none");
         }
 
-        if (IsAuthPath(path))
+        // Only the submission is charged to the stingy budget. Rendering the form
+        // costs a token too if you count every method, and at 0.2/s that means a
+        // GET plus four bad passwords exhausts the bucket — so the fifth attempt,
+        // the one that trips the account lockout, returns a bare 429 and the user
+        // never learns their account is locked.
+        if (IsAuthPath(path) && !HttpMethods.IsGet(context.Request.Method))
         {
             return Bucket("auth", ClientKey(context), settings.AuthRateLimitRate, settings.AuthRateLimitBurst);
         }
 
-        // Storage traffic is charged to the account, not the address: several
-        // people behind one home IP shouldn't share a sync budget.
-        if (path.StartsWithSegments("/storage") && context.User.Identity?.IsAuthenticated == true)
+        // Storage traffic is charged to the app token, not the address: several
+        // people behind one home IP shouldn't share a sync budget. It can't be
+        // charged to the account — /storage authenticates by reading the bearer
+        // header inside the endpoint, so there is no authentication scheme and
+        // context.User is still anonymous this early in the pipeline.
+        if (path.StartsWithSegments("/storage") && BearerKey(context) is { } bearer)
         {
-            var user = context.User.Identity.Name ?? "anonymous";
-            return Bucket("user", user, settings.UserRateLimitRate, settings.UserRateLimitBurst);
+            return Bucket("token", bearer, settings.UserRateLimitRate, settings.UserRateLimitBurst);
         }
 
         return Bucket("ip", ClientKey(context), settings.RateLimitRate, settings.RateLimitBurst);
@@ -82,16 +108,57 @@ public static class RateLimiting
         || path.StartsWithSegments("/_content")
         || path.StartsWithSegments("/_blazor")
         || path.StartsWithSegments("/healthz")
-        || path.StartsWithSegments("/css")
-        || path.StartsWithSegments("/js")
-        || path.StartsWithSegments("/lib")
-        || path.StartsWithSegments("/favicon.ico");
+        || IsStaticAsset(path);
+
+    /// <summary>
+    /// True for the files this app actually ships — <c>app.css</c>, <c>app.js</c>,
+    /// the favicons, the manifest — which sit at the root of <c>wwwroot</c>, not
+    /// under <c>/css</c> or <c>/js</c>. Matching on directories that don't exist
+    /// meant every page load spent five tokens of the caller's request budget,
+    /// and a throttled stylesheet renders the UI unstyled rather than erroring.
+    /// </summary>
+    private static bool IsStaticAsset(PathString path)
+    {
+        var value = path.Value;
+
+        // Root-level only: a nested path is /storage/… or a page, never an asset.
+        // MapStaticAssets' fingerprinted names (app.6f3a1b.css) stay single-segment.
+        if (string.IsNullOrEmpty(value) || value.IndexOf('/', 1) >= 0)
+        {
+            return false;
+        }
+
+        var dot = value.LastIndexOf('.');
+        return dot > 0 && StaticExtensions.Contains(value[dot..], StringComparer.OrdinalIgnoreCase);
+    }
 
     private static bool IsAuthPath(PathString path) =>
         AuthPaths.Any(p => path.StartsWithSegments(p));
 
     private static string ClientKey(HttpContext context) =>
         context.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+
+    /// <summary>
+    /// A stable per-token key, or null when the request carries no bearer token.
+    /// Hashed because the partition key outlives the request inside the limiter's
+    /// dictionary, and a bearer secret has no business living there.
+    /// </summary>
+    private static string? BearerKey(HttpContext context)
+    {
+        var header = context.Request.Headers.Authorization.ToString();
+        if (!header.StartsWith("Bearer ", StringComparison.Ordinal))
+        {
+            return null;
+        }
+
+        var token = header["Bearer ".Length..];
+        if (token.Length == 0)
+        {
+            return null;
+        }
+
+        return Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(token)).AsSpan(0, 16));
+    }
 
     /// <summary>
     /// A token bucket for one scope, or no limit when the rate is 0.
@@ -115,7 +182,7 @@ public static class RateLimiting
         // sign-in every five seconds) get a single token on a longer period.
         var (tokensPerPeriod, period) = rate >= 1
             ? ((int)Math.Round(rate), TimeSpan.FromSeconds(1))
-            : (1, TimeSpan.FromSeconds(1 / rate));
+            : (1, TimeSpan.FromSeconds(Math.Min(1 / rate, MaxPeriodSeconds)));
 
         return RateLimitPartition.GetTokenBucketLimiter(
             $"{scope}:{key}:{rate}:{burst}",
