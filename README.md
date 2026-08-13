@@ -1,192 +1,144 @@
+<div align="center">
+
+<img src="docs/assets/logo.svg" alt="rstash" width="96" height="96">
+
 # rstash
 
-A [remoteStorage](https://remotestorage.io/) server you host yourself. Implements
-[draft-dejong-remotestorage-26](https://datatracker.ietf.org/doc/html/draft-dejong-remotestorage-26).
+**Your apps' data, in storage you own.**
 
-remoteStorage lets apps keep their data in storage you control instead of theirs. rstash
-is that storage. It runs as one binary against a SQLite file, and everything past the
-first launch is configured in a web UI. The intended user runs one server for themselves,
-or for a few family and friends.
+[![Release](https://img.shields.io/github/v/release/Klutch-Software-Incorporated/rstash?sort=semver)](https://github.com/Klutch-Software-Incorporated/rstash/releases)
+[![CI](https://github.com/Klutch-Software-Incorporated/rstash/actions/workflows/ci.yml/badge.svg)](https://github.com/Klutch-Software-Incorporated/rstash/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-Written in C#/.NET 10. MIT licensed.
+[Website](https://rstash.cloud) · [Documentation](docs/) · [Roadmap](ROADMAP.md) · [Contributing](CONTRIBUTING.md)
 
-## Running it
+</div>
 
-```sh
-curl -LO https://github.com/Klutch-Software-Incorporated/rstash/releases/latest/download/rstash-linux-amd64
-chmod +x rstash-linux-amd64
-./rstash-linux-amd64
-```
+---
 
-Binaries are published for Linux (amd64, arm64), macOS (amd64, arm64), and Windows
-(amd64). There is also a `Dockerfile` in the repository root.
+rstash is a [remoteStorage](https://remotestorage.io/) server you run yourself. It is one
+binary and a database file, and it gives every remoteStorage app somewhere to keep your
+data that isn't somebody else's cloud.
 
-Then open `http://localhost:8080`. While no account exists, every page redirects to a
-setup wizard that creates the first admin. After that, sign in and use the web UI.
+Think of the part of Dropbox or iCloud that apps quietly sync to in the background — the
+notes, the bookmarks, the task lists. remoteStorage is an open protocol for exactly that,
+and rstash is the server end of it. Apps ask your permission, you grant them a folder,
+and the data stays on your machine.
 
-By default this writes two files in the working directory: `rstash.sqlite` for metadata
-and `rstash-blobs.sqlite` for file contents. Point `RSTASH_DB` and `RSTASH_BLOB`
-elsewhere before you have data worth keeping.
+<!-- ASSET: hero.gif — 15–25s loop, ~1200px wide: first-run setup → file browser → an app
+     asking for permission on the consent screen. Drop at docs/assets/hero.gif and
+     uncomment. -->
+<!-- <div align="center"><img src="docs/assets/hero.gif" alt="Setting up rstash and connecting an app" width="800"></div> -->
 
-## What it does
+## Why rstash
 
-The protocol surface is complete: `GET`/`PUT`/`DELETE`/`HEAD` on documents and folders,
-ETags and conditional requests, JSON-LD folder listings, WebFinger discovery at
-`/.well-known/webfinger`, and the OAuth app-authorization flow (authorization code with
-PKCE, plus the implicit grant that older clients still use). Folders are implicit,
-derived from document paths rather than stored. Paths under `/public/` are readable
-without a token.
+- **You keep the data.** No account with us, no telemetry, no tier where your files get
+  held hostage. rstash has no hosted version and [isn't getting one](ROADMAP.md#non-goals).
+- **No lock-in, by protocol.** remoteStorage is a published spec
+  ([draft-dejong-remotestorage-26](https://datatracker.ietf.org/doc/html/draft-dejong-remotestorage-26)).
+  Any compliant app works with rstash, and your data moves to any other compliant server.
+- **Small enough to actually run.** A single self-contained binary against a SQLite file.
+  No Redis, no Elasticsearch, no job queue. Point it at Postgres and S3-style object
+  storage instead when you outgrow that.
+- **Built for a household, not a datacenter.** Per-user and server-wide quotas, an admin
+  UI for users and settings, and an audit log — sized for you, your family, and a few
+  friends.
 
-The web UI covers setup, sign-in, account settings, a file browser, the app-consent
-screen, and an admin area with server settings, user management, and an audit log.
+## Apps that work with it
 
-Accounts have storage and egress quotas, stamped at creation from a configurable
-default. There are also server-wide caps. An operator setting controls whether apps may
-write under `/public/`.
+remoteStorage apps are written against the spec, not against rstash, so anything
+compliant should connect.
 
-Sign-in is a username and a password, held by ASP.NET Core Identity. See
-[docs/IDENTITY.md](docs/IDENTITY.md) for how that relates to the OAuth tokens issued to
-apps, which are a separate thing despite the similar URLs.
+<!-- TODO(interop): fill in from the recorded compatibility pass in ROADMAP §1 before
+     publishing this section. Do not list an app here until someone has actually
+     connected it to rstash and read and written data. -->
 
-## Not implemented yet
+*A verified compatibility list is coming — see the interop item on the
+[roadmap](ROADMAP.md). Until then, please
+[tell us what you connected](https://github.com/Klutch-Software-Incorporated/rstash/issues/new/choose),
+working or not.*
 
-Worth knowing before you deploy:
+## Get started
 
-- **TLS.** rstash speaks plain HTTP. Terminate TLS at nginx, Caddy, or Traefik, set
-  `RSTASH_TRUST_PROXY=true`, and set `RSTASH_BASE_URL` to the public `https://` URL.
-- **Rate limiting.** The settings exist in the admin UI. Nothing enforces them yet.
-- **Refresh tokens.** Only `grant_type=authorization_code` is accepted.
-- **Email verification.** Password reset by email works if `RSTASH_EMAIL` is set;
-  verifying an address at signup does not.
-- **S3 blob storage.** Planned. Azure Blob and the filesystem work today.
-- **Range requests.** Whole documents only.
-
-[ROADMAP.md](ROADMAP.md) has the ordering and the things that are deliberately not
-planned.
-
-## Configuration
-
-Six environment variables are read at boot. Everything else is a runtime setting stored
-in the database and edited in the admin UI: registration mode, quota defaults, token
-lifetime, upload size limit, legal pages, and so on.
-
-Run `rstash env` to print a documented template.
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `RSTASH_ADDR` | `:8080` | Listen address, `host:port`. An empty host binds all interfaces. |
-| `RSTASH_BASE_URL` | `http://localhost:8080` | Public URL of the server. Every absolute URL rstash emits is built from this and never from the incoming request. Validated at boot. |
-| `RSTASH_TRUST_PROXY` | `false` | Honour `X-Forwarded-Proto`, `-Host`, and `-For`. Turn this on only behind a reverse proxy: the headers are forgeable by anyone who can reach the server directly. |
-| `RSTASH_DB` | `sqlite:rstash.sqlite` | Metadata database DSN. |
-| `RSTASH_BLOB` | `sqlite:rstash-blobs.sqlite` | Blob store DSN. |
-| `RSTASH_EMAIL` | *(unset)* | Email provider DSN. Without it, password-reset mail is silently dropped. |
-
-### Database DSNs
-
-| Database | Format | Example |
-|----------|--------|---------|
-| SQLite | `sqlite:path` | `sqlite:/var/lib/rstash/rstash.sqlite` |
-| PostgreSQL | `postgres:` then an Npgsql connection string | `postgres:Host=db;Database=rstash;Username=rstash;Ssl Mode=Require` |
-| MySQL | `mysql:dsn` | not wired yet |
-| SQL Server | `mssql:dsn` | not wired yet |
-
-Append `;Auth=Entra` to a Postgres DSN to authenticate to Azure Database for PostgreSQL
-with Entra ID instead of a password.
-
-If you put the SQLite file on an SMB share such as Azure Files, add
-`?journal_mode=delete`. WAL journaling corrupts SQLite over SMB.
-
-### Blob store DSNs
-
-| Backend | Format | Example |
-|---------|--------|---------|
-| SQLite | `sqlite:path` | `sqlite:/var/lib/rstash/blobs.sqlite` |
-| Filesystem | `fs:/path` | `fs:/var/lib/rstash/blobs` |
-| Azure Blob | `azureblob://{account}/{container}` | `azureblob://mystorage/rstash` |
-| Database | any database DSN | `postgres:Host=db;Database=blobs;Username=rstash` |
-| S3-compatible | `s3:bucket?params` | not wired yet |
-
-Azure Blob authenticates with a shared key, a SAS token, or `DefaultAzureCredential`.
-
-For throwaway local runs, `sqlite::memory:` gives you a database wiped on restart. If
-both DSNs use it they have to name *different* in-memory databases, since one cannot
-hold both schemas.
-
-### Email
-
-`RSTASH_EMAIL` takes a provider DSN. Only Resend is implemented:
-
-```
-resend:re_yourapikey?from=noreply@example.com
-```
-
-Leave it unset and outbound mail goes to a no-op sender. The only thing that currently
-needs it is password reset, so an admin who can still sign in does not need it
-configured.
-
-## CLI
-
-Running `rstash` with no arguments starts the server. The subcommands exit before the
-web host starts.
-
-```
-rstash              start the server
-rstash env          print a documented environment-variable template
-rstash check        validate configuration, test database and blob connectivity
-rstash seed [user]  fill an account with sample modules, folders, and files
-```
-
-`rstash check` exits non-zero on failure, which makes it usable in a healthcheck or a
-deploy gate. The running server also answers `/healthz`.
-
-## Development
-
-You need the [.NET 10 SDK](https://dotnet.microsoft.com/download).
+**Download a binary**
 
 ```sh
-dotnet build Rstash.slnx
-dotnet run --project src/Rstash.Server     # http://localhost:8080
-dotnet test Rstash.slnx
+curl -LO https://github.com/Klutch-Software-Incorporated/rstash/releases/latest/download/rstash-linux-x64
+chmod +x rstash-linux-x64
+./rstash-linux-x64
 ```
 
-`dotnet watch --project src/Rstash.Server` gives you hot reload.
+Builds are published for Linux (x64, arm64), macOS (x64, arm64), and Windows (x64).
 
-Schema changes are hand-written [FluentMigrator](https://fluentmigrator.github.io/)
-migrations in `src/Rstash.Database/Migrations/`, one database-agnostic set applied at
-startup. EF Core owns runtime queries and Identity but not DDL, and a test guards the
-two against drifting apart. There is no `dotnet-ef` codegen step.
+**Or run it in Docker**
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) before opening a pull request.
+There's no published image yet, so build it from the repository:
 
-## Layout
-
-Seven projects under `src/`, two under `tests/`. Dependencies point inward, and
-interfaces live beside their implementations rather than in a shared contracts project.
-
-```
-src/
-  Rstash.Model          Protocol types and pure rules: Node, ETag, Scope, StoragePath. No IO.
-  Rstash.Services       Use cases: RemoteStorageService, SettingsService, TokenStore,
-                        EgressTracker, AuditService
-  Rstash.Storage        Blob backends behind IStorage: filesystem, database, Azure Blob
-  Rstash.Database       EF Core context, Identity, NodeStore, entity configs, migrations
-  Rstash.Notifications  Outbound email behind IEmailSender: Resend, no-op
-  Rstash.Web            Blazor class library + MudBlazor: every page
-  Rstash.Server         The executable: minimal-API endpoints, DI and middleware, CLI
-tests/
-  Rstash.Core.Tests         Unit tests over Model, Services, Storage, Database
-  Rstash.IntegrationTests   End-to-end against the real host via WebApplicationFactory
+```sh
+git clone https://github.com/Klutch-Software-Incorporated/rstash.git && cd rstash
+docker build -t rstash .
+docker run -d --name rstash -p 8080:8080 -v rstash-data:/data \
+  -e RSTASH_BASE_URL=http://localhost:8080 rstash
 ```
 
-[CLAUDE.md](CLAUDE.md) has the longer version, plus the conventions worth knowing before
-you change anything.
+Then open **http://localhost:8080**. While no account exists, every page redirects to a
+setup wizard that creates the first admin; after that you sign in and everything else
+happens in the web UI.
 
-## History
+Before anyone else uses it, put it behind a reverse proxy that terminates TLS, and set
+`RSTASH_BASE_URL` to the public `https://` address with `RSTASH_TRUST_PROXY=true`.
+rstash speaks plain HTTP itself. Full details in
+**[docs/CONFIGURATION.md](docs/CONFIGURATION.md)**.
 
-rstash was written in Go first, and rewritten in C# in mid-2026. The Go tree was kept
-in-repo as a behavioural reference until August 2026; it now lives at the `go-final`
-tag. [docs/PARITY-GAPS.md](docs/PARITY-GAPS.md) tracks what has not been carried
-across, and what was left behind deliberately.
+## What it looks like
+
+<!-- ASSET: three stills, ~1000px wide, light theme, seeded demo data.
+     1. files.png    — the file browser at /files showing the seeded modules
+     2. consent.png  — the OAuth consent screen at /oauth/authorize
+     3. admin.png    — admin settings or the user list
+     Drop in docs/assets/ and uncomment. -->
+<!--
+| Your files | Granting an app access | Running the server |
+|---|---|---|
+| <img src="docs/assets/files.png" alt="File browser"> | <img src="docs/assets/consent.png" alt="App consent screen"> | <img src="docs/assets/admin.png" alt="Admin settings"> |
+-->
+
+## Status
+
+The protocol surface is complete and in daily use: documents and folders over
+`GET`/`PUT`/`DELETE`/`HEAD`, ETags and conditional requests, JSON-LD folder listings,
+WebFinger discovery, and the OAuth app-authorization flow with PKCE and refresh tokens.
+Storage runs on SQLite or Postgres, with blobs on disk, in the database, or in Azure Blob
+Storage.
+
+It is pre-1.0, which is the honest signal: configuration, schema, and defaults can still
+move under you between releases. Direct HTTPS, S3-compatible blobs, and an admin JSON API
+are the notable things not built yet — [ROADMAP.md](ROADMAP.md) has the ordering, and the
+things deliberately not planned.
+
+## Documentation
+
+- **[Configuration](docs/CONFIGURATION.md)** — environment variables, database and blob
+  DSNs, email, TLS, the CLI
+- **[Identity & authorization](docs/IDENTITY.md)** — how signing in differs from the
+  tokens handed to apps
+- **[Roadmap](ROADMAP.md)** — what's next, and what is deliberately out of scope
+- **[Parity gaps](docs/PARITY-GAPS.md)** — what the Go original did that this doesn't, yet
+
+## Contributing
+
+You don't have to write C# to help. Running rstash and reporting what broke, connecting
+an app and telling us whether it worked, or fixing a paragraph that misled you are all
+genuinely useful — and the compatibility list above is waiting on exactly that.
+
+If you do want to write code: you need the [.NET 10 SDK](https://dotnet.microsoft.com/download),
+and then `dotnet build Rstash.slnx` and `dotnet test Rstash.slnx` should both be clean on
+a fresh clone. [CONTRIBUTING.md](CONTRIBUTING.md) covers the workflow, and
+[CLAUDE.md](CLAUDE.md) has the architecture and the conventions worth knowing before you
+change anything.
+
+rstash is written in C# on .NET 10. It was written in Go first and rewritten in mid-2026;
+the Go tree is preserved at the `go-final` tag.
 
 ## License
 
