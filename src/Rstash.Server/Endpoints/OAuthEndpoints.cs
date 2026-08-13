@@ -98,7 +98,7 @@ internal static class OAuthEndpoints
         // in the URL alongside the access token, where the whole point of a
         // longer-lived secret is lost.
         var lifetime = ParseLifetime(settings.Current.TokenLifetime);
-        var token = await tokens.CreateAsync(user.Id, origin, scopeStr, lifetime, refreshLifetime: null);
+        var token = await tokens.CreateAsync(user.Id, origin, scopeStr, lifetime, withRefreshToken: false);
 
         var fragment = $"access_token={Uri.EscapeDataString(token.Token)}&token_type=bearer";
         if (lifetime is { } span)
@@ -171,7 +171,8 @@ internal static class OAuthEndpoints
 
         var lifetime = ParseLifetime(settings.Current.TokenLifetime);
         var token = await tokens.CreateAsync(
-            ac.UserId, ac.ClientId, ac.Scopes, lifetime, ParseLifetime(settings.Current.RefreshTokenLifetime));
+            ac.UserId, ac.ClientId, ac.Scopes, lifetime,
+            withRefreshToken: true, ParseLifetime(settings.Current.RefreshTokenLifetime));
 
         return TokenResponse(token, lifetime);
     }
@@ -180,6 +181,12 @@ internal static class OAuthEndpoints
     /// Trades a refresh token for a fresh access token so an app doesn't have to
     /// send the user back through the consent screen every time its token ages out.
     /// </summary>
+    /// <remarks>
+    /// <c>client_id</c> is required and must match the app the token was issued
+    /// to (RFC 6749 §6). These are public clients with no secret to prove who
+    /// they are, so the binding is all that stops one origin from redeeming
+    /// another's refresh token and inheriting its scopes.
+    /// </remarks>
     private static async Task<IResult> RefreshTokenGrantAsync(
         IFormCollection form, UserManager<ApplicationUser> users, TokenStore tokens, SettingsService settings)
     {
@@ -189,6 +196,12 @@ internal static class OAuthEndpoints
             return TokenError("invalid_request", "refresh_token is required", 400);
         }
 
+        var clientId = form["client_id"].ToString();
+        if (clientId.Length == 0)
+        {
+            return TokenError("invalid_request", "client_id is required", 400);
+        }
+
         var lifetime = ParseLifetime(settings.Current.TokenLifetime);
         var refreshLifetime = ParseLifetime(settings.Current.RefreshTokenLifetime);
 
@@ -196,6 +209,13 @@ internal static class OAuthEndpoints
         // must not be able to renew, and rotating first would burn the old token.
         var existing = await tokens.FindByRefreshTokenAsync(refreshToken);
         if (existing is null)
+        {
+            return TokenError("invalid_grant", "refresh token is invalid or expired", 400);
+        }
+
+        // Same generic error as an unknown token: telling a caller it guessed a
+        // real refresh token but the wrong app is a hint worth withholding.
+        if (!string.Equals(existing.ClientId, clientId, StringComparison.Ordinal))
         {
             return TokenError("invalid_grant", "refresh token is invalid or expired", 400);
         }
