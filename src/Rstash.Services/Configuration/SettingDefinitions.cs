@@ -139,36 +139,8 @@ public static class SettingDefinitions
             InputType = SettingInputType.Text,
             RuntimeEditable = true,
         },
-        new()
-        {
-            Key = "home_subtitle",
-            Group = "Branding",
-            Label = "Home page subtitle",
-            Description = "Tagline shown to logged-out visitors on the home page.",
-            Default = "A personal remoteStorage server.",
-            InputType = SettingInputType.Text,
-            RuntimeEditable = true,
-        },
-        new()
-        {
-            Key = "custom_links",
-            Group = "Branding",
-            Label = "Custom links",
-            Description = "JSON array of {label, url, description} entries shown in the user menu and profile page.",
-            InputType = SettingInputType.TextArea,
-            RuntimeEditable = true,
-        },
 
         // ── Access (runtime-editable) ──
-        new()
-        {
-            Key = "cookie_domain",
-            Group = "Access",
-            Label = "Cookie domain",
-            Description = "Parent domain for session/CSRF cookies (e.g. \".example.com\"). Empty = host-only.",
-            InputType = SettingInputType.Text,
-            RuntimeEditable = true,
-        },
         new()
         {
             Key = "registration_mode",
@@ -187,24 +159,6 @@ public static class SettingDefinitions
             Label = "External registration URL",
             Description = "Where /register redirects when registration_mode is \"external\".",
             InputType = SettingInputType.Text,
-            RuntimeEditable = true,
-        },
-        new()
-        {
-            Key = "external_account_url",
-            Group = "Access",
-            Label = "External account management URL",
-            Description = "Where externally-managed users go to change their email or delete their account.",
-            InputType = SettingInputType.Text,
-            RuntimeEditable = true,
-        },
-        new()
-        {
-            Key = "disabled_account_message",
-            Group = "Access",
-            Label = "Disabled account message",
-            Description = "Shown on the login page when a disabled user tries to log in.",
-            InputType = SettingInputType.TextArea,
             RuntimeEditable = true,
         },
 
@@ -289,15 +243,6 @@ public static class SettingDefinitions
         },
         new()
         {
-            Key = "blocked_mime_types",
-            Group = "Storage",
-            Label = "Blocked MIME types",
-            Description = "Comma-separated MIME types to reject on upload (e.g. application/x-executable,video/*).",
-            InputType = SettingInputType.Text,
-            RuntimeEditable = true,
-        },
-        new()
-        {
             Key = "allow_public_writes",
             Group = "Storage",
             Label = "Public writes",
@@ -346,17 +291,6 @@ public static class SettingDefinitions
         },
         new()
         {
-            Key = "refresh_tokens",
-            Group = "OAuth",
-            Label = "Refresh tokens",
-            Description = "Whether to issue refresh tokens alongside access tokens.",
-            Default = "enabled",
-            ValidValues = ["enabled", "disabled"],
-            InputType = SettingInputType.Select,
-            RuntimeEditable = true,
-        },
-        new()
-        {
             Key = "refresh_token_lifetime",
             Group = "OAuth",
             Label = "Refresh token lifetime",
@@ -400,70 +334,5 @@ public static class SettingDefinitions
             InputType = SettingInputType.Text,
         },
 
-        // ── Legal (runtime-editable) ──
-        new()
-        {
-            Key = "audit_retention_days",
-            Group = "Legal",
-            Label = "Audit log retention (days)",
-            Description = "How many days of audit-log history to keep. 0 = forever.",
-            Default = "0",
-            InputType = SettingInputType.Number,
-            RuntimeEditable = true,
-            NumberMin = "0",
-        },
-        new()
-        {
-            Key = "log_client_ips",
-            Group = "Legal",
-            Label = "Client IP logging",
-            Description = "How to record client IPs in sessions and audit entries.",
-            Default = "enabled",
-            ValidValues = ["enabled", "hashed", "disabled"],
-            InputType = SettingInputType.Select,
-            RuntimeEditable = true,
-        },
-        new()
-        {
-            Key = "tos_mode",
-            Group = "Legal",
-            Label = "Terms of Service mode",
-            Description = "How the Terms of Service is provided: off, text, or url.",
-            Default = "off",
-            ValidValues = ["off", "text", "url"],
-            InputType = SettingInputType.Select,
-            RuntimeEditable = true,
-        },
-        new()
-        {
-            Key = "tos_content",
-            Group = "Legal",
-            Label = "Terms of Service content",
-            Description = "TOS text (when mode=text) or URL (when mode=url).",
-            Default = "Terms of Service\n\n1. Acceptance. By creating an account or using this service, you agree to these terms.\n2. Acceptable Use. You shall not use this service to store, transmit, or distribute content that is unlawful, harmful, threatening, abusive, defamatory, or otherwise objectionable.\n3. Prohibited Content. You shall not store content that: (a) violates any applicable law or regulation; (b) infringes any intellectual property right; (c) contains child sexual abuse material; or (d) contains malware or other harmful code.\n4. Termination. The operator may suspend or terminate your account at any time, with or without cause or notice.\n5. No Warranty. This service is provided \"as is\" without warranty of any kind, express or implied.\n6. Limitation of Liability. The operator shall not be liable for any indirect, incidental, special, consequential, or punitive damages.\n7. Modifications. These terms may be updated at any time. Continued use constitutes acceptance.",
-            InputType = SettingInputType.TextArea,
-            RuntimeEditable = true,
-        },
-        new()
-        {
-            Key = "privacy_mode",
-            Group = "Legal",
-            Label = "Privacy Policy mode",
-            Description = "How the Privacy Policy is provided: off, text, or url.",
-            Default = "off",
-            ValidValues = ["off", "text", "url"],
-            InputType = SettingInputType.Select,
-            RuntimeEditable = true,
-        },
-        new()
-        {
-            Key = "privacy_content",
-            Group = "Legal",
-            Label = "Privacy Policy content",
-            Description = "Privacy Policy text (when mode=text) or URL (when mode=url).",
-            Default = "Privacy Policy\n\n1. Data Collected. This service stores account credentials (username, hashed password) and files you upload. Server logs may record IP addresses, timestamps, and user agents.\n2. Use of Data. Your data is used solely to provide the service. The operator does not sell, share, or disclose your data to third parties except as required by law.\n3. Data Access. The server operator has technical access to the infrastructure. Your files are not routinely accessed by the operator.\n4. Data Retention. Your data is retained for the duration of your account. Upon deletion, your data is permanently removed.\n5. Security. Reasonable measures are taken to protect your data. No method of storage or transmission is completely secure.\n6. Contact. For questions, contact the server operator.",
-            InputType = SettingInputType.TextArea,
-            RuntimeEditable = true,
-        },
     ];
 }

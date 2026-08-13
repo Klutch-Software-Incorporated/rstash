@@ -18,8 +18,8 @@ publish and the container build work. Tests are green.
 
 ## 1. Things a self-hoster hits first
 
-- [ ] **OAuth refresh-token grant** — `grant_type=refresh_token` with rotation. Real
-      remoteStorage apps expect it; without it, long-lived sessions break.
+- [x] **OAuth refresh-token grant** — `grant_type=refresh_token`, always on, both
+      secrets rotating on each use. Not issued to the implicit flow.
 - [ ] **Interop testing against real apps** — Litewrite, Laverna, and friends, as a
       recorded manual pass. Spec conformance and *app* compatibility are not the same
       thing, and only the second one is what a user experiences.
@@ -32,10 +32,22 @@ publish and the container build work. Tests are green.
 
 ## 2. Operational hardening
 
-- [ ] **Rate-limit enforcement** — wire the existing `rate_limit_*` settings to real
-      per-IP middleware. Matters for anyone exposing rstash to the open internet.
-- [ ] **Observability** — decide on `/metrics`, structured logging, and OpenTelemetry
-      before building any of it. Currently bare-bones.
+- [ ] **Rate-limit enforcement** — confirmed wanted, not optional. The four
+      `rate_limit_*` / `user_rate_limit_*` settings exist and are read by nothing, so
+      the admin UI currently advertises a protection that isn't there. Build per-IP and
+      per-user enforcement; still open is whether the knobs stay runtime settings, move
+      to env vars, or get hardcoded.
+- [ ] **TLS / deployment topology** — *needs a design discussion before any code.* Four
+      `tls_*` settings exist with no Kestrel HTTPS wiring behind them. The open question
+      is which deployments rstash should support directly: behind a reverse proxy
+      (today's assumption, and what `RSTASH_TRUST_PROXY` is for), directly exposed on
+      :443 with operator-supplied certs, or directly exposed with ACME/Let's Encrypt.
+      "Production ready" plausibly means more than one of those. Decide the target
+      scenarios first, then decide whether the settings survive.
+- [ ] **Observability** — *needs a design discussion before any code.* `/metrics` and
+      some form of log view are both wanted; `metrics_mode`, `log_level`, and `log_file`
+      exist today and are read by nothing. Prefer the simplest thing that answers "is it
+      up, and what just went wrong" over a full OpenTelemetry story.
 - [ ] **Admin JSON API** — API-key-authed `/api/admin/*` for scripting user and quota
       management without the browser.
 

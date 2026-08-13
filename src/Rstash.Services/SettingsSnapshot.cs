@@ -23,22 +23,9 @@ public sealed record SettingsSnapshot
     public required long TotalEgressLimit { get; init; }
     public required long DefaultUserEgressLimit { get; init; }
     public required string TokenLifetime { get; init; }
-    public required string RefreshTokens { get; init; }
     public required string RefreshTokenLifetime { get; init; }
     public required string SiteName { get; init; }
-    public required string HomeSubtitle { get; init; }
-    public required string BlockedMimeTypes { get; init; }
-    public required string TosMode { get; init; }
-    public required string TosContent { get; init; }
-    public required string PrivacyMode { get; init; }
-    public required string PrivacyContent { get; init; }
-    public required string CookieDomain { get; init; }
     public required string RegistrationExternalUrl { get; init; }
-    public required string ExternalAccountUrl { get; init; }
-    public required IReadOnlyList<CustomLink> CustomLinks { get; init; }
-    public required string DisabledAccountMessage { get; init; }
-    public required int AuditRetentionDays { get; init; }
-    public required string LogClientIps { get; init; }
 
     /// <summary>
     /// Builds a snapshot from optional DB overrides, falling back to each
@@ -67,16 +54,6 @@ public sealed record SettingsSnapshot
                 ? i
                 : int.Parse(SettingDefinitions.ByKey(key)!.Default, CultureInfo.InvariantCulture);
 
-        IReadOnlyList<CustomLink> links;
-        try
-        {
-            links = Configuration.CustomLinks.Parse(Val("custom_links"));
-        }
-        catch (SettingValidationException)
-        {
-            links = [];
-        }
-
         return new SettingsSnapshot
         {
             MetricsMode = Val("metrics_mode"),
@@ -93,22 +70,9 @@ public sealed record SettingsSnapshot
             TotalEgressLimit = Bytes("total_egress_limit"),
             DefaultUserEgressLimit = Bytes("default_user_egress_limit"),
             TokenLifetime = Val("token_lifetime"),
-            RefreshTokens = Val("refresh_tokens"),
             RefreshTokenLifetime = Val("refresh_token_lifetime"),
             SiteName = Val("site_name"),
-            HomeSubtitle = Val("home_subtitle"),
-            BlockedMimeTypes = Val("blocked_mime_types"),
-            TosMode = Val("tos_mode"),
-            TosContent = Val("tos_content"),
-            PrivacyMode = Val("privacy_mode"),
-            PrivacyContent = Val("privacy_content"),
-            CookieDomain = Val("cookie_domain"),
             RegistrationExternalUrl = Val("registration_external_url"),
-            ExternalAccountUrl = Val("external_account_url"),
-            CustomLinks = links,
-            DisabledAccountMessage = Val("disabled_account_message"),
-            AuditRetentionDays = Count("audit_retention_days"),
-            LogClientIps = Val("log_client_ips"),
         };
     }
 }

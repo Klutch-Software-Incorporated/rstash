@@ -90,7 +90,12 @@ public sealed class InitialCreate : Migration
             .WithColumn("ClientId").AsString(255).NotNullable()
             .WithColumn("Scopes").AsString(1024).NotNullable()
             .WithColumn("CreatedAt").AsDateTimeOffset().NotNullable()
-            .WithColumn("ExpiresAt").AsDateTimeOffset().Nullable();
+            .WithColumn("ExpiresAt").AsDateTimeOffset().Nullable()
+            .WithColumn("RefreshToken").AsString(255).Nullable()
+            .WithColumn("RefreshExpiresAt").AsDateTimeOffset().Nullable();
+
+        Create.Index("IX_oauth_tokens_RefreshToken")
+            .OnTable("oauth_tokens").OnColumn("RefreshToken").Ascending();
 
         Create.Table("authorization_codes")
             .WithColumn("Code").AsString(255).NotNullable().PrimaryKey()
@@ -140,8 +145,6 @@ public sealed class InitialCreate : Migration
             .WithColumn("CreatedAt").AsDateTimeOffset().NotNullable()
             .WithColumn("LastLoginAt").AsDateTimeOffset().Nullable()
             .WithColumn("LastLoginIp").AsString(int.MaxValue).Nullable()
-            .WithColumn("TosAcceptedAt").AsDateTimeOffset().Nullable()
-            .WithColumn("PrivacyAcceptedAt").AsDateTimeOffset().Nullable()
             // Standard ASP.NET Identity columns.
             .WithColumn("UserName").AsString(256).Nullable()
             .WithColumn("NormalizedUserName").AsString(256).Nullable()

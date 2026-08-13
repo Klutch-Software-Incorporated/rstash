@@ -15,8 +15,8 @@ public class SettingsSnapshotTests
         Assert.Equal(50L * 1024 * 1024, snap.MaxUploadSize);
         Assert.Equal(0, snap.TotalStorageLimit);
         Assert.Equal("30d", snap.TokenLifetime);
+        Assert.Equal("90d", snap.RefreshTokenLifetime);
         Assert.Equal("rstash", snap.SiteName);
-        Assert.Empty(snap.CustomLinks);
     }
 
     [Fact]
@@ -28,7 +28,6 @@ public class SettingsSnapshotTests
             ["max_upload_size"] = "100MB",
             ["rate_limit_rate"] = "2.5",
             ["site_name"] = "My Cloud",
-            ["custom_links"] = "[{\"label\":\"Billing\",\"url\":\"https://billing.example.com\"}]",
         };
 
         var snap = SettingsSnapshot.Resolve(overrides);
@@ -37,8 +36,6 @@ public class SettingsSnapshotTests
         Assert.Equal(100L * 1024 * 1024, snap.MaxUploadSize);
         Assert.Equal(2.5, snap.RateLimitRate);
         Assert.Equal("My Cloud", snap.SiteName);
-        Assert.Single(snap.CustomLinks);
-        Assert.Equal("Billing", snap.CustomLinks[0].Label);
     }
 
     [Fact]
