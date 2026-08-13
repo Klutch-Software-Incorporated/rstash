@@ -28,7 +28,6 @@ public sealed record SettingsSnapshot
     public required string TokenLifetime { get; init; }
     public required string RefreshTokenLifetime { get; init; }
     public required string SiteName { get; init; }
-    public required string RegistrationExternalUrl { get; init; }
 
     /// <summary>
     /// Builds a snapshot from optional DB overrides, falling back to each
@@ -78,7 +77,6 @@ public sealed record SettingsSnapshot
             TokenLifetime = Val("token_lifetime"),
             RefreshTokenLifetime = Val("refresh_token_lifetime"),
             SiteName = Val("site_name"),
-            RegistrationExternalUrl = Val("registration_external_url"),
         };
     }
 }

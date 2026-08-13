@@ -146,19 +146,11 @@ public static class SettingDefinitions
             Key = "registration_mode",
             Group = "Access",
             Label = "Registration mode",
-            Description = "Who can create new accounts.",
+            Description = "Who can create new accounts: anyone (open), anyone pending your "
+                + "approval, or nobody (closed — you create accounts from the admin pages).",
             Default = "closed",
-            ValidValues = ["open", "approval", "closed", "external"],
+            ValidValues = ["open", "approval", "closed"],
             InputType = SettingInputType.Select,
-            RuntimeEditable = true,
-        },
-        new()
-        {
-            Key = "registration_external_url",
-            Group = "Access",
-            Label = "External registration URL",
-            Description = "Where /register redirects when registration_mode is \"external\".",
-            InputType = SettingInputType.Text,
             RuntimeEditable = true,
         },
 
@@ -181,9 +173,10 @@ public static class SettingDefinitions
             Key = "auth_rate_limit_rate",
             Group = "Rate Limiting",
             Label = "Sign-in rate limit",
-            Description = "Max sign-in, registration, password-reset, and token requests per "
-                + "second per IP (0 = unlimited). Low on purpose — this is what makes password "
-                + "guessing expensive.",
+            Description = "Max sign-in, registration, and password-reset requests per second "
+                + "per IP (0 = unlimited). Low on purpose — this is what makes password guessing "
+                + "expensive. OAuth token requests are not counted here; their secrets are random "
+                + "and not worth guessing.",
             Default = "0.2",
             InputType = SettingInputType.Number,
             RuntimeEditable = true,

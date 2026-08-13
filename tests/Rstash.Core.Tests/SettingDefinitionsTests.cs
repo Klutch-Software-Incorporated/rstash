@@ -19,7 +19,7 @@ public class SettingDefinitionsTests
         Assert.NotNull(def);
         Assert.Equal("closed", def.Default);
         Assert.Equal(SettingInputType.Select, def.InputType);
-        Assert.Contains("external", def.ValidValues);
+        Assert.Equal(["open", "approval", "closed"], def.ValidValues);
         Assert.True(def.RuntimeEditable);
     }
 
