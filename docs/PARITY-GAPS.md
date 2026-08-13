@@ -13,10 +13,13 @@ stubbed** in the C# rewrite, to be tackled as individual features after the
 
 - **Rate limiting enforcement.** Go enforces per-IP and per-user token buckets
   (`legacy/internal/api/ratelimit.go`). C# defines `rate_limit_*` /
-  `user_rate_limit_*` settings but never reads or enforces them.
-- **OAuth refresh-token grant.** Go rotates refresh tokens
-  (`legacy/internal/api/token.go`). C# rejects every grant but
-  `authorization_code` (`OAuthEndpoints.cs`), despite the `refresh_tokens` setting.
+  `user_rate_limit_*` settings but never reads or enforces them. Confirmed as
+  wanted (August 2026); see ROADMAP §2.
+
+Closed: the **OAuth refresh-token grant** is now implemented (August 2026) —
+`grant_type=refresh_token`, always on, rotating both secrets on each use, and
+withheld from the implicit flow. The `refresh_tokens` on/off setting was deleted
+rather than wired, since a self-hoster gains nothing by turning it off.
 
 ## Tier 2 — known/documented deferrals
 

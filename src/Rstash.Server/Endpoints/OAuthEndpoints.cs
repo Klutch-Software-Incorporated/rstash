@@ -94,9 +94,11 @@ internal static class OAuthEndpoints
             return Results.Redirect(WithQuery(redirectUri, WithState($"code={Uri.EscapeDataString(ac.Code)}", state)));
         }
 
-        // Implicit flow: token in the fragment.
+        // Implicit flow: token in the fragment. No refresh token — it would ride
+        // in the URL alongside the access token, where the whole point of a
+        // longer-lived secret is lost.
         var lifetime = ParseLifetime(settings.Current.TokenLifetime);
-        var token = await tokens.CreateAsync(user.Id, origin, scopeStr, lifetime);
+        var token = await tokens.CreateAsync(user.Id, origin, scopeStr, lifetime, refreshLifetime: null);
 
         var fragment = $"access_token={Uri.EscapeDataString(token.Token)}&token_type=bearer";
         if (lifetime is { } span)
@@ -108,18 +110,25 @@ internal static class OAuthEndpoints
         return Results.Redirect(redirectUri + "#" + fragment);
     }
 
-    // POST /oauth/token — authorization-code + PKCE exchange.
+    // POST /oauth/token — authorization-code + PKCE exchange, and refresh.
     private static async Task<IResult> TokenAsync(
         HttpContext ctx, UserManager<ApplicationUser> users, TokenStore tokens, SettingsService settings)
     {
         ctx.Response.Headers.CacheControl = "no-store";
 
         var form = await ctx.Request.ReadFormAsync();
-        if (form["grant_type"].ToString() != "authorization_code")
+        return form["grant_type"].ToString() switch
         {
-            return TokenError("unsupported_grant_type", "supported grant types: authorization_code", 400);
-        }
+            "authorization_code" => await AuthorizationCodeGrantAsync(form, users, tokens, settings),
+            "refresh_token" => await RefreshTokenGrantAsync(form, users, tokens, settings),
+            _ => TokenError(
+                "unsupported_grant_type", "supported grant types: authorization_code, refresh_token", 400),
+        };
+    }
 
+    private static async Task<IResult> AuthorizationCodeGrantAsync(
+        IFormCollection form, UserManager<ApplicationUser> users, TokenStore tokens, SettingsService settings)
+    {
         var code = form["code"].ToString();
         var codeVerifier = form["code_verifier"].ToString();
         var redirectUri = form["redirect_uri"].ToString();
@@ -161,14 +170,66 @@ internal static class OAuthEndpoints
         await tokens.UseCodeAsync(code);
 
         var lifetime = ParseLifetime(settings.Current.TokenLifetime);
-        var token = await tokens.CreateAsync(ac.UserId, ac.ClientId, ac.Scopes, lifetime);
+        var token = await tokens.CreateAsync(
+            ac.UserId, ac.ClientId, ac.Scopes, lifetime, ParseLifetime(settings.Current.RefreshTokenLifetime));
 
+        return TokenResponse(token, lifetime);
+    }
+
+    /// <summary>
+    /// Trades a refresh token for a fresh access token so an app doesn't have to
+    /// send the user back through the consent screen every time its token ages out.
+    /// </summary>
+    private static async Task<IResult> RefreshTokenGrantAsync(
+        IFormCollection form, UserManager<ApplicationUser> users, TokenStore tokens, SettingsService settings)
+    {
+        var refreshToken = form["refresh_token"].ToString();
+        if (refreshToken.Length == 0)
+        {
+            return TokenError("invalid_request", "refresh_token is required", 400);
+        }
+
+        var lifetime = ParseLifetime(settings.Current.TokenLifetime);
+        var refreshLifetime = ParseLifetime(settings.Current.RefreshTokenLifetime);
+
+        // Peek before rotating: an account disabled since the app was authorized
+        // must not be able to renew, and rotating first would burn the old token.
+        var existing = await tokens.FindByRefreshTokenAsync(refreshToken);
+        if (existing is null)
+        {
+            return TokenError("invalid_grant", "refresh token is invalid or expired", 400);
+        }
+
+        var user = await users.FindByIdAsync(
+            existing.UserId.ToString(System.Globalization.CultureInfo.InvariantCulture));
+        if (user is null || user.Disabled || !user.Approved)
+        {
+            return TokenError("invalid_grant", "user account is disabled", 400);
+        }
+
+        var rotated = await tokens.RefreshAsync(refreshToken, lifetime, refreshLifetime);
+        if (rotated is null)
+        {
+            return TokenError("invalid_grant", "refresh token is invalid or expired", 400);
+        }
+
+        return TokenResponse(rotated, lifetime);
+    }
+
+    private static IResult TokenResponse(OAuthToken token, TimeSpan? lifetime)
+    {
         var response = new Dictionary<string, object>
         {
             ["access_token"] = token.Token,
             ["token_type"] = "bearer",
-            ["scope"] = ac.Scopes,
+            ["scope"] = token.Scopes,
         };
+
+        if (token.RefreshToken is { } refresh)
+        {
+            response["refresh_token"] = refresh;
+        }
+
         if (lifetime is { } span)
         {
             response["expires_in"] = (long)span.TotalSeconds;

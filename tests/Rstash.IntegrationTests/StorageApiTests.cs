@@ -206,7 +206,7 @@ public sealed class StorageApiTests(RstashAppFactory factory) : IClassFixture<Rs
         }
 
         var tokens = scope.ServiceProvider.GetRequiredService<TokenStore>();
-        var token = await tokens.CreateAsync(user!.Id, "test-client", scopes, lifetime: null);
+        var token = await tokens.CreateAsync(user!.Id, "test-client", scopes, lifetime: null, refreshLifetime: null);
         return (username, token.Token);
     }
 

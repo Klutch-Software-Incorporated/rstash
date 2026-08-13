@@ -19,4 +19,17 @@ public class OAuthToken
 
     /// <summary>Null = no expiry.</summary>
     public DateTimeOffset? ExpiresAt { get; set; }
+
+    /// <summary>
+    /// Opaque secret that buys a fresh access token once the current one expires.
+    /// Rotated on every use, so a stolen refresh token stops working as soon as
+    /// the real client redeems its copy.
+    /// </summary>
+    public string? RefreshToken { get; set; }
+
+    /// <summary>
+    /// When the refresh token stops working, at which point the user has to
+    /// authorize the app again. Null = no expiry.
+    /// </summary>
+    public DateTimeOffset? RefreshExpiresAt { get; set; }
 }

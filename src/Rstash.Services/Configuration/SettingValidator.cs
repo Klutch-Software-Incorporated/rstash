@@ -19,17 +19,6 @@ public static class SettingValidator
             throw new SettingValidationException($"setting \"{key}\" cannot be changed at runtime");
         }
 
-        // Structured values get special-cased validators.
-        if (key == "custom_links")
-        {
-            if (!string.IsNullOrWhiteSpace(value))
-            {
-                CustomLinks.Parse(value);
-            }
-
-            return;
-        }
-
         switch (def.InputType)
         {
             case SettingInputType.Select:

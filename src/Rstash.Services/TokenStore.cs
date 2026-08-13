@@ -30,18 +30,20 @@ public sealed class TokenStore(IDbContextFactory<RstashDbContext> contextFactory
     }
 
     public async Task<OAuthToken> CreateAsync(
-        long userId, string clientId, string scopes, TimeSpan? lifetime,
+        long userId, string clientId, string scopes, TimeSpan? lifetime, TimeSpan? refreshLifetime,
         CancellationToken cancellationToken = default)
     {
         var now = DateTimeOffset.UtcNow;
         var token = new OAuthToken
         {
-            Token = Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(32)),
+            Token = NewSecret(),
             UserId = userId,
             ClientId = clientId,
             Scopes = scopes,
             CreatedAt = now,
             ExpiresAt = lifetime is { } span ? now.Add(span) : null,
+            RefreshToken = NewSecret(),
+            RefreshExpiresAt = refreshLifetime is { } refreshSpan ? now.Add(refreshSpan) : null,
         };
 
         await using var db = await contextFactory.CreateDbContextAsync(cancellationToken);
@@ -49,6 +51,71 @@ public sealed class TokenStore(IDbContextFactory<RstashDbContext> contextFactory
         await db.SaveChangesAsync(cancellationToken);
         return token;
     }
+
+    /// <summary>Looks up a live token by its refresh secret; null if unknown or the refresh has expired.</summary>
+    public async Task<OAuthToken?> FindByRefreshTokenAsync(
+        string refreshToken, CancellationToken cancellationToken = default)
+    {
+        await using var db = await contextFactory.CreateDbContextAsync(cancellationToken);
+        var found = await db.OAuthTokens.AsNoTracking()
+            .FirstOrDefaultAsync(t => t.RefreshToken == refreshToken, cancellationToken);
+
+        return found is null || found.RefreshExpiresAt is { } expiry && expiry <= DateTimeOffset.UtcNow
+            ? null
+            : found;
+    }
+
+    /// <summary>
+    /// Trades a refresh token for a fresh access token, carrying the original
+    /// client and scopes across. Returns null if the refresh token is unknown or
+    /// expired.
+    /// </summary>
+    /// <remarks>
+    /// The old row is deleted and a new one written, so both secrets rotate
+    /// together and the previous access token stops working immediately. That
+    /// keeps a leaked pair from outliving the client's next refresh, at the cost
+    /// of breaking a client that refreshes concurrently from two places — the
+    /// right trade for a personal server.
+    /// </remarks>
+    public async Task<OAuthToken?> RefreshAsync(
+        string refreshToken, TimeSpan? lifetime, TimeSpan? refreshLifetime,
+        CancellationToken cancellationToken = default)
+    {
+        await using var db = await contextFactory.CreateDbContextAsync(cancellationToken);
+        var existing = await db.OAuthTokens.AsNoTracking()
+            .FirstOrDefaultAsync(t => t.RefreshToken == refreshToken, cancellationToken);
+
+        if (existing is null
+            || existing.RefreshExpiresAt is { } expiry && expiry <= DateTimeOffset.UtcNow)
+        {
+            return null;
+        }
+
+        var now = DateTimeOffset.UtcNow;
+        var rotated = new OAuthToken
+        {
+            Token = NewSecret(),
+            UserId = existing.UserId,
+            ClientId = existing.ClientId,
+            Scopes = existing.Scopes,
+            CreatedAt = now,
+            ExpiresAt = lifetime is { } span ? now.Add(span) : null,
+            RefreshToken = NewSecret(),
+            RefreshExpiresAt = refreshLifetime is { } refreshSpan ? now.Add(refreshSpan) : null,
+        };
+
+        await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
+        await db.OAuthTokens
+            .Where(t => t.Token == existing.Token)
+            .ExecuteDeleteAsync(cancellationToken);
+        db.OAuthTokens.Add(rotated);
+        await db.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+        return rotated;
+    }
+
+    private static string NewSecret() =>
+        Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(32));
 
     public async Task RevokeAsync(string token, CancellationToken cancellationToken = default)
     {

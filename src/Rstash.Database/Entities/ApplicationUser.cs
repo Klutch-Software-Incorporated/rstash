@@ -37,8 +37,4 @@ public class ApplicationUser : IdentityUser<long>
     public DateTimeOffset? LastLoginAt { get; set; }
 
     public string? LastLoginIp { get; set; }
-
-    public DateTimeOffset? TosAcceptedAt { get; set; }
-
-    public DateTimeOffset? PrivacyAcceptedAt { get; set; }
 }

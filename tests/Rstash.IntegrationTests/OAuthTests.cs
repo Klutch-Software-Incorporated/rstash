@@ -50,6 +50,69 @@ public sealed class OAuthTests(RstashAppFactory factory) : IClassFixture<RstashA
     }
 
     [Fact]
+    public async Task RefreshGrant_RotatesTokens_AndKeepsScopesWorking()
+    {
+        const string verifier = "refresh-flow-code-verifier-0123456789";
+        const string redirectUri = "https://refresh.example.com/callback";
+
+        var code = await SeedCodeAsync(
+            "refreshuser", "https://refresh.example.com", redirectUri, "*:rw", Pkce(verifier));
+        var client = factory.CreateClient();
+
+        var first = JsonDocument.Parse(
+            await (await client.PostAsync("/oauth/token", TokenForm(code, verifier, redirectUri)))
+                .Content.ReadAsStringAsync()).RootElement;
+
+        var oldAccess = first.GetProperty("access_token").GetString()!;
+        var oldRefresh = first.GetProperty("refresh_token").GetString()!;
+        Assert.False(string.IsNullOrEmpty(oldRefresh));
+
+        var refreshed = await client.PostAsync("/oauth/token", new FormUrlEncodedContent(
+            new Dictionary<string, string> { ["grant_type"] = "refresh_token", ["refresh_token"] = oldRefresh }));
+        Assert.Equal(HttpStatusCode.OK, refreshed.StatusCode);
+
+        var second = JsonDocument.Parse(await refreshed.Content.ReadAsStringAsync()).RootElement;
+        var newAccess = second.GetProperty("access_token").GetString()!;
+        var newRefresh = second.GetProperty("refresh_token").GetString()!;
+
+        // Both secrets rotate, and the original scopes carry across.
+        Assert.NotEqual(oldAccess, newAccess);
+        Assert.NotEqual(oldRefresh, newRefresh);
+        Assert.Equal("*:rw", second.GetProperty("scope").GetString());
+
+        // The new access token works.
+        var put = new HttpRequestMessage(HttpMethod.Put, "/storage/refreshuser/docs/b.txt")
+        {
+            Content = new StringContent("hi"),
+        };
+        put.Headers.Authorization = new AuthenticationHeaderValue("Bearer", newAccess);
+        Assert.Equal(HttpStatusCode.Created, (await client.SendAsync(put)).StatusCode);
+
+        // The superseded access token does not.
+        var stale = new HttpRequestMessage(HttpMethod.Get, "/storage/refreshuser/docs/b.txt");
+        stale.Headers.Authorization = new AuthenticationHeaderValue("Bearer", oldAccess);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await client.SendAsync(stale)).StatusCode);
+
+        // And the spent refresh token cannot be replayed.
+        var replay = await client.PostAsync("/oauth/token", new FormUrlEncodedContent(
+            new Dictionary<string, string> { ["grant_type"] = "refresh_token", ["refresh_token"] = oldRefresh }));
+        Assert.Equal(HttpStatusCode.BadRequest, replay.StatusCode);
+    }
+
+    [Fact]
+    public async Task RefreshGrant_UnknownToken_Rejected()
+    {
+        var response = await factory.CreateClient().PostAsync("/oauth/token", new FormUrlEncodedContent(
+            new Dictionary<string, string>
+            {
+                ["grant_type"] = "refresh_token",
+                ["refresh_token"] = "deadbeef",
+            }));
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
     public async Task TokenEndpoint_BadVerifier_Rejected()
     {
         const string redirectUri = "https://app2.example.com/cb";
@@ -134,7 +197,7 @@ public sealed class OAuthTests(RstashAppFactory factory) : IClassFixture<RstashA
         using var scope = factory.Services.CreateScope();
         var userId = await EnsureUserAsync(scope.ServiceProvider, username);
         var tokens = scope.ServiceProvider.GetRequiredService<TokenStore>();
-        return (await tokens.CreateAsync(userId, "client", scopes, lifetime: null)).Token;
+        return (await tokens.CreateAsync(userId, "client", scopes, lifetime: null, refreshLifetime: null)).Token;
     }
 
     private static async Task<long> EnsureUserAsync(IServiceProvider services, string username)
