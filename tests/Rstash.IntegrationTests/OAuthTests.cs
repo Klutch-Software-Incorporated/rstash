@@ -67,8 +67,8 @@ public sealed class OAuthTests(RstashAppFactory factory) : IClassFixture<RstashA
         var oldRefresh = first.GetProperty("refresh_token").GetString()!;
         Assert.False(string.IsNullOrEmpty(oldRefresh));
 
-        var refreshed = await client.PostAsync("/oauth/token", new FormUrlEncodedContent(
-            new Dictionary<string, string> { ["grant_type"] = "refresh_token", ["refresh_token"] = oldRefresh }));
+        var refreshed = await client.PostAsync(
+            "/oauth/token", RefreshForm(oldRefresh, "https://refresh.example.com"));
         Assert.Equal(HttpStatusCode.OK, refreshed.StatusCode);
 
         var second = JsonDocument.Parse(await refreshed.Content.ReadAsStringAsync()).RootElement;
@@ -94,13 +94,52 @@ public sealed class OAuthTests(RstashAppFactory factory) : IClassFixture<RstashA
         Assert.Equal(HttpStatusCode.Unauthorized, (await client.SendAsync(stale)).StatusCode);
 
         // And the spent refresh token cannot be replayed.
-        var replay = await client.PostAsync("/oauth/token", new FormUrlEncodedContent(
-            new Dictionary<string, string> { ["grant_type"] = "refresh_token", ["refresh_token"] = oldRefresh }));
+        var replay = await client.PostAsync(
+            "/oauth/token", RefreshForm(oldRefresh, "https://refresh.example.com"));
         Assert.Equal(HttpStatusCode.BadRequest, replay.StatusCode);
     }
 
     [Fact]
     public async Task RefreshGrant_UnknownToken_Rejected()
+    {
+        var response = await factory.CreateClient().PostAsync(
+            "/oauth/token", RefreshForm("deadbeef", "https://whoever.example.com"));
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    /// <summary>
+    /// A refresh token belongs to the app it was issued to. These are public
+    /// clients with no secret, so if the grant doesn't check client_id, any app
+    /// that gets hold of the token inherits the other app's scopes.
+    /// </summary>
+    [Fact]
+    public async Task RefreshGrant_FromAnotherClient_Rejected()
+    {
+        const string verifier = "wrong-client-code-verifier-0123456789";
+        const string redirectUri = "https://owner.example.com/callback";
+
+        var code = await SeedCodeAsync(
+            "wrongclientuser", "https://owner.example.com", redirectUri, "*:rw", Pkce(verifier));
+        var client = factory.CreateClient();
+
+        var issued = JsonDocument.Parse(
+            await (await client.PostAsync("/oauth/token", TokenForm(code, verifier, redirectUri)))
+                .Content.ReadAsStringAsync()).RootElement;
+        var refresh = issued.GetProperty("refresh_token").GetString()!;
+
+        var stolen = await client.PostAsync(
+            "/oauth/token", RefreshForm(refresh, "https://attacker.example.com"));
+        Assert.Equal(HttpStatusCode.BadRequest, stolen.StatusCode);
+
+        // Refused, not consumed — the rightful owner can still redeem it.
+        var rightful = await client.PostAsync(
+            "/oauth/token", RefreshForm(refresh, "https://owner.example.com"));
+        Assert.Equal(HttpStatusCode.OK, rightful.StatusCode);
+    }
+
+    [Fact]
+    public async Task RefreshGrant_WithoutClientId_Rejected()
     {
         var response = await factory.CreateClient().PostAsync("/oauth/token", new FormUrlEncodedContent(
             new Dictionary<string, string>
@@ -110,6 +149,8 @@ public sealed class OAuthTests(RstashAppFactory factory) : IClassFixture<RstashA
             }));
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Contains(
+            "client_id", await response.Content.ReadAsStringAsync(), StringComparison.Ordinal);
     }
 
     [Fact]
@@ -175,6 +216,14 @@ public sealed class OAuthTests(RstashAppFactory factory) : IClassFixture<RstashA
             ["redirect_uri"] = redirectUri,
         });
 
+    private static FormUrlEncodedContent RefreshForm(string refreshToken, string clientId) =>
+        new(new Dictionary<string, string>
+        {
+            ["grant_type"] = "refresh_token",
+            ["refresh_token"] = refreshToken,
+            ["client_id"] = clientId,
+        });
+
     private static async Task<HttpResponseMessage> GetStorage(HttpClient client, string url, string token)
     {
         var request = new HttpRequestMessage(HttpMethod.Get, url);
@@ -197,7 +246,7 @@ public sealed class OAuthTests(RstashAppFactory factory) : IClassFixture<RstashA
         using var scope = factory.Services.CreateScope();
         var userId = await EnsureUserAsync(scope.ServiceProvider, username);
         var tokens = scope.ServiceProvider.GetRequiredService<TokenStore>();
-        return (await tokens.CreateAsync(userId, "client", scopes, lifetime: null, refreshLifetime: null)).Token;
+        return (await tokens.CreateAsync(userId, "client", scopes, lifetime: null, withRefreshToken: false)).Token;
     }
 
     private static async Task<long> EnsureUserAsync(IServiceProvider services, string username)

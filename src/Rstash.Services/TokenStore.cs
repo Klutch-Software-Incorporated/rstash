@@ -29,8 +29,19 @@ public sealed class TokenStore(IDbContextFactory<RstashDbContext> contextFactory
         return found;
     }
 
+    /// <summary>
+    /// Mints an access token, optionally with a refresh secret alongside it.
+    /// </summary>
+    /// <remarks>
+    /// Whether a refresh token is issued is its own argument rather than being
+    /// inferred from <paramref name="refreshLifetime"/>: a null lifetime means
+    /// "never expires" (the documented meaning of <c>refresh_token_lifetime=0</c>),
+    /// not "don't issue one". Reading suppression out of the lifetime silently
+    /// handed the implicit flow an immortal refresh secret.
+    /// </remarks>
     public async Task<OAuthToken> CreateAsync(
-        long userId, string clientId, string scopes, TimeSpan? lifetime, TimeSpan? refreshLifetime,
+        long userId, string clientId, string scopes, TimeSpan? lifetime,
+        bool withRefreshToken, TimeSpan? refreshLifetime = null,
         CancellationToken cancellationToken = default)
     {
         var now = DateTimeOffset.UtcNow;
@@ -42,8 +53,10 @@ public sealed class TokenStore(IDbContextFactory<RstashDbContext> contextFactory
             Scopes = scopes,
             CreatedAt = now,
             ExpiresAt = lifetime is { } span ? now.Add(span) : null,
-            RefreshToken = NewSecret(),
-            RefreshExpiresAt = refreshLifetime is { } refreshSpan ? now.Add(refreshSpan) : null,
+            RefreshToken = withRefreshToken ? NewSecret() : null,
+            RefreshExpiresAt = withRefreshToken && refreshLifetime is { } refreshSpan
+                ? now.Add(refreshSpan)
+                : null,
         };
 
         await using var db = await contextFactory.CreateDbContextAsync(cancellationToken);
@@ -76,6 +89,13 @@ public sealed class TokenStore(IDbContextFactory<RstashDbContext> contextFactory
     /// keeps a leaked pair from outliving the client's next refresh, at the cost
     /// of breaking a client that refreshes concurrently from two places — the
     /// right trade for a personal server.
+    /// <para>
+    /// The delete is what claims the token, so its row count decides the winner:
+    /// two requests racing the same refresh secret both read the row, but only
+    /// one deletes it, and the loser gets nothing. Ignoring the count let both
+    /// mint independent token families — which is precisely the replay that
+    /// rotating is meant to stop.
+    /// </para>
     /// </remarks>
     public async Task<OAuthToken?> RefreshAsync(
         string refreshToken, TimeSpan? lifetime, TimeSpan? refreshLifetime,
@@ -105,9 +125,17 @@ public sealed class TokenStore(IDbContextFactory<RstashDbContext> contextFactory
         };
 
         await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
-        await db.OAuthTokens
+
+        var claimed = await db.OAuthTokens
             .Where(t => t.Token == existing.Token)
             .ExecuteDeleteAsync(cancellationToken);
+
+        if (claimed == 0)
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            return null;
+        }
+
         db.OAuthTokens.Add(rotated);
         await db.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
