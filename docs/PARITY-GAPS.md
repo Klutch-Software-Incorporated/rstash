@@ -54,8 +54,7 @@ stubbed** in the C# rewrite, to be tackled as individual features after the
   default, covering the physical-media threat for free. If app-managed keys are ever
   required (e.g. an honest "we hold the encryption keys" claim), use a Key Vault
   customer-managed key — infra-only, with real rotation — not an app-held key.
-  (The "layered on later" note in `src/Rstash.Storage/StorageFactory.cs` is now
-  stale and should be reconciled to say this.)
+  `StorageFactory`'s docstring now says the same.
 - **Range requests (RFC 7233).** Not implemented in *either* version (Go lacks it
   too); listed as planned, not a regression.
 - **OAuth client registry.** remoteStorage is registration-free by design

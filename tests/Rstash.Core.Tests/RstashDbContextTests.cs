@@ -7,8 +7,8 @@ namespace Rstash.Core.Tests;
 
 /// <summary>
 /// Exercises the EF Core SQLite stack end to end (migrate + write + read) on a
-/// real file. Also serves as the P1 runtime check that the bumped
-/// SQLitePCLRaw 3.0.3 native bundle loads and works.
+/// real file. Doubles as the runtime check that the SQLitePCLRaw native bundle
+/// actually loads, which a mocked test would not catch.
 /// </summary>
 public class RstashDbContextTests
 {

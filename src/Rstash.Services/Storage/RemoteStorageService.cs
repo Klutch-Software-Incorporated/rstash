@@ -9,7 +9,8 @@ namespace Rstash.Services.Storage;
 /// <summary>
 /// Orchestrates remoteStorage document operations across blob content and node
 /// metadata: ETags, implicit folders, conditional requests, and transactions.
-/// Quota and egress enforcement are layered on later (currently no-op).
+/// Storage quota is enforced here on write; the egress cap is enforced at the
+/// endpoint, where the response size is known.
 /// </summary>
 public sealed class RemoteStorageService(
     IDbContextFactory<RstashDbContext> contextFactory,
