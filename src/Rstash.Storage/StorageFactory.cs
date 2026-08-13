@@ -2,8 +2,14 @@ namespace Rstash.Storage;
 
 /// <summary>
 /// Opens a blob store from a DSN. The supported scheme list is the source of
-/// truth shared with config validation. Encryption wrapping (RSTASH_BLOB_KEY)
-/// and the S3/database backends are layered on in later chunks.
+/// truth shared with config validation.
+/// <para>
+/// The filesystem, database, and Azure Blob backends are wired; S3 is not. There
+/// is deliberately no app-level encryption wrapper: an app-held key defends only
+/// against a leaked storage credential without the app environment, and carries
+/// an unrotatable lose-the-key-lose-everything footgun. Use a customer-managed
+/// key in the storage account instead. See docs/PARITY-GAPS.md.
+/// </para>
 /// </summary>
 public static class StorageFactory
 {
@@ -20,8 +26,8 @@ public static class StorageFactory
         {
             "fs" => new FileSystemStorage(spec),
             // The database backend takes the full DSN (it parses the scheme to
-            // pick a provider). SQLite is wired; other providers throw until
-            // their packages land.
+            // pick a provider). SQLite and Postgres are wired; MySQL and SQL
+            // Server throw until their packages land.
             "sqlite" or "postgres" or "mysql" or "mssql" => new DatabaseStorage(dsn),
             // Object stores take the full DSN and parse it themselves.
             "azureblob" => new AzureBlobStorage(dsn),
