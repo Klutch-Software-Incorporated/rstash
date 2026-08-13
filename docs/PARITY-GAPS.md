@@ -9,12 +9,14 @@ stubbed** in the C# rewrite, to be tackled as individual features after the
 > filesystem/database blobs, storage **and** egress quotas, public-write policy).
 > The items below are the deltas, not blockers for personal/family use.
 
-## Tier 1 — impactful and currently misrepresented (a setting/comment implies they exist)
+## Tier 1 — closed (August 2026)
 
-- **Rate limiting enforcement.** Go enforces per-IP and per-user token buckets
-  (`legacy/internal/api/ratelimit.go`). C# defines `rate_limit_*` /
-  `user_rate_limit_*` settings but never reads or enforces them. Confirmed as
-  wanted (August 2026); see ROADMAP §2.
+Both items here were settings that described behavior the code did not have.
+
+Closed: **rate limiting** is now enforced (August 2026) via ASP.NET's built-in
+limiter — strict per-IP on password endpoints, per-account on the storage API,
+per-IP elsewhere, with static assets and `/healthz` exempt. Identity's account
+lockout, previously switched off at the call site, is on as well.
 
 Closed: the **OAuth refresh-token grant** is now implemented (August 2026) —
 `grant_type=refresh_token`, always on, rotating both secrets on each use, and

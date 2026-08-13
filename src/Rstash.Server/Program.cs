@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore;
 using MudBlazor.Services;
 using Rstash.Database;
 using Rstash.Notifications;
+using Rstash.Server;
 using Rstash.Server.Components;
 using Rstash.Server.Endpoints;
 using Rstash.Server.Health;
@@ -139,6 +140,15 @@ builder.Services
     {
         options.SignIn.RequireConfirmedAccount = false;
         options.User.RequireUniqueEmail = false;
+
+        // Lock an account briefly after repeated failures, so guessing a password
+        // costs an attacker real time. Deliberately short: the lockout is per
+        // account, so anyone who knows a username can trigger it on purpose, and
+        // a long window would turn that into a denial of service. Per-IP rate
+        // limiting is what actually slows an attacker down.
+        options.Lockout.AllowedForNewUsers = true;
+        options.Lockout.MaxFailedAccessAttempts = 5;
+        options.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromMinutes(5);
     })
     .AddRoles<IdentityRole<long>>()
     .AddEntityFrameworkStores<RstashDbContext>()
@@ -147,6 +157,7 @@ builder.Services
 
 builder.Services.AddAuthorization();
 builder.Services.AddCascadingAuthenticationState();
+builder.Services.AddRstashRateLimiting();
 
 // Blazor Web App (interactive server) + MudBlazor.
 builder.Services.AddRazorComponents().AddInteractiveServerComponents();
@@ -158,7 +169,9 @@ var app = builder.Build();
 SchemaMigrator.MigrateUp(databaseDsn);
 await using (var scope = app.Services.CreateAsyncScope())
 {
-    await scope.ServiceProvider.GetRequiredService<SettingsService>().ReloadAsync();
+    var settings = scope.ServiceProvider.GetRequiredService<SettingsService>();
+    await settings.ReloadAsync();
+    RateLimiting.WarnIfProxiedWithoutTrust(app.Logger, trustProxy, settings.Current);
 }
 
 // Must precede any middleware that reads the scheme, host, or client IP. Clearing the
@@ -245,6 +258,9 @@ app.Use(async (context, next) =>
 
 app.UseAuthentication();
 app.UseAuthorization();
+// After authentication so storage traffic can be charged to the account rather
+// than the address it arrived from.
+app.UseRateLimiter();
 app.UseAntiforgery();
 
 app.MapHealthChecks("/healthz", new Microsoft.AspNetCore.Diagnostics.HealthChecks.HealthCheckOptions
