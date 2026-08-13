@@ -230,9 +230,9 @@ app.UseCors();
 app.Use(async (context, next) =>
 {
     var setup = context.RequestServices.GetRequiredService<SetupState>();
+    var path = context.Request.Path;
     if (!setup.IsComplete)
     {
-        var path = context.Request.Path;
         var exempt = path.StartsWithSegments("/setup")
             || path.StartsWithSegments("/healthz")
             || path.StartsWithSegments("/storage")
@@ -253,6 +253,17 @@ app.Use(async (context, next) =>
             context.Response.Redirect("/setup");
             return;
         }
+    }
+
+    // And once an account exists, close the wizard. It creates an administrator
+    // without asking who is asking, so leaving it reachable hands anyone who can
+    // route to the server a full-privilege account. The check reads a cached bool,
+    // and the branch above marks it in the same request that discovers the first
+    // user, so a server that has just been set up is already covered.
+    if (setup.IsComplete && path.StartsWithSegments("/setup"))
+    {
+        context.Response.Redirect("/");
+        return;
     }
 
     await next(context);
