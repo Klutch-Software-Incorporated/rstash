@@ -59,6 +59,20 @@
 
     private async Task CreateAdminAsync()
     {
+        // Second lock on the same door as the middleware guard. This handler is what
+        // actually mints an administrator, so it does not get to assume something
+        // upstream vetted the request — and unlike the cached flag, this reads the
+        // table, which also settles two first-run submissions racing each other.
+        await using (var db = await DbFactory.CreateDbContextAsync())
+        {
+            if (await db.Users.AnyAsync())
+            {
+                SetupStatus.MarkComplete();
+                Navigation.NavigateTo("/", forceLoad: true);
+                return;
+            }
+        }
+
         var user = new ApplicationUser
         {
             UserName = Input.Username,
