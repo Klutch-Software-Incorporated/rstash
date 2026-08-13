@@ -67,6 +67,8 @@ builder.WebHost.UseUrls(listenAddr.StartsWith(':') ? $"http://0.0.0.0{listenAddr
 // Core services.
 // Connectivity checks are bounded so /healthz fails fast instead of blocking on
 // SDK retries when a dependency is down (load balancers poll this).
+builder.Services.AddSingleton(TimeProvider.System);
+builder.Services.AddSingleton<StorageProbeCache>();
 builder.Services.AddHealthChecks()
     .AddCheck<DatabaseHealthCheck>(
         "database",
