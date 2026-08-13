@@ -21,7 +21,8 @@ internal static class FileBrowserEndpoints
     }
 
     private static async Task<IResult> DownloadAsync(
-        HttpContext ctx, string path, RemoteStorageService storage, UserManager<ApplicationUser> users)
+        HttpContext ctx, string path, RemoteStorageService storage, UserManager<ApplicationUser> users,
+        EgressTracker egress)
     {
         var user = await users.GetUserAsync(ctx.User);
         if (user is null)
@@ -32,6 +33,24 @@ internal static class FileBrowserEndpoints
         try
         {
             var result = await storage.GetDocumentAsync(user.Id, "/" + path, new StorageConditions(), ctx.RequestAborted);
+
+            // Metered on the same terms as the storage API. These are the same bytes
+            // leaving over the same wire; charging them only when an app asks would let
+            // anyone spend their whole allowance through this door without the meter
+            // moving, and would leave the dashboard reading zero for someone who works
+            // mostly in the web UI.
+            if (!await egress.CanServeAsync(user.Id, result.ContentLength, user.EgressQuota, ctx.RequestAborted))
+            {
+                await result.Content.DisposeAsync();
+                EgressLimit.SetRetryAfter(ctx.Response);
+                return Results.Text(
+                    "You have used your transfer allowance for this month. It resets when the month does.",
+                    "text/plain",
+                    statusCode: StatusCodes.Status429TooManyRequests);
+            }
+
+            egress.Record(user.Id, result.ContentLength);
+
             var name = path.Split('/').LastOrDefault() ?? "file";
             var contentType = result.ContentType.Length > 0 ? result.ContentType : "application/octet-stream";
             return Results.File(result.Content, contentType, name);
