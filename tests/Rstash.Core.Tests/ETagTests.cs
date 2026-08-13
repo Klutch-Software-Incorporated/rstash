@@ -3,7 +3,7 @@ using Rstash.Model;
 namespace Rstash.Core.Tests;
 
 /// <summary>
-/// Ported from the Go reference (legacy/internal/storage/etag_test.go) — the
+/// Ported from the Go reference (the Go implementation's internal/storage/etag_test.go) — the
 /// behavioral oracle for ETag computation.
 /// </summary>
 public class ETagTests

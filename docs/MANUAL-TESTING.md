@@ -288,4 +288,4 @@ Auth is chosen by the DSN: `key=` → shared key, `sas=` → SAS token, neither 
   (`azureblob://{account}/{container}`) is wired.
 - `/healthz` returns JSON (`{status, checks[]}`) with per-dependency status and probes
   live **database** + **storage** connectivity; it returns 503 when either is unreachable.
-- The original Go server lives in `legacy/` for reference; it is not built.
+- The Go server was deleted in August 2026; the `go-final` tag preserves it.

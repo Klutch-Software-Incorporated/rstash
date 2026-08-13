@@ -5,8 +5,8 @@
 - [.NET 10 SDK](https://dotnet.microsoft.com/download)
 - Git
 
-rstash is a C#/.NET 10 application. (The original Go implementation is preserved
-under `legacy/` as a behavioral reference; it is not built or shipped.)
+rstash is a C#/.NET 10 application. (It was written in Go first; that tree was
+deleted in August 2026 and is preserved at the `go-final` tag.)
 
 ## Contribution workflow
 

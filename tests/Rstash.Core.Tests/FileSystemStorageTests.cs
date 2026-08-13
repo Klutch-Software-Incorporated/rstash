@@ -2,7 +2,7 @@ using Rstash.Storage;
 
 namespace Rstash.Core.Tests;
 
-/// <summary>Ported from legacy/internal/blob/fs_test.go.</summary>
+/// <summary>Ported from the Go implementation's internal/blob/fs_test.go.</summary>
 public sealed class FileSystemStorageTests : IDisposable
 {
     private readonly string _dir;

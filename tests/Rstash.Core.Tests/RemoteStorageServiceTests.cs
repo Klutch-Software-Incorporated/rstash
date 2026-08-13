@@ -7,7 +7,7 @@ using Rstash.Storage;
 
 namespace Rstash.Core.Tests;
 
-/// <summary>Ported from legacy/internal/storage/service_test.go.</summary>
+/// <summary>Ported from the Go implementation's internal/storage/service_test.go.</summary>
 public sealed class RemoteStorageServiceTests : IDisposable
 {
     private const long UserId = 1;

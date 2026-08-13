@@ -97,7 +97,7 @@
 
 /* Decorative wave shaper: faint layered waves down the left edge, behind all
    content (pointer-events:none, z-index:-1 so it sits above the page background
-   but under everything else). Ported from the legacy site. */
+   but under everything else). Ported from the Go-era site. */
 .rs-shaper {
     position: fixed;
     inset: 0;
