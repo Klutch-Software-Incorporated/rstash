@@ -165,10 +165,49 @@ public static class SettingDefinitions
         // ── Rate Limiting (runtime-editable) ──
         new()
         {
+            Key = "rate_limit",
+            Group = "Rate Limiting",
+            Label = "Rate limiting",
+            Description = "Throttle abusive clients. Behind a reverse proxy this needs "
+                + "<code>RSTASH_TRUST_PROXY=true</code>, or every request looks like it came "
+                + "from the proxy and all users share one budget.",
+            Default = "enabled",
+            ValidValues = ["enabled", "disabled"],
+            InputType = SettingInputType.Select,
+            RuntimeEditable = true,
+        },
+        new()
+        {
+            Key = "auth_rate_limit_rate",
+            Group = "Rate Limiting",
+            Label = "Sign-in rate limit",
+            Description = "Max sign-in, registration, password-reset, and token requests per "
+                + "second per IP (0 = unlimited). Low on purpose — this is what makes password "
+                + "guessing expensive.",
+            Default = "0.2",
+            InputType = SettingInputType.Number,
+            RuntimeEditable = true,
+            NumberMin = "0",
+            NumberStep = "0.1",
+        },
+        new()
+        {
+            Key = "auth_rate_limit_burst",
+            Group = "Rate Limiting",
+            Label = "Sign-in rate limit burst",
+            Description = "Attempts allowed back-to-back before sign-in throttling starts.",
+            Default = "5",
+            InputType = SettingInputType.Number,
+            RuntimeEditable = true,
+            NumberMin = "0",
+        },
+        new()
+        {
             Key = "rate_limit_rate",
             Group = "Rate Limiting",
             Label = "Rate limit",
-            Description = "Max requests per second per IP (0 = unlimited).",
+            Description = "Max requests per second per IP for everything else (0 = unlimited). "
+                + "Static assets and health checks are never limited.",
             Default = "10",
             InputType = SettingInputType.Number,
             RuntimeEditable = true,

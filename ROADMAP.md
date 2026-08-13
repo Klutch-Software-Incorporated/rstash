@@ -32,22 +32,23 @@ publish and the container build work. Tests are green.
 
 ## 2. Operational hardening
 
-- [ ] **Rate-limit enforcement** — confirmed wanted, not optional. The four
-      `rate_limit_*` / `user_rate_limit_*` settings exist and are read by nothing, so
-      the admin UI currently advertises a protection that isn't there. Build per-IP and
-      per-user enforcement; still open is whether the knobs stay runtime settings, move
-      to env vars, or get hardcoded.
-- [ ] **TLS / deployment topology** — *needs a design discussion before any code.* Four
-      `tls_*` settings exist with no Kestrel HTTPS wiring behind them. The open question
-      is which deployments rstash should support directly: behind a reverse proxy
-      (today's assumption, and what `RSTASH_TRUST_PROXY` is for), directly exposed on
-      :443 with operator-supplied certs, or directly exposed with ACME/Let's Encrypt.
-      "Production ready" plausibly means more than one of those. Decide the target
-      scenarios first, then decide whether the settings survive.
-- [ ] **Observability** — *needs a design discussion before any code.* `/metrics` and
-      some form of log view are both wanted; `metrics_mode`, `log_level`, and `log_file`
-      exist today and are read by nothing. Prefer the simplest thing that answers "is it
-      up, and what just went wrong" over a full OpenTelemetry story.
+- [x] **Rate limiting + account lockout** — per-IP throttling on sign-in, per-account
+      throttling on storage, per-IP everywhere else; Identity lockout after 5 failed
+      passwords. On by default.
+- [ ] **TLS: operator-supplied certs *and* ACME** — decided (August 2026): rstash should
+      serve HTTPS on its own, not only behind a proxy. `tls_mode` stays `off` by default
+      so localhost and behind-a-proxy deployments are unaffected. `files` takes a cert
+      and key from disk (Kestrel config, no dependency); `acme` obtains and renews a
+      Let's Encrypt certificate automatically, needs port 80 reachable, and makes
+      `tls_cache` state worth backing up. Derive the ACME hostname from
+      `RSTASH_BASE_URL` rather than adding a `tls_domains` setting. Turning TLS on also
+      implies an HTTP→HTTPS redirect and HSTS.
+- [ ] **Observability** — decided (August 2026): an admin status page (uptime, version,
+      counts, storage used, blob/node consistency, dependency health), an in-memory
+      recent-errors view so diagnosing a problem doesn't need SSH, a runtime-adjustable
+      `log_level`, and an **admin-only** Prometheus `/metrics`. Note `metrics_mode`
+      currently defaults to `public`, which would expose operational detail to anyone;
+      change that default when wiring it. `/healthz` already exists.
 - [ ] **Admin JSON API** — API-key-authed `/api/admin/*` for scripting user and quota
       management without the browser.
 

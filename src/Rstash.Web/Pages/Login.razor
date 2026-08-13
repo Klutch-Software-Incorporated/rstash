@@ -67,7 +67,13 @@
         }
 
         var result = await SignInManager.PasswordSignInAsync(
-            user, Input.Password, isPersistent: true, lockoutOnFailure: false);
+            user, Input.Password, isPersistent: true, lockoutOnFailure: true);
+
+        if (result.IsLockedOut)
+        {
+            _error = "Too many failed attempts. This account is locked for a few minutes.";
+            return;
+        }
 
         if (!result.Succeeded)
         {

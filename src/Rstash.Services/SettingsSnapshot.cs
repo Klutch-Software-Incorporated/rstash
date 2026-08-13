@@ -12,6 +12,9 @@ public sealed record SettingsSnapshot
     public required string MetricsMode { get; init; }
     public required string RegistrationMode { get; init; }
     public required string LogLevel { get; init; }
+    public required bool RateLimit { get; init; }
+    public required double AuthRateLimitRate { get; init; }
+    public required int AuthRateLimitBurst { get; init; }
     public required double RateLimitRate { get; init; }
     public required int RateLimitBurst { get; init; }
     public required double UserRateLimitRate { get; init; }
@@ -59,6 +62,9 @@ public sealed record SettingsSnapshot
             MetricsMode = Val("metrics_mode"),
             RegistrationMode = Val("registration_mode"),
             LogLevel = Val("log_level"),
+            RateLimit = Val("rate_limit") != "disabled",
+            AuthRateLimitRate = Rate("auth_rate_limit_rate"),
+            AuthRateLimitBurst = Count("auth_rate_limit_burst"),
             RateLimitRate = Rate("rate_limit_rate"),
             RateLimitBurst = Count("rate_limit_burst"),
             UserRateLimitRate = Rate("user_rate_limit_rate"),
