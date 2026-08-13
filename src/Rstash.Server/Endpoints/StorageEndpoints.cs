@@ -1,5 +1,4 @@
 using System.Buffers;
-using System.Globalization;
 using System.Text.Json;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
@@ -196,15 +195,10 @@ internal static class StorageEndpoints
         await content.CopyToAsync(ctx.Response.Body, ctx.RequestAborted);
     }
 
-    // 429, not 507: egress is transfer (not "storage full"), and the limit clears when the
-    // monthly period rolls over. Retry-After points at the next UTC month boundary so clients
-    // and HTTP libraries back off until then. (draft-dejong-remotestorage-26 §5 / RFC 6585.)
+    // See EgressLimit for why this is a 429 with a Retry-After at the period boundary.
     private static Task WriteEgressExceededAsync(HttpContext ctx)
     {
-        var now = DateTimeOffset.UtcNow;
-        var nextMonth = new DateTimeOffset(now.Year, now.Month, 1, 0, 0, 0, TimeSpan.Zero).AddMonths(1);
-        var seconds = Math.Max(1, (int)Math.Ceiling((nextMonth - now).TotalSeconds));
-        ctx.Response.Headers["Retry-After"] = seconds.ToString(CultureInfo.InvariantCulture);
+        EgressLimit.SetRetryAfter(ctx.Response);
         return TextAsync(ctx, StatusCodes.Status429TooManyRequests, "egress exceeded");
     }
 
