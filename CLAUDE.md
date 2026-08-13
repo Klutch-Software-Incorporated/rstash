@@ -12,9 +12,9 @@ The target audience is technical self-hosters running personal or small family/f
 servers. The design prioritizes a "just run it and go" experience — run `rstash` to
 start the server and complete setup through the web UI.
 
-> **History:** this codebase was rewritten from Go to idiomatic C#/.NET. The original Go
-> implementation is preserved under `legacy/` as a behavioral reference and parity oracle.
-> It is not built or shipped. The Go tests were ported to xUnit as the correctness baseline.
+> **History:** this codebase was rewritten from Go to idiomatic C#/.NET. The Go tests were
+> ported to xUnit as the correctness baseline. The Go tree was deleted in August 2026 once
+> it had stopped earning its keep as a parity oracle; the `go-final` tag preserves it.
 
 Source control is Git, hosted on GitHub (Klutch-Software-Incorporated/rstash).
 

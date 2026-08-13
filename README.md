@@ -183,9 +183,9 @@ you change anything.
 
 ## History
 
-rstash was written in Go first. It was rewritten in C# in mid-2026, and the Go source is
-kept under `legacy/` as a reference for behaviour rather than something that builds or
-ships. [docs/PARITY-GAPS.md](docs/PARITY-GAPS.md) tracks what has not been carried
+rstash was written in Go first, and rewritten in C# in mid-2026. The Go tree was kept
+in-repo as a behavioural reference until August 2026; it now lives at the `go-final`
+tag. [docs/PARITY-GAPS.md](docs/PARITY-GAPS.md) tracks what has not been carried
 across, and what was left behind deliberately.
 
 ## License

@@ -2,7 +2,7 @@ using Rstash.Services.Configuration;
 
 namespace Rstash.Core.Tests;
 
-/// <summary>Ported from legacy/internal/config/size_test.go.</summary>
+/// <summary>Ported from the Go implementation's internal/config/size_test.go.</summary>
 public class ByteSizeTests
 {
     [Theory]

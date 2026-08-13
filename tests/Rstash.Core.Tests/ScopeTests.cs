@@ -2,7 +2,7 @@ using Rstash.Model;
 
 namespace Rstash.Core.Tests;
 
-/// <summary>Ported from legacy/internal/api/scope_test.go.</summary>
+/// <summary>Ported from the Go implementation's internal/api/scope_test.go.</summary>
 public class ScopeTests
 {
     [Theory]
