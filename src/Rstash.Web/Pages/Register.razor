@@ -13,10 +13,6 @@
 {
     <MudAlert Severity="Severity.Info">Registration is currently closed.</MudAlert>
 }
-else if (_mode == "external")
-{
-    <MudText>Redirecting to the registration page…</MudText>
-}
 else
 {
     @if (_message is not null)
@@ -59,20 +55,11 @@ else
     protected override void OnInitialized()
     {
         _mode = Settings.Current.RegistrationMode;
-
-        if (_mode == "external")
-        {
-            var url = Settings.Current.RegistrationExternalUrl;
-            if (!string.IsNullOrWhiteSpace(url))
-            {
-                Navigation.NavigateTo(url, forceLoad: true);
-            }
-        }
     }
 
     private async Task RegisterAsync()
     {
-        if (_mode is "closed" or "external")
+        if (_mode == "closed")
         {
             return;
         }
