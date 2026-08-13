@@ -222,8 +222,10 @@ public static class SettingDefinitions
         {
             Key = "user_rate_limit_rate",
             Group = "Rate Limiting",
-            Label = "Per-user rate limit",
-            Description = "Max storage requests per second per user account (0 = disabled).",
+            Label = "Per-app rate limit",
+            Description = "Max storage requests per second per connected app (0 = disabled). "
+                + "Counted per app token rather than per IP, so several people behind one "
+                + "home connection don't share a sync budget.",
             Default = "0",
             InputType = SettingInputType.Number,
             RuntimeEditable = true,
@@ -234,8 +236,8 @@ public static class SettingDefinitions
         {
             Key = "user_rate_limit_burst",
             Group = "Rate Limiting",
-            Label = "Per-user rate limit burst",
-            Description = "Max burst of requests per user before throttling (0 = disabled).",
+            Label = "Per-app rate limit burst",
+            Description = "Max burst of requests per connected app before throttling (0 = disabled).",
             Default = "20",
             InputType = SettingInputType.Number,
             RuntimeEditable = true,
