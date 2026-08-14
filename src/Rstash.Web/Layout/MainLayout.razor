@@ -2,6 +2,7 @@
 @inject Rstash.Services.SettingsService Settings
 @inject CurrentUserAccessor CurrentUser
 @inject NavigationManager Navigation
+@inject IConfiguration Config
 
 <MudThemeProvider Theme="RstashTheme.Theme" IsDarkMode="_isDarkMode" />
 <MudPopoverProvider />
@@ -166,8 +167,10 @@
             _isAdmin = user?.IsAdmin ?? false;
 
             // Show the remoteStorage handle (user@host) — the brand's identity anchor.
+            // Same string, same source as the dashboard: the configured origin, port
+            // included. It reads as an address, so it has to be one that works.
             var name = user?.UserName ?? HttpContext.User.Identity.Name ?? "";
-            var host = new Uri(Navigation.BaseUri).Host;
+            var host = BaseUrl.AddressHost(BaseUrl.Resolve(Config[EnvVars.BaseUrl]));
             _accountLabel = string.IsNullOrEmpty(name) ? host : $"{name}@{host}";
             _initial = string.IsNullOrEmpty(name) ? "?" : name[..1];
         }

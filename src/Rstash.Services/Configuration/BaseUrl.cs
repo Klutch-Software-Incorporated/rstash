@@ -59,6 +59,17 @@ public static class BaseUrl
         return true;
     }
 
+    /// <summary>
+    /// The right-hand side of a user's storage address (<c>you@here</c>) — the origin's
+    /// host, carrying its port whenever that port isn't the scheme's default.
+    /// </summary>
+    /// <remarks>
+    /// The port is the whole point. An app is handed <c>you@host</c> and resolves
+    /// WebFinger against exactly that authority, so dropping <c>:8080</c> sends it to
+    /// port 80 and the address silently fails to connect anywhere.
+    /// </remarks>
+    public static string AddressHost(string resolved) => new Uri(resolved).Authority;
+
     /// <summary>Resolve + validate for the boot path, where a bad value must stop the server.</summary>
     public static string ResolveOrThrow(string? configured)
     {

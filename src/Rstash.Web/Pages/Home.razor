@@ -5,7 +5,7 @@
 @inject RemoteStorageService Storage
 @inject TokenStore Tokens
 @inject Rstash.Services.Storage.EgressTracker Egress
-@inject NavigationManager Navigation
+@inject IConfiguration Config
 
 <PageTitle>@Settings.Current.SiteName</PageTitle>
 
@@ -173,7 +173,11 @@
         }
 
         _username = _user.UserName ?? "";
-        _host = new Uri(Navigation.BaseUri).Host;
+
+        // From the configured origin, not the request: behind a TLS-terminating proxy
+        // the request says localhost:8080 while users are somewhere else entirely, and
+        // this string is the one thing on the page a user is told to copy elsewhere.
+        _host = BaseUrl.AddressHost(BaseUrl.Resolve(Config[EnvVars.BaseUrl]));
         _handle = $"{_username}@{_host}";
 
         _tokens = await Tokens.ListForUserAsync(_user.Id);
