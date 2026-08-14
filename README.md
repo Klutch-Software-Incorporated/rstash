@@ -10,7 +10,7 @@
 [![CI](https://github.com/Klutch-Software-Incorporated/rstash/actions/workflows/ci.yml/badge.svg)](https://github.com/Klutch-Software-Incorporated/rstash/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-[Website](https://rstash.cloud) · [Documentation](docs/) · [Roadmap](ROADMAP.md) · [Contributing](CONTRIBUTING.md)
+[Documentation](docs/) · [Roadmap](ROADMAP.md) · [Contributing](CONTRIBUTING.md)
 
 </div>
 
@@ -60,17 +60,7 @@ working or not.*
 
 ## Get started
 
-**Download a binary**
-
-```sh
-curl -LO https://github.com/Klutch-Software-Incorporated/rstash/releases/latest/download/rstash-linux-x64
-chmod +x rstash-linux-x64
-./rstash-linux-x64
-```
-
-Builds are published for Linux (x64, arm64), macOS (x64, arm64), and Windows (x64).
-
-**Or run it in Docker**
+**In Docker**
 
 There's no published image yet, so build it from the repository:
 
@@ -80,6 +70,21 @@ docker build -t rstash .
 docker run -d --name rstash -p 8080:8080 -v rstash-data:/data \
   -e RSTASH_BASE_URL=http://localhost:8080 rstash
 ```
+
+**Or build the binary**
+
+You need the [.NET 10 SDK](https://dotnet.microsoft.com/download). Substitute your own
+platform for `linux-x64` — `linux-arm64`, `osx-x64`, `osx-arm64`, and `win-x64` all work:
+
+```sh
+dotnet publish src/Rstash.Server -c Release -r linux-x64 \
+  --self-contained true -p:PublishSingleFile=true \
+  -p:IncludeNativeLibrariesForSelfExtract=true
+```
+
+> **Prebuilt binaries are not current.** The newest published release predates the
+> C# rewrite, so its attached binaries are the old Go server. Build from source until
+> the next release is cut.
 
 Then open **http://localhost:8080**. While no account exists, every page redirects to a
 setup wizard that creates the first admin; after that you sign in and everything else
