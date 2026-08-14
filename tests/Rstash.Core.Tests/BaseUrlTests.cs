@@ -67,7 +67,10 @@ public sealed class BaseUrlTests
     // is handed, so a storage address missing ':8080' points at port 80 and finds nothing.
     [InlineData("http://localhost:8080", "localhost:8080")]
     [InlineData("https://rstash.example.org:8443", "rstash.example.org:8443")]
-    // Default ports are implied by the scheme and would be noise in the address.
+    // Default ports are implied by the scheme and would be noise in the address. This is
+    // the ordinary reverse-proxy shape: rstash listens on 8080, the public site is :80,
+    // and the listen port is nobody's business but the proxy's.
+    [InlineData("http://rstash.example.org", "rstash.example.org")]
     [InlineData("https://rstash.example.org", "rstash.example.org")]
     [InlineData("http://rstash.example.org:80", "rstash.example.org")]
     [InlineData("https://rstash.example.org:443", "rstash.example.org")]

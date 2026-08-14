@@ -49,6 +49,21 @@ public sealed class StorageAddressTests
     }
 
     [Fact]
+    public async Task Dashboard_HidesTheListenPortWhenProxiedOntoPort80()
+    {
+        // The common deployment: rstash listening on 8080, a reverse proxy serving the
+        // public site on 80. The address is where users are, so neither the listen port
+        // nor the proxy's own port belongs in it.
+        await using var factory = Factory("http://rstash.example.org");
+
+        var page = await SignedInDashboardAsync(factory);
+
+        Assert.Contains("alice@rstash.example.org", page, StringComparison.Ordinal);
+        Assert.DoesNotContain("rstash.example.org:80", page, StringComparison.Ordinal);
+        Assert.DoesNotContain(":8080", page, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task TopBar_ShowsTheSameAddressOnEveryPage()
     {
         // The account pill builds the handle independently of the dashboard, and had
