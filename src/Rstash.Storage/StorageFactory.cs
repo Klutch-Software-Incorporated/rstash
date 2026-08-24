@@ -8,7 +8,7 @@ namespace Rstash.Storage;
 /// is deliberately no app-level encryption wrapper: an app-held key defends only
 /// against a leaked storage credential without the app environment, and carries
 /// an unrotatable lose-the-key-lose-everything footgun. Use a customer-managed
-/// key in the storage account instead. See docs/PARITY-GAPS.md.
+/// key in the storage account instead. See the non-goals in ROADMAP.md.
 /// </para>
 /// </summary>
 public static class StorageFactory

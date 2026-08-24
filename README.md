@@ -10,7 +10,7 @@
 [![CI](https://github.com/Klutch-Software-Incorporated/rstash/actions/workflows/ci.yml/badge.svg)](https://github.com/Klutch-Software-Incorporated/rstash/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-[Documentation](docs/) · [Roadmap](ROADMAP.md) · [Contributing](CONTRIBUTING.md)
+[Configuration](docs/CONFIGURATION.md) · [Roadmap](ROADMAP.md) · [Contributing](CONTRIBUTING.md)
 
 </div>
 
@@ -90,6 +90,9 @@ Then open **http://localhost:8080**. While no account exists, every page redirec
 setup wizard that creates the first admin; after that you sign in and everything else
 happens in the web UI.
 
+Your dashboard shows your storage address — `you@your-host` — which is what you paste
+into a remoteStorage app to point it here.
+
 Before anyone else uses it, put it behind a reverse proxy that terminates TLS, and set
 `RSTASH_BASE_URL` to the public `https://` address with `RSTASH_TRUST_PROXY=true`.
 rstash speaks plain HTTP itself. Full details in
@@ -125,10 +128,7 @@ things deliberately not planned.
 
 - **[Configuration](docs/CONFIGURATION.md)** — environment variables, database and blob
   DSNs, email, TLS, the CLI
-- **[Identity & authorization](docs/IDENTITY.md)** — how signing in differs from the
-  tokens handed to apps
 - **[Roadmap](ROADMAP.md)** — what's next, and what is deliberately out of scope
-- **[Parity gaps](docs/PARITY-GAPS.md)** — what the Go original did that this doesn't, yet
 
 ## Contributing
 

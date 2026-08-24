@@ -4,9 +4,6 @@ rstash is a remoteStorage server for people who want to run their own, for thems
 or for a handful of family and friends. Everything below is judged against that: does
 it make the thing better to *self-host*?
 
-For the verified list of Go features not yet ported, see
-[docs/PARITY-GAPS.md](docs/PARITY-GAPS.md).
-
 ## Status
 
 Functionally complete for self-hosted remoteStorage use: the storage API
@@ -66,15 +63,19 @@ publish and the container build work. Tests are green.
 - **Hosted multi-tenant rstash.** Considered and dropped (August 2026). If a managed
   offering ever happens it belongs in a separate service that *operates* rstash
   instances over the admin API — not as a second personality compiled into the binary
-  every self-hoster downloads. See [docs/IDENTITY.md](docs/IDENTITY.md) for what this
-  cost when it was tried, and why the embedded OIDC provider was removed.
+  every self-hoster downloads. It was tried: an embedded OIDC provider, a second user
+  table, and an entitlement indirection, all removed again at a cost of ~2,500 lines.
 - **rstash as its own OpenID Connect provider.** Optional *external* SSO (Authelia,
   Keycloak) is a reasonable future request; hosting a provider to log in our own users
   is not.
 - **Billing, entitlement claims, abuse/DMCA review flows.** Operator-of-strangers
   concerns, not self-hosting ones.
-- **App-level blob encryption at rest.** Reclassified as an intentional non-gap — see
-  PARITY-GAPS for the reasoning and the Key Vault alternative.
+- **App-level blob encryption at rest.** Decided against (July 2026). An app-held key
+  only defends one narrow seam — a leaked storage credential *without* the application
+  environment — and buys it with an unrotatable key that loses every file if mislaid.
+  Object stores already encrypt at rest, which covers the physical-media threat. If
+  app-managed keys are ever genuinely required, the answer is an infrastructure-level
+  customer-managed key with real rotation, not a key held by rstash.
 - **A pre-registered OAuth client registry.** remoteStorage is registration-free by
   design.
 
