@@ -22,8 +22,7 @@ Source control is Git, hosted on GitHub (Klutch-Software-Incorporated/rstash).
 > explored through mid-2026 and **dropped** in August 2026 — the embedded OIDC
 > provider, the `storage_users` split, and the entitlement indirection it required were
 > all removed. Weigh new work against "does this make rstash better to self-host?"; see
-> [ROADMAP.md](ROADMAP.md) for the non-goals and [docs/IDENTITY.md](docs/IDENTITY.md)
-> for what the reversal cost.
+> [ROADMAP.md](ROADMAP.md) for the non-goals.
 
 ## Build & Run Commands
 

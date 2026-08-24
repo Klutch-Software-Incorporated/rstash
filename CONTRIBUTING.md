@@ -108,5 +108,5 @@ is also provided via the root `Dockerfile`.
 
 ## Project structure & conventions
 
-See the Solution Layout and Key Conventions in [CLAUDE.md](CLAUDE.md), and the
-parity backlog in [docs/PARITY-GAPS.md](docs/PARITY-GAPS.md).
+See the Solution Layout and Key Conventions in [CLAUDE.md](CLAUDE.md), and what's
+planned and deliberately unplanned in [ROADMAP.md](ROADMAP.md).
