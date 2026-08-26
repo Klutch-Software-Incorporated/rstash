@@ -1,3 +1,6 @@
+using System.Diagnostics.CodeAnalysis;
+using System.Net.Security;
+using System.Reflection;
 using System.Text;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -9,11 +12,106 @@ using Rstash.Storage;
 
 namespace Rstash.Server;
 
-/// <summary>The minimal CLI: <c>env</c> (print config template), <c>check</c>
-/// (validate config + connectivity), and <c>seed</c> (populate an account with
-/// sample data). Everything else runs the server.</summary>
+/// <summary>The minimal CLI: <c>version</c>, <c>env</c> (print config template),
+/// <c>check</c> (validate config + connectivity), <c>healthcheck</c> (probe a running
+/// server), and <c>seed</c> (populate an account with sample data). Everything else
+/// runs the server.</summary>
 internal static class Cli
 {
+    /// <summary>
+    /// The build identity: "v0.5.0" from a release, "v0.5.0+dev" from anything else.
+    /// Logged at startup and printed by <c>rstash version</c>, so however the server is
+    /// running there is a way to ask what it is.
+    /// </summary>
+    public static string Version =>
+        Assembly.GetEntryAssembly()?
+            .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?
+            .InformationalVersion
+        ?? "unknown";
+
+    public static void PrintVersion() => Console.WriteLine($"rstash {Version}");
+
+    /// <summary>
+    /// Probes <c>/healthz</c> on the local server and exits non-zero if it is not healthy.
+    /// This exists so the container image can declare a HEALTHCHECK: the .NET runtime images
+    /// ship no curl or wget, and adding one to every deployment for the sake of a health
+    /// probe is a poor trade. Talks to the loopback address on the configured port rather
+    /// than RSTASH_BASE_URL, which names the *public* URL and may resolve to a proxy.
+    /// </summary>
+    public static async Task<int> HealthcheckAsync(IConfiguration config)
+    {
+        var scheme = TlsOptions.TryResolve(
+            config[EnvVars.TlsMode],
+            config[EnvVars.TlsCert],
+            config[EnvVars.TlsKey],
+            out var tls,
+            out _) && tls.Enabled
+            ? "https"
+            : "http";
+
+        var url = $"{scheme}://127.0.0.1:{ListenPort(config[EnvVars.Addr])}/healthz";
+
+        using var handler = new HttpClientHandler();
+        if (scheme == "https")
+        {
+            // The certificate is almost never valid for 127.0.0.1, and checking it here would
+            // test the wrong thing: this asks "is my own process serving?", not "does a client
+            // trust it?" — over loopback, inside the container, with no network in between.
+            [SuppressMessage("Security", "CA5359:Do not disable certificate validation",
+                Justification = "Loopback liveness probe of our own process; identity is established by the address, not the certificate.")]
+            static bool AcceptLoopbackCertificate(
+                HttpRequestMessage request, System.Security.Cryptography.X509Certificates.X509Certificate2? certificate,
+                System.Security.Cryptography.X509Certificates.X509Chain? chain, SslPolicyErrors errors) => true;
+
+            handler.ServerCertificateCustomValidationCallback = AcceptLoopbackCertificate;
+        }
+
+        // Short: Docker's default healthcheck timeout is 30s, and a probe that hangs is a
+        // probe that reports nothing.
+        using var client = new HttpClient(handler) { Timeout = TimeSpan.FromSeconds(5) };
+
+        try
+        {
+            using var response = await client.GetAsync(url);
+            if (response.IsSuccessStatusCode)
+            {
+                return 0;
+            }
+
+            // /healthz answers 503 with a JSON body naming the failing dependency; surface it,
+            // since `docker inspect` keeps the last few probe outputs and that is often the
+            // only diagnostic an operator has.
+            Console.Error.WriteLine($"unhealthy: {url} returned {(int)response.StatusCode} — {await response.Content.ReadAsStringAsync()}");
+            return 1;
+        }
+        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException)
+        {
+            Console.Error.WriteLine($"unhealthy: {url} — {ex.Message}");
+            return 1;
+        }
+    }
+
+    /// <summary>
+    /// Extracts the port from an RSTASH_ADDR value (":8080", "0.0.0.0:8080", "host:8080").
+    /// </summary>
+    private static string ListenPort(string? addr)
+    {
+        const string defaultPort = "8080";
+        if (string.IsNullOrWhiteSpace(addr))
+        {
+            return defaultPort;
+        }
+
+        var separator = addr.LastIndexOf(':');
+        if (separator < 0 || separator == addr.Length - 1)
+        {
+            return defaultPort;
+        }
+
+        var port = addr[(separator + 1)..];
+        return ushort.TryParse(port, out _) ? port : defaultPort;
+    }
+
     public static void PrintEnvTemplate()
     {
         Console.WriteLine("# rstash configuration (environment variables).");

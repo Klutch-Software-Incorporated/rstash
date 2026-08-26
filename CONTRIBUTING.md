@@ -37,11 +37,18 @@ upgrade**:
 Label each PR `breaking` / `feature` / `fix` so the highest label across the
 merged-since-last-release set dictates the next bump.
 
-**Who cuts a release:** maintainers, not contributors. Merging a PR does not cut
-a release — pushing a `vX.Y.Z` tag does, and that (and only that) triggers the
-release workflow, which publishes the binaries. Tagging is **decoupled from
-deploys**: rstash.cloud continuously deploys every approved merge to `main`
-regardless of tags — a release tag only governs the downloadable binaries.
+**Who cuts a release:** maintainers, not contributors. Merging a PR does not cut a
+release — pushing a `vX.Y.Z` tag does, and that triggers both the release workflow
+(binaries attached to a GitHub Release) and the image workflow (`ghcr.io/…/rstash`
+tagged `X.Y.Z`, `X.Y`, and `latest`).
+
+Bump `<Version>` in `Directory.Build.props` to the new number **in the same commit you
+tag**. It is what `rstash version` reports, and it is also what every build between
+releases reports with a `+dev` suffix — so if you forget, `main` spends the next release
+cycle claiming to be the previous one.
+
+Merges to `main` publish an `:edge` image but never `:latest`, which stays reserved for
+tagged releases.
 
 ## Getting started
 

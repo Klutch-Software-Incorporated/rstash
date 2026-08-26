@@ -14,11 +14,26 @@ using Rstash.Services.Configuration;
 using Rstash.Services.Storage;
 using Rstash.Storage;
 
-// CLI: `rstash env` / `rstash check` short-circuit before the web host starts.
+// CLI: `rstash version` / `env` / `check` / `healthcheck` short-circuit before the web
+// host starts.
+if (args is ["version", ..] or ["--version", ..] or ["-v", ..])
+{
+    Rstash.Server.Cli.PrintVersion();
+    return;
+}
+
 if (args is ["env", ..])
 {
     Rstash.Server.Cli.PrintEnvTemplate();
     return;
+}
+
+// Used by the container image's HEALTHCHECK; probes a server that is already running,
+// unlike `check`, which validates configuration without one.
+if (args is ["healthcheck", ..])
+{
+    Environment.Exit(await Rstash.Server.Cli.HealthcheckAsync(
+        new ConfigurationBuilder().AddEnvironmentVariables().Build()));
 }
 
 if (args is ["check", ..])
@@ -72,9 +87,10 @@ var tls = TlsOptions.ResolveOrThrow(
 // Listen on RSTASH_ADDR (host:port; empty host = all interfaces), default :8080.
 var listenAddr = builder.Configuration[EnvVars.Addr] ?? ":8080";
 var listenScheme = tls.Enabled ? "https" : "http";
-builder.WebHost.UseUrls(listenAddr.StartsWith(':')
+var listenUrl = listenAddr.StartsWith(':')
     ? $"{listenScheme}://0.0.0.0{listenAddr}"
-    : $"{listenScheme}://{listenAddr}");
+    : $"{listenScheme}://{listenAddr}";
+builder.WebHost.UseUrls(listenUrl);
 
 // Assigned once the host exists (below), so a renewal that fails at 3am reaches the
 // application log instead of vanishing.
@@ -196,6 +212,8 @@ builder.Services.AddRazorComponents().AddInteractiveServerComponents();
 builder.Services.AddMudServices();
 
 var app = builder.Build();
+
+ServerLog.Starting(app.Logger, Rstash.Server.Cli.Version, listenUrl);
 
 // A renewal caught mid-write is normal and transient, so a failed reload warns and keeps
 // serving the certificate already in memory rather than dropping connections.
