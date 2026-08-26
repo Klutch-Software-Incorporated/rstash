@@ -16,6 +16,5 @@ public static class EnvVars
     public const string TlsCert = "RSTASH_TLS_CERT";
     public const string TlsKey = "RSTASH_TLS_KEY";
     public const string TlsMode = "RSTASH_TLS_MODE";
-    public const string TlsCache = "RSTASH_TLS_CACHE";
     public const string Email = "RSTASH_EMAIL";
 }

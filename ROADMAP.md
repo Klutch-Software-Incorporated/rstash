@@ -32,14 +32,20 @@ publish and the container build work. Tests are green.
 - [x] **Rate limiting + account lockout** — per-IP throttling on sign-in, per-account
       throttling on storage, per-IP everywhere else; Identity lockout after 5 failed
       passwords. On by default.
-- [ ] **TLS: operator-supplied certs *and* ACME** — decided (August 2026): rstash should
-      serve HTTPS on its own, not only behind a proxy. `tls_mode` stays `off` by default
-      so localhost and behind-a-proxy deployments are unaffected. `files` takes a cert
-      and key from disk (Kestrel config, no dependency); `acme` obtains and renews a
-      Let's Encrypt certificate automatically, needs port 80 reachable, and makes
-      `tls_cache` state worth backing up. Derive the ACME hostname from
-      `RSTASH_BASE_URL` rather than adding a `tls_domains` setting. Turning TLS on also
-      implies an HTTP→HTTPS redirect and HSTS.
+- [x] **TLS from operator-supplied certificates** — `tls_mode=files` serves HTTPS from a PEM
+      certificate and key, reloading in place when an external renewer replaces them, so
+      renewal never needs a restart. `off` remains the default, leaving localhost and
+      behind-a-proxy deployments unchanged. No new dependency.
+- [ ] **TLS via ACME** — deferred (August 2026), not dropped. .NET ships no ACME client and
+      Microsoft maintains none; LettuceEncrypt was archived in April 2025. The credible
+      candidate is the LettuceEncrypt-Archon fork — net10.0, released August 2026 — but it is
+      one company's fork and its ARI (RFC 9773) support is unconfirmed. That matters more
+      every year: Let's Encrypt's `tlsserver` profile is already 45 days, and the CA/Browser
+      Forum ceiling drops to 100 days in March 2027 and 47 in March 2029, so an unmaintained
+      ACME client becomes an outage on a timer rather than a stale dependency. Revisit when
+      the fork's renewal story is provable. Derive the hostname from `RSTASH_BASE_URL` rather
+      than adding a `tls_domains` setting, and note it needs a port-80 listener — the same one
+      an HTTP→HTTPS redirect wants, which is why neither exists yet.
 - [ ] **Observability** — decided (August 2026): an admin status page (uptime, version,
       counts, storage used, blob/node consistency, dependency health), an in-memory
       recent-errors view so diagnosing a problem doesn't need SSH, a runtime-adjustable
