@@ -54,6 +54,53 @@ internal static class Cli
             Console.WriteLine("[ok]   proxy:      trusting X-Forwarded-* headers");
         }
 
+        // Checked here rather than at startup alone, because the failure this guards against
+        // is silent: an unreadable or mismatched certificate pair otherwise surfaces as a
+        // failed handshake for every client, with nothing wrong in the logs at boot.
+        if (!TlsOptions.TryResolve(
+                config[EnvVars.TlsMode],
+                config[EnvVars.TlsCert],
+                config[EnvVars.TlsKey],
+                out var tls,
+                out var tlsError))
+        {
+            ok = false;
+            Console.WriteLine($"[FAIL] tls:        {tlsError}");
+        }
+        else if (!tls.Enabled)
+        {
+            Console.WriteLine("[ok]   tls:        off — serving plain HTTP, terminate TLS at a reverse proxy");
+        }
+        else
+        {
+            var (certificatePath, keyPath) = tls.RequirePaths();
+            try
+            {
+                // Loading proves the key matches the certificate and is readable by this user.
+                using var certificate = TlsCertificate.Load(certificatePath, keyPath);
+                var expiry = certificate.NotAfter.ToUniversalTime();
+                var remaining = expiry - DateTime.UtcNow;
+
+                if (remaining <= TimeSpan.Zero)
+                {
+                    ok = false;
+                    Console.WriteLine(
+                        $"[FAIL] tls:        {certificatePath} — certificate expired {expiry:u}");
+                }
+                else
+                {
+                    Console.WriteLine(
+                        $"[ok]   tls:        {certificate.Subject} — expires {expiry:u} "
+                        + $"({(int)remaining.TotalDays}d)");
+                }
+            }
+            catch (Exception ex)
+            {
+                ok = false;
+                Console.WriteLine($"[FAIL] tls:        {certificatePath} — {ex.Message}");
+            }
+        }
+
         try
         {
             await using var db = new RstashDbContext(

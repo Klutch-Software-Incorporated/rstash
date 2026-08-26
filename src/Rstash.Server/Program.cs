@@ -60,9 +60,39 @@ var trustProxy = builder.Configuration.GetValue(EnvVars.TrustProxy, false);
 // must name DISTINCT in-memory databases (one can't hold both schemas).
 RstashDbContextOptionsExtensions.EnsureDistinctInMemoryDatabases(databaseDsn, blobDsn);
 
+// TLS is off by default: behind a reverse proxy — the common deployment — the proxy
+// terminates and rstash speaks plain HTTP. Mode 'files' serves HTTPS directly from a
+// certificate an external renewer keeps on disk. rstash never obtains one itself; see
+// TlsOptions for why.
+var tls = TlsOptions.ResolveOrThrow(
+    builder.Configuration[EnvVars.TlsMode],
+    builder.Configuration[EnvVars.TlsCert],
+    builder.Configuration[EnvVars.TlsKey]);
+
 // Listen on RSTASH_ADDR (host:port; empty host = all interfaces), default :8080.
-var listenAddr = builder.Configuration["RSTASH_ADDR"] ?? ":8080";
-builder.WebHost.UseUrls(listenAddr.StartsWith(':') ? $"http://0.0.0.0{listenAddr}" : $"http://{listenAddr}");
+var listenAddr = builder.Configuration[EnvVars.Addr] ?? ":8080";
+var listenScheme = tls.Enabled ? "https" : "http";
+builder.WebHost.UseUrls(listenAddr.StartsWith(':')
+    ? $"{listenScheme}://0.0.0.0{listenAddr}"
+    : $"{listenScheme}://{listenAddr}");
+
+// Assigned once the host exists (below), so a renewal that fails at 3am reaches the
+// application log instead of vanishing.
+Action<Exception>? onTlsReloadFailure = null;
+if (tls.Enabled)
+{
+    var (certificatePath, keyPath) = tls.RequirePaths();
+
+    // Loads eagerly, so an unreadable certificate stops the server here rather than
+    // failing every handshake later. Registered as a singleton for disposal on shutdown.
+    var certificate = new TlsCertificate(
+        certificatePath,
+        keyPath,
+        onReloadFailure: ex => onTlsReloadFailure?.Invoke(ex));
+    builder.Services.AddSingleton(certificate);
+    builder.WebHost.ConfigureKestrel(options => options.ConfigureHttpsDefaults(
+        https => https.ServerCertificateSelector = (_, _) => certificate.Current));
+}
 
 // Core services.
 // Connectivity checks are bounded so /healthz fails fast instead of blocking on
@@ -166,6 +196,10 @@ builder.Services.AddRazorComponents().AddInteractiveServerComponents();
 builder.Services.AddMudServices();
 
 var app = builder.Build();
+
+// A renewal caught mid-write is normal and transient, so a failed reload warns and keeps
+// serving the certificate already in memory rather than dropping connections.
+onTlsReloadFailure = ex => TlsLog.CertificateReloadFailed(app.Logger, ex, tls.CertificatePath);
 
 // Apply the schema (FluentMigrator owns DDL) and load runtime settings before serving.
 SchemaMigrator.MigrateUp(databaseDsn);

@@ -17,8 +17,10 @@ COPY --from=build /app ./
 
 # SQLite data lives here by default; mount a volume for persistence, or point
 # RSTASH_DB / RSTASH_BLOB at Postgres/S3/Azure for production.
-ENV ASPNETCORE_URLS=http://+:8080 \
-    RSTASH_DB=sqlite:/data/rstash.sqlite \
+#
+# No ASPNETCORE_URLS: rstash binds from RSTASH_ADDR (default :8080) and picks the scheme
+# from RSTASH_TLS_MODE, so it calls UseUrls itself and would override anything set here.
+ENV RSTASH_DB=sqlite:/data/rstash.sqlite \
     RSTASH_BLOB=sqlite:/data/rstash-blobs.sqlite
 VOLUME /data
 EXPOSE 8080

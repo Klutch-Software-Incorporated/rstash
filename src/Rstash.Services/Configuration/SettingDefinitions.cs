@@ -82,11 +82,25 @@ public static class SettingDefinitions
         },
         new()
         {
+            Key = "tls_mode",
+            EnvVar = EnvVars.TlsMode,
+            Group = "Server",
+            Label = "TLS mode",
+            Description = "How rstash serves HTTPS: 'off' for plain HTTP, correct when a reverse proxy "
+                + "terminates TLS; 'files' to serve HTTPS itself from RSTASH_TLS_CERT and RSTASH_TLS_KEY. "
+                + "Empty auto-detects — setting both paths turns TLS on. rstash does not obtain "
+                + "certificates itself; renew them with certbot, acme.sh, or Caddy.",
+            ValidValues = TlsOptions.ValidModes,
+            InputType = SettingInputType.Select,
+        },
+        new()
+        {
             Key = "tls_cert",
             EnvVar = EnvVars.TlsCert,
             Group = "Server",
             Label = "TLS certificate",
-            Description = "Path to TLS certificate file. Both RSTASH_TLS_CERT and RSTASH_TLS_KEY must be set to enable TLS.",
+            Description = "Path to the PEM certificate chain (certbot writes this as fullchain.pem). "
+                + "Replacing the file applies the new certificate without a restart.",
             InputType = SettingInputType.Text,
         },
         new()
@@ -95,27 +109,8 @@ public static class SettingDefinitions
             EnvVar = EnvVars.TlsKey,
             Group = "Server",
             Label = "TLS private key",
-            Description = "Path to TLS private key file. Both RSTASH_TLS_CERT and RSTASH_TLS_KEY must be set to enable TLS.",
-            InputType = SettingInputType.Text,
-        },
-        new()
-        {
-            Key = "tls_mode",
-            EnvVar = EnvVars.TlsMode,
-            Group = "Server",
-            Label = "TLS mode",
-            Description = "TLS mode: off, manual, auto. Empty = auto-detect from TLS_CERT/TLS_KEY.",
-            ValidValues = ["", "off", "manual", "auto"],
-            InputType = SettingInputType.Select,
-        },
-        new()
-        {
-            Key = "tls_cache",
-            EnvVar = EnvVars.TlsCache,
-            Group = "Server",
-            Label = "TLS cache directory",
-            Description = "Directory for autocert certificate cache (used when TLS mode is auto).",
-            Default = "./certs",
+            Description = "Path to the PEM private key (certbot writes this as privkey.pem). "
+                + "Must be readable by the user rstash runs as.",
             InputType = SettingInputType.Text,
         },
         new()

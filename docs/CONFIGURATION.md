@@ -1,6 +1,6 @@
 # Configuration
 
-rstash reads six environment variables at boot. Everything else is a runtime setting,
+rstash reads nine environment variables at boot. Everything else is a runtime setting,
 stored in the database and edited in the admin UI: registration mode, quota defaults,
 token lifetime, upload size limit, rate limits, legal pages, and so on.
 
@@ -16,6 +16,9 @@ Run `rstash env` to print a documented template of the boot variables.
 | `RSTASH_DB` | `sqlite:rstash.sqlite` | Metadata database DSN. |
 | `RSTASH_BLOB` | `sqlite:rstash-blobs.sqlite` | Blob store DSN. |
 | `RSTASH_EMAIL` | *(unset)* | Email provider DSN. Without it, password-reset mail is silently dropped. |
+| `RSTASH_TLS_MODE` | *(auto)* | `off` for plain HTTP, `files` to serve HTTPS from the pair below. Empty auto-detects from whether both paths are set. |
+| `RSTASH_TLS_CERT` | *(unset)* | Path to the PEM certificate chain (certbot's `fullchain.pem`). |
+| `RSTASH_TLS_KEY` | *(unset)* | Path to the PEM private key (certbot's `privkey.pem`). |
 
 > **Set `RSTASH_BASE_URL` before anyone else uses the server.** WebFinger responses and
 > OAuth redirects are built from it, so a server reachable at `https://storage.example.com`
@@ -66,15 +69,54 @@ needs it is password reset, so an admin who can still sign in does not need it c
 
 ## TLS
 
-rstash speaks plain HTTP today. Terminate TLS at nginx, Caddy, or Traefik, then set:
+Two supported shapes. Pick based on whether something else on that host is already
+terminating TLS.
+
+### Behind a reverse proxy
+
+The default, and the right answer if you already run nginx, Caddy, or Traefik. rstash
+speaks plain HTTP and the proxy holds the certificate:
 
 ```sh
 RSTASH_TRUST_PROXY=true
 RSTASH_BASE_URL=https://storage.example.com
 ```
 
-Serving HTTPS directly — operator-supplied certificates and automatic ACME — is planned;
-see [ROADMAP.md](../ROADMAP.md).
+`RSTASH_TRUST_PROXY=true` is what makes rstash honour `X-Forwarded-Proto`. Without it the
+app believes every request arrived over plain HTTP and builds its links accordingly.
+
+### Serving HTTPS directly
+
+Point rstash at a PEM certificate and key:
+
+```sh
+RSTASH_TLS_MODE=files
+RSTASH_TLS_CERT=/etc/letsencrypt/live/storage.example.com/fullchain.pem
+RSTASH_TLS_KEY=/etc/letsencrypt/live/storage.example.com/privkey.pem
+RSTASH_BASE_URL=https://storage.example.com
+```
+
+Leaving `RSTASH_TLS_MODE` unset auto-detects — setting both paths turns TLS on. Setting only
+one is a boot-time error rather than a silent fall back to HTTP.
+
+> **rstash does not obtain certificates itself.** It ships no ACME client, so something else
+> has to issue and renew: certbot, acme.sh, Caddy, `tailscale cert`, or an internal CA.
+
+Renewals apply without a restart. rstash re-reads the files when their timestamps change,
+checking at most every five minutes; a renewal caught half-written is logged and retried
+while the certificate already loaded stays in service.
+
+`rstash check` loads the pair and reports it, so a wrong path or a key that doesn't match
+its certificate fails *before* you restart into it:
+
+```
+[ok]   tls:        CN=storage.example.com — expires 2026-11-14 08:12:03Z (81d)
+```
+
+There is no HTTP→HTTPS redirect and no HSTS: rstash binds a single port, so a redirect
+needs a second listener it doesn't have yet. Redirect at the proxy, or leave port 80 closed.
+Automatic ACME is on the [roadmap](../ROADMAP.md) but deliberately not built yet — .NET has
+no maintained ACME client, and an unmaintained one is an outage on a timer.
 
 ## CLI
 

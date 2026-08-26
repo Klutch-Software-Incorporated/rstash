@@ -93,9 +93,10 @@ happens in the web UI.
 Your dashboard shows your storage address — `you@your-host` — which is what you paste
 into a remoteStorage app to point it here.
 
-Before anyone else uses it, put it behind a reverse proxy that terminates TLS, and set
-`RSTASH_BASE_URL` to the public `https://` address with `RSTASH_TRUST_PROXY=true`.
-rstash speaks plain HTTP itself. Full details in
+Before anyone else uses it, give it TLS. The usual answer is a reverse proxy terminating
+HTTPS, with `RSTASH_BASE_URL` set to the public `https://` address and
+`RSTASH_TRUST_PROXY=true` — rstash speaks plain HTTP by default. It can also serve HTTPS
+itself from a certificate you already renew elsewhere. Both are in
 **[docs/CONFIGURATION.md](docs/CONFIGURATION.md)**.
 
 ## What it looks like
@@ -120,9 +121,9 @@ Storage runs on SQLite or Postgres, with blobs on disk, in the database, or in A
 Storage.
 
 It is pre-1.0, which is the honest signal: configuration, schema, and defaults can still
-move under you between releases. Direct HTTPS, S3-compatible blobs, and an admin JSON API
-are the notable things not built yet — [ROADMAP.md](ROADMAP.md) has the ordering, and the
-things deliberately not planned.
+move under you between releases. Automatic certificate issuance, S3-compatible blobs, and an
+admin JSON API are the notable things not built yet — [ROADMAP.md](ROADMAP.md) has the
+ordering, and the things deliberately not planned.
 
 ## Documentation
 
