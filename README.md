@@ -62,14 +62,18 @@ working or not.*
 
 **In Docker**
 
-There's no published image yet, so build it from the repository:
-
 ```sh
-git clone https://github.com/Klutch-Software-Incorporated/rstash.git && cd rstash
-docker build -t rstash .
 docker run -d --name rstash -p 8080:8080 -v rstash-data:/data \
-  -e RSTASH_BASE_URL=http://localhost:8080 rstash
+  -e RSTASH_BASE_URL=http://localhost:8080 \
+  ghcr.io/klutch-software-incorporated/rstash:latest
 ```
+
+Images are built for `linux/amd64` and `linux/arm64`. Use `:latest` or pin a release
+(`:0.5`, `:0.5.0`); `:edge` tracks the current `main` and is not supported.
+
+The server runs as an unprivileged user (uid 1654), so a named volume like the one above
+works as-is. If you bind-mount a host directory instead, `chown -R 1654:1654` it first or
+rstash won't be able to write its database.
 
 **Or build the binary**
 
