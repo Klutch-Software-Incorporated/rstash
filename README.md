@@ -75,7 +75,14 @@ The server runs as an unprivileged user (uid 1654), so a named volume like the o
 works as-is. If you bind-mount a host directory instead, `chown -R 1654:1654` it first or
 rstash won't be able to write its database.
 
-**Or build the binary**
+**Or grab a binary**
+
+Every release attaches a self-contained binary for Linux and macOS (Intel and ARM) and
+for Windows on Intel — [take the one for your
+platform](https://github.com/Klutch-Software-Incorporated/rstash/releases/latest) and run
+it. There is no runtime to install alongside it.
+
+**Or build it yourself**
 
 You need the [.NET 10 SDK](https://dotnet.microsoft.com/download). Substitute your own
 platform for `linux-x64` — `linux-arm64`, `osx-x64`, `osx-arm64`, and `win-x64` all work:
@@ -85,10 +92,6 @@ dotnet publish src/Rstash.Server -c Release -r linux-x64 \
   --self-contained true -p:PublishSingleFile=true \
   -p:IncludeNativeLibrariesForSelfExtract=true
 ```
-
-> **Prebuilt binaries are not current.** The newest published release predates the
-> C# rewrite, so its attached binaries are the old Go server. Build from source until
-> the next release is cut.
 
 Then open **http://localhost:8080**. While no account exists, every page redirects to a
 setup wizard that creates the first admin; after that you sign in and everything else
