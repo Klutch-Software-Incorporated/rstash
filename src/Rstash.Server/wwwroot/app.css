@@ -144,6 +144,14 @@
     text-decoration: underline;
 }
 
+/* Pushed to the far end so the build identity reads as metadata rather than as
+   another footer link. Admin-only, so it is absent for most visitors. */
+.rs-footer-version {
+    margin-left: auto;
+    opacity: 0.7;
+    letter-spacing: 0.02em;
+}
+
 /* ---------- dashboard ---------- */
 
 /* Cards + hero share the hairline border (MudPaper supplies surface + shadow + radius). */
