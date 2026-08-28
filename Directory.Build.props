@@ -11,11 +11,11 @@
   </PropertyGroup>
 
   <!-- The most recent release. Bump this as part of cutting one (see CONTRIBUTING.md).
-       Every build that isn't a release says so: `rstash version` reports "v0.5.0+dev"
-       from a working tree and "v0.5.0" from the tag, because the release and image
+       Every build that isn't a release says so: `rstash version` reports "v0.5.1+dev"
+       from a working tree and "v0.5.1" from the tag, because the release and image
        workflows pass the clean tag as InformationalVersion. -->
   <PropertyGroup>
-    <Version>0.5.0</Version>
+    <Version>0.5.1</Version>
     <InformationalVersion>v$(Version)+dev</InformationalVersion>
     <!-- Otherwise the SDK appends "+<commit sha>" and the suffix stops being readable. -->
     <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
