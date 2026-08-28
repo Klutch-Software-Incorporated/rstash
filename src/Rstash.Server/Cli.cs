@@ -1,6 +1,5 @@
 using System.Diagnostics.CodeAnalysis;
 using System.Net.Security;
-using System.Reflection;
 using System.Text;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -23,11 +22,7 @@ internal static class Cli
     /// Logged at startup and printed by <c>rstash version</c>, so however the server is
     /// running there is a way to ask what it is.
     /// </summary>
-    public static string Version =>
-        Assembly.GetEntryAssembly()?
-            .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?
-            .InformationalVersion
-        ?? "unknown";
+    public static string Version => BuildInfo.Version;
 
     public static void PrintVersion() => Console.WriteLine($"rstash {Version}");
 

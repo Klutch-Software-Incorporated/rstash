@@ -97,6 +97,16 @@
                         <span>Open source · self-hosted</span>
                         <a href="/files">Files</a>
                         <a href="/account">Account</a>
+                        @* Admins only: which build is running is operator information, and
+                           advertising it to every visitor only helps someone matching a
+                           server against a published vulnerability. *@
+                        @if (_isAdmin)
+                        {
+                            <span class="rs-mono rs-footer-version"
+                                  title="Server version. A +dev suffix means this build was not cut from a release tag.">
+                                @BuildInfo.Version
+                            </span>
+                        }
                     </footer>
                 </main>
             </div>
